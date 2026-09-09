@@ -37,7 +37,7 @@ npm run build:wechat -- --mode wechat
 ```text
 POST /api/auth/wechat
 body: { "code": "wx.login 返回的一次性 code" }
-response: { "playerId": "...", "accessToken": "..." }
+response: { "playerId": "wechat-...", "accessToken": "...", "expiresAt": 1234567890 }
 
 POST /api/rooms/{roomId}/invites
 Authorization: Bearer <accessToken>
@@ -59,9 +59,13 @@ response: {
 WebSocket 握手优先从 `Authorization` 请求头验证微信访问令牌；座位恢复仍使用服务端签发的
 `rejoinCode`。
 
+运行时启动后会调用 `wx.login`，访问令牌与到期时间保存在微信本地存储中。有效令牌会直接
+恢复；临近到期会重新登录；受保护接口返回 401 时只自动刷新并重试一次。微信的原始 OpenID
+和 `session_key` 始终留在服务端，不写入小游戏存储。
+
 ## 后续开发
 
-1. 在 Python 后端实现上述登录和邀请接口。
+1. 在 Python 后端实现房间邀请和凭邀请加入接口（微信登录接口已完成）。
 2. 增加 Canvas 大厅与分享/确认加入交互。
 3. 将 Three.js 渲染器接到小游戏 Canvas/WebGL，并逐步迁移牌桌 HUD。
 4. 将主题、图片和音频拆成分包或远程资源。

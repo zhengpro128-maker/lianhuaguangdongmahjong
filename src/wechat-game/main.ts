@@ -15,4 +15,8 @@ GameGlobal.lianhuaGuangma = createWechatGameRuntime({
   apiBase,
 })
 
+void GameGlobal.lianhuaGuangma.ensureLogin().catch((error) => {
+  console.error('[莲花广麻] 微信登录失败', error)
+})
+
 console.info('[莲花广麻] 微信小游戏运行时已启动')
