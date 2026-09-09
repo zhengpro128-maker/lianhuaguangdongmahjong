@@ -62,8 +62,6 @@ export function useWuhanGame({
   ruleset = WUHAN_RULESET,
 }: UseWuhanGameOptions = {}) {
   const state = createWuhanGameState()
-  const selectors = createWuhanSelectors(state, ruleset)
-
   let openingTimeline!: ReturnType<typeof createWuhanOpening>
   let settlementTimeline!: ReturnType<typeof createWuhanSettlement>
   let kong!: ReturnType<typeof createWuhanKong>
@@ -72,6 +70,11 @@ export function useWuhanGame({
   let playerActions!: ReturnType<typeof createWuhanHuman>
   let countdown!: ReturnType<typeof createLocalCountdownController>
   let transient!: ReturnType<typeof createLocalTransientEventPresenter>
+  const selectors = createWuhanSelectors(state, ruleset, (playerIndex) => settlementTimeline?.isLegalWin(playerIndex, {
+    selfDraw: true,
+    kongBloom: turnOrchestrator?.isKongDraw(playerIndex),
+    winHand: [...(state.players[playerIndex]?.hand ?? [])],
+  }) ?? false)
 
   const usesAnimeFixedActionVoice = () => resolveAnimeAudioPolicy({
     themeName: getThemeName(),
@@ -231,6 +234,7 @@ export function useWuhanGame({
     beginTurn,
     ruleset,
     endGame,
+    isLegalWin: settlementTimeline.isLegalWin,
     playerSeeds: aiPlayerSeeds,
     humanPlayerSeed,
   })
@@ -273,6 +277,7 @@ export function useWuhanGame({
     announce: transient.announce,
     later: timer.later,
     ruleset,
+    isLegalWin: settlementTimeline.isLegalWin,
   })
 
   playerActions = createWuhanHuman({

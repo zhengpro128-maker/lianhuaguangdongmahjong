@@ -49,9 +49,11 @@ export function isWuhanStandardWin(
     || usable.some(tile => (counts.get(tile) ?? 0) >= 1 && jokers > 0 && melds(take(counts, tile, 1), jokers - 1, 4 - exposed))
 }
 
-export type WuhanWinKind = '屁胡' | '碰碰胡' | '清一色' | '将一色' | '风一色' | '全求人' | '七对' | '龙七对' | '双龙七对' | '杠上开花' | '抢杠胡' | '见字胡'
+export type WuhanWinKind = '屁胡' | '碰碰胡' | '清一色' | '门前清' | '全求人' | '七对' | '龙七对' | '双龙七对' | '杠上开花' | '抢杠胡'
 export interface WuhanWinContext {
   exposed?: number
+  /** 暗杠和红中单杠不破门前清；未传入时退化为无结构副露。 */
+  menQianQing?: boolean
   joker?: TileType
   /** 全求人只在点炮单钓时成立。 */
   discardWin?: boolean
@@ -83,8 +85,6 @@ export function evaluateWuhanWin(tiles: readonly TileType[], context: WuhanWinCo
   if (standard) {
     const suits = new Set(natural.filter(t => /^[mps]/.test(t)).map(t => t[0])); const honors = natural.some(t => t === 'green' || t === 'white')
     if (suits.size === 1 && !honors) kinds.push('清一色')
-    if (natural.every(t => !/^[mps]/.test(t) || ['2', '5', '8'].includes(t[1]))) kinds.push('将一色')
-    if (natural.every(t => t === 'green' || t === 'white')) kinds.push('风一色')
     const canPengPeng = usable.some(tile => {
       const amount = countsFor(natural).get(tile) ?? 0
       const remaining = take(countsFor(natural), tile, Math.min(2, amount))
@@ -105,6 +105,7 @@ export function evaluateWuhanWin(tiles: readonly TileType[], context: WuhanWinCo
       kinds.push(quads > 1 ? '双龙七对' : quads ? '龙七对' : '七对')
     }
   }
+  if ((context.menQianQing ?? exposed === 0) && kinds.length) kinds.push('门前清')
   return kinds
 }
 
@@ -122,19 +123,40 @@ export function canChi(hand: readonly TileType[], tile: TileType, _jokers: reado
 /** Adds scene-specific large hands after the base hand is independently legal. */
 export function withWuhanWinScenes(kinds: readonly WuhanWinKind[], tiles: readonly TileType[], context: WuhanWinContext): WuhanWinKind[] {
   const result = [...kinds]
-  const hasHonor = tiles.includes('green') || tiles.includes('white')
-  if (hasHonor && (context.selfDraw || context.robbedKong)) result.push('见字胡')
   if (context.exposed === 4 && context.discardWin) result.push('全求人')
   if (context.kongBloom) result.push('杠上开花')
   if (context.robbedKong) result.push('抢杠胡')
   return result
 }
 
-export function wuhanWinPayment(kinds: readonly WuhanWinKind[], selfDraw: boolean, hard: boolean, kongs: readonly WuhanKongKind[]) {
-  const big = kinds.filter(k => k !== '屁胡').length
-  const base = big ? big * 10 : kinds.includes('屁胡') ? 1 : 0
-  const points = base * (hard ? 2 : 1) * (selfDraw ? (big ? 1.5 : 2) : 1) * wuhanKongMultiplier(kongs)
-  return capWuhanPayment(points)
+export const WUHAN_MIN_WIN_POINTS = 10
+
+export function wuhanRawWinPoints(
+  kinds: readonly WuhanWinKind[], selfDraw: boolean, hard: boolean,
+  kongs: readonly WuhanKongKind[], discardWin = false,
+) {
+  const bigKinds = kinds.filter(k => k !== '屁胡')
+  const base = bigKinds.length
+    ? bigKinds.reduce((points, kind) => points + (kind === '门前清' ? 6 : 10), 0)
+    : kinds.includes('屁胡') ? (selfDraw ? 3 : 1) : 0
+  const winTypeMultiplier = selfDraw
+    ? (bigKinds.length ? 1.5 : 1)
+    : discardWin && bigKinds.length ? 1.2 : 1
+  return base * (hard ? 2 : 1) * winTypeMultiplier * wuhanKongMultiplier(kongs)
+}
+
+export function wuhanMeetsMinimum(
+  kinds: readonly WuhanWinKind[], selfDraw: boolean, hard: boolean,
+  kongs: readonly WuhanKongKind[], discardWin = false,
+) {
+  return wuhanRawWinPoints(kinds, selfDraw, hard, kongs, discardWin) >= WUHAN_MIN_WIN_POINTS
+}
+
+export function wuhanWinPayment(
+  kinds: readonly WuhanWinKind[], selfDraw: boolean, hard: boolean,
+  kongs: readonly WuhanKongKind[], discardWin = false,
+) {
+  return capWuhanPayment(wuhanRawWinPoints(kinds, selfDraw, hard, kongs, discardWin))
 }
 
 function contextJoker(context?: RuleEvaluationContext) {
@@ -161,8 +183,8 @@ function applyWinnerPayment(
 ) {
   let total = 0
   players.forEach((player, index) => {
-    if (index === winnerIndex || (payerIndex != null && index !== payerIndex)) return
-    const payment = capWuhanPayment(points)
+    if (index === winnerIndex) return
+    const payment = capWuhanPayment(points + (index === payerIndex ? 2 : 0))
     player.score -= payment
     total += payment
   })
