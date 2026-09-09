@@ -146,7 +146,14 @@ try {
   # 按本脚本既定语义处理：这些文件对 vibehub 不存在 → 一律保留删除。
   $unresolved = @(git diff --name-only --diff-filter=U)
   foreach ($file in $unresolved) {
-    if ($file -like 'src/game/online/api/*' -or $file -in $masterOnly) {
+    $isMasterOnly = $false
+    foreach ($path in $masterOnly) {
+      if ($file -eq $path -or $file.StartsWith("$path/")) {
+        $isMasterOnly = $true
+        break
+      }
+    }
+    if ($isMasterOnly) {
       git rm --quiet -f -- $file
       Write-Host "==> 按删除解决 modify/delete 冲突: $file"
     }
