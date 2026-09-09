@@ -330,7 +330,7 @@ function toggleWakuDemoAuth() {
       />
 
       <MatchTypePicker v-else-if="dialog === 'match'" :model-value="selectedMatch" @close="closePicker" @confirm="selectMatch" />
-      <RuleVariantPicker v-else :model-value="selectedRule" :allow-blood-flow="gameMode === 'local' && bloodFlowEnabled('local')" @close="closePicker" @confirm="selectRule" @view-rules="viewRules" />
+      <RuleVariantPicker v-else :model-value="selectedRule" :allow-blood-flow="gameMode === 'local' && bloodFlowEnabled('local')" :allow-wuhan="gameMode === 'local'" @close="closePicker" @confirm="selectRule" @view-rules="viewRules" />
     </LobbyDialog>
 
   </section>

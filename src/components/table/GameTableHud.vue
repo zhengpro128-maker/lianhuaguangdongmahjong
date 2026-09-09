@@ -70,7 +70,7 @@ interface Props {
   autoPlayEnabled?: boolean
   /** 当前是否已开启托管（联机自动出牌/过牌） */
   autoPlay?: boolean
-  rulesetId?: 'lotus-classic' | 'lotus-legacy' | 'lotus-blood-flow'
+  rulesetId?: 'lotus-classic' | 'lotus-legacy' | 'lotus-blood-flow' | 'wuhan-huanghuang'
   bloodFlow?: BloodFlowTableState | null
   secondDice?: [number, number]
   /** 本局癞子集合（莲花麻将翻精），未传按白板癞子处理 */
@@ -318,8 +318,11 @@ const jokerGuide = computed(() => {
   if (!props.flipTile || !props.jokerTiles?.length) return null
   const precisionNames = props.jokerTiles.map(tileName).join('、')
   return {
+    title: props.rulesetId === 'wuhan-huanghuang' ? '癞子' : '精牌',
     precision: precisionNames,
-    wildcard: [...new Set([...props.jokerTiles, 'white' as TileType])].map(tileName).join('、'),
+    wildcard: props.rulesetId === 'wuhan-huanghuang'
+      ? null
+      : [...new Set([...props.jokerTiles, 'white' as TileType])].map(tileName).join('、'),
   }
 })
 // 摸牌位：手牌比基准（13 - 3×非花副露数）多一张时，把多出的那张视为「摸牌」并留间隙。
@@ -475,14 +478,17 @@ function onAvatarError(entry: GamePlayer) {
       :theme-name="themeName"
       :players="players" :local-seat="user.seat" :current-player="currentPlayer" :last-discard="lastDiscard"
       :wall="wall" :wall-head-drawn="wallHeadDrawn" :wall-count="wallCount"
+      :wall-total="rulesetId === 'wuhan-huanghuang' ? 120 : 136"
       :horses="result?.horses" :reveal-hands="revealHands" :winner-index="winningPlayerIndex"
       :joker-tiles="jokerTiles" :wildcard-tiles="wildcardTiles"
+      :joker-as-laizi="rulesetId === 'wuhan-huanghuang'"
       :win-effect="winEffect" :win-presentation="winPresentation" :deal-animation="dealAnimation"
       :opening-stage="openingStage" :dice-values="diceValues" :dealer-index="dealer" :dice-thrower-index="diceThrowerIndex"
       :table-action-event="tableActionEvent"
       :wall-break-index="wallBreakIndex"
       :flip-tile="flipTile"
       :flip-stack="flipStack"
+      :flip-stack-removed="rulesetId !== 'wuhan-huanghuang'"
       :blood-flow-batches="bloodFlow?.batches"
       :blood-flow-compact="compactPiles"
       :blood-flow-presentation-key="bloodFlow?.presentationKey"
@@ -521,16 +527,16 @@ function onAvatarError(entry: GamePlayer) {
     <Transition name="flip-cue">
       <div
         v-if="flipTile" key="flip" class="flip-indicator" :class="{ 'flip-open': flipOpen }"
-        role="button" tabindex="0" aria-label="翻精指示牌" :aria-expanded="flipOpen"
+        role="button" tabindex="0" :aria-label="rulesetId === 'wuhan-huanghuang' ? '翻癞指示牌' : '翻精指示牌'" :aria-expanded="flipOpen"
         @click="flipOpen = !flipOpen" @keydown.enter="flipOpen = !flipOpen" @keydown.space.prevent="flipOpen = !flipOpen"
       >
         <div class="flip-indicator-head">
-          <span>{{ bloodFlow ? '精' : '翻精' }}</span>
+          <span>{{ bloodFlow ? '精' : rulesetId === 'wuhan-huanghuang' ? '翻癞' : '翻精' }}</span>
           <template v-if="bloodFlow">
             <MahjongTile v-for="tile in jokerTiles" :key="tile" :tile="tile" :joker-tiles="jokerTiles" :theme-name="themeName" small disabled />
           </template>
           <template v-else>
-            <MahjongTile :tile="flipTile" :joker-tiles="jokerTiles" :wildcard-tiles="wildcardTiles" :theme-name="themeName" small disabled />
+            <MahjongTile :tile="flipTile" :joker-tiles="jokerTiles" :wildcard-tiles="wildcardTiles" :joker-as-laizi="rulesetId === 'wuhan-huanghuang'" :theme-name="themeName" small disabled />
             <em>{{ tileName(flipTile) }}</em>
           </template>
           <i class="flip-chevron" aria-hidden="true"></i>
@@ -539,9 +545,9 @@ function onAvatarError(entry: GamePlayer) {
           <div v-if="rulesetId !== 'lotus-classic' && secondDice" class="second-dice-note">
             二骰 {{ secondDice[0] }} + {{ secondDice[1] }}
           </div>
-          <div v-if="jokerGuide" class="joker-guide" role="note" aria-label="精牌替代说明">
-            <div><strong>精牌：</strong>{{ jokerGuide.precision }}</div>
-            <div><strong>白板替代：</strong>{{ jokerGuide.wildcard }}</div>
+          <div v-if="jokerGuide" class="joker-guide" role="note" :aria-label="rulesetId === 'wuhan-huanghuang' ? '癞子说明' : '精牌替代说明'">
+            <div><strong>{{ jokerGuide.title }}：</strong>{{ jokerGuide.precision }}</div>
+            <div v-if="jokerGuide.wildcard"><strong>白板替代：</strong>{{ jokerGuide.wildcard }}</div>
           </div>
         </div>
       </div>
@@ -611,7 +617,7 @@ function onAvatarError(entry: GamePlayer) {
         >
           <span class="hand-hit-area" aria-hidden="true"></span>
           <span v-if="isTingDiscard(index, tile)" class="ting-arrow" aria-hidden="true"></span>
-          <MahjongTile :tile="tile" :joker-tiles="jokerTiles" :wildcard-tiles="wildcardTiles" :theme-name="themeName" :selected="selectedIndex === index" :drawn="userDrawnIndex === index" :disabled="!isUserTurn || Boolean(bloodFlow?.seats[user.seat].locked && index !== userDrawnIndex)" @choose="handleTileActivation(index, $event)" />
+          <MahjongTile :tile="tile" :joker-tiles="jokerTiles" :wildcard-tiles="wildcardTiles" :joker-as-laizi="rulesetId === 'wuhan-huanghuang'" :theme-name="themeName" :selected="selectedIndex === index" :drawn="userDrawnIndex === index" :disabled="!isUserTurn || Boolean(bloodFlow?.seats[user.seat].locked && index !== userDrawnIndex)" @choose="handleTileActivation(index, $event)" />
         </div>
       </div>
     </section>
@@ -668,18 +674,18 @@ function onAvatarError(entry: GamePlayer) {
       <div v-if="bloodFlow" class="blood-flow-wait-grid" :style="{ gridTemplateColumns: `repeat(${Math.min(4, bloodFlowWaitTiles.length) || 1}, minmax(0, 1fr))` }">
         <div v-for="item in bloodFlowWaitTiles" :key="item.tile" class="blood-flow-wait-tile" :class="{ exhausted: item.remaining === 0 }"
           :aria-label="`${tileName(item.tile)}，自摸预估${item.multiplier ?? '未知'}倍，剩余${item.remaining}张`">
-          <MahjongTile :tile="item.tile" :joker-tiles="jokerTiles" :wildcard-tiles="wildcardTiles" :theme-name="themeName" small disabled />
+          <MahjongTile :tile="item.tile" :joker-tiles="jokerTiles" :wildcard-tiles="wildcardTiles" :joker-as-laizi="rulesetId === 'wuhan-huanghuang'" :theme-name="themeName" small disabled />
           <span class="wait-multiplier">{{ item.multiplier ?? '—' }}倍</span>
           <span class="wait-remaining">{{ item.remaining }}张</span>
         </div>
       </div>
       <template v-else-if="activeWaits.any"><strong>听任意</strong><em>{{ activeWaits.remaining }}张</em></template>
-      <template v-else><div class="waiting-tiles"><div v-for="item in activeWaits.tiles" :key="item.tile"><MahjongTile :tile="item.tile" :joker-tiles="jokerTiles" :wildcard-tiles="wildcardTiles" :theme-name="themeName" small disabled /><small>{{ item.remaining }}张</small></div></div></template>
+      <template v-else><div class="waiting-tiles"><div v-for="item in activeWaits.tiles" :key="item.tile"><MahjongTile :tile="item.tile" :joker-tiles="jokerTiles" :wildcard-tiles="wildcardTiles" :joker-as-laizi="rulesetId === 'wuhan-huanghuang'" :theme-name="themeName" small disabled /><small>{{ item.remaining }}张</small></div></div></template>
     </div>
 
     <Transition name="modal">
       <div v-if="kongPickerOpen && userKongs.length" class="result-backdrop kong-picker-backdrop" role="dialog" aria-modal="true" aria-labelledby="kong-picker-title" @click.self="kongPickerOpen = false">
-        <section class="result-card kong-picker-card"><h2 id="kong-picker-title">请选择想要杠的牌</h2><div class="kong-picker-tiles"><MahjongTile v-for="tile in userKongs" :key="tile" :tile="tile" :joker-tiles="jokerTiles" :wildcard-tiles="wildcardTiles" :theme-name="themeName" class="kong-picker-tile" @choose="chooseKong(tile)" /></div></section>
+        <section class="result-card kong-picker-card"><h2 id="kong-picker-title">请选择想要杠的牌</h2><div class="kong-picker-tiles"><MahjongTile v-for="tile in userKongs" :key="tile" :tile="tile" :joker-tiles="jokerTiles" :wildcard-tiles="wildcardTiles" :joker-as-laizi="rulesetId === 'wuhan-huanghuang'" :theme-name="themeName" class="kong-picker-tile" @choose="chooseKong(tile)" /></div></section>
       </div>
     </Transition>
     <Transition name="modal">
@@ -688,7 +694,7 @@ function onAvatarError(entry: GamePlayer) {
           <h2 id="chi-picker-title">请选择吃牌组合</h2>
           <div class="kong-picker-tiles chi-picker-options">
             <button v-for="(option, chiIndex) in actionPrompt.chiOptions" :key="chiIndex" class="chi-picker-option" @click="chooseChi(chiIndex)">
-              <MahjongTile v-for="tile in option.tiles" :key="tile" :tile="tile" :joker-tiles="jokerTiles" :wildcard-tiles="wildcardTiles" :theme-name="themeName" small disabled />
+              <MahjongTile v-for="tile in option.tiles" :key="tile" :tile="tile" :joker-tiles="jokerTiles" :wildcard-tiles="wildcardTiles" :joker-as-laizi="rulesetId === 'wuhan-huanghuang'" :theme-name="themeName" small disabled />
             </button>
           </div>
         </section>

@@ -1,5 +1,4 @@
-// 「莲花麻将」本地引擎组装：把规则/开局/回合/杠/结算/人类/AI 拼成 GamePort。
-// 结构仿 core/local/useGame.ts，但整体独立于「莲花广麻」，复用共享的计时/瞬态事件/音效模块。
+// 武汉晃晃本地引擎组装：把规则、开局、回合、杠和结算接入统一 GamePort。
 import { computed, getCurrentInstance, onBeforeUnmount, ref } from 'vue'
 import type { TableActionEvent, TileType } from '../../core/contracts/types'
 import { defineGamePort } from '../../core/contracts/gamePort'
@@ -19,28 +18,26 @@ const ANIME_FIXED_ACTION_AUDIO_FILES: ReadonlySet<string> = new Set(
   Object.values(ANIME_ACTION_FALLBACK_AUDIO),
 )
 import { tileName } from '../../core/rules/tiles'
-import type { LotusController, LotusHumanBridge } from './lotusControllers'
-import { LotusAiController, LotusHumanController } from './lotusControllers'
-import { createLotusHuman } from './lotusHuman'
-import { createLotusKong } from './lotusKong'
+import type { LotusController as WuhanController, LotusHumanBridge as WuhanHumanBridge } from '../lotus/lotusControllers'
+import { LotusAiController as WuhanAiController, LotusHumanController as WuhanHumanController } from '../lotus/lotusControllers'
+import { createWuhanHuman } from './wuhanHuman'
+import { createLotusKong as createWuhanKong } from '../lotus/lotusKong'
 import { sortTilesWithJokers } from '../../core/rules/tiles'
-import { createLotusOpening } from './lotusOpening'
-import { createLotusSelectors } from './lotusSelectors'
-import { createLotusSettlement } from './lotusSettlement'
-import { structuralMeldCount } from './lotusSelectors'
-import { createLotusGameState, type LotusEndGameOptions } from './lotusState'
-import { createLotusTileFlow } from './lotusTileFlow'
-import { createLotusTurnOrchestrator } from './lotusTurnOrchestrator'
-import { LOTUS_RULESET } from './lotusRules'
+import { createWuhanOpening } from './wuhanOpening'
+import { createWuhanSelectors, structuralMeldCount } from './wuhanSelectors'
+import { createWuhanSettlement } from './wuhanSettlement'
+import { createWuhanGameState, type WuhanEndGameOptions } from './wuhanState'
+import { createWuhanTileFlow } from './wuhanTileFlow'
+import { createWuhanTurnOrchestrator } from './wuhanTurnOrchestrator'
+import { WUHAN_RULESET } from './rules'
 import type { RuleSet } from '../../core/rules/ruleset'
-import { createFollowDealerTracker } from '../../shared/runtime/followDealer'
 
-interface UseLotusGameOptions {
+interface UseWuhanGameOptions {
   playSound?: (name: string, volume?: number, onFinish?: () => void) => unknown
   playSoundAndWait?: (name: string, volume?: number) => Promise<void>
-  controllers?: LotusController[]
+  controllers?: WuhanController[]
   /** 单机人机：注入座位 1-3 的 AI 控制器（可含 LLM 控制器）；默认启发式 AI 玩家 */
-  aiControllers?: LotusController[]
+  aiControllers?: WuhanController[]
   /** 单机人机：座位 1-3 的玩家形象（昵称/头像，LLM 人设覆盖） */
   aiPlayerSeeds?: Array<PlayerSeed | undefined>
   /** 单机本家座位 0 的展示形象。 */
@@ -52,7 +49,7 @@ interface UseLotusGameOptions {
   ruleset?: RuleSet
 }
 
-export function useLotusGame({
+export function useWuhanGame({
   playSound = () => {},
   playSoundAndWait = async () => {},
   controllers: suppliedControllers,
@@ -62,17 +59,17 @@ export function useLotusGame({
   getThemeName = () => 'jade',
   animeFixedTts,
   countdownEnabled = true,
-  ruleset = LOTUS_RULESET,
-}: UseLotusGameOptions = {}) {
-  const state = createLotusGameState()
-  const selectors = createLotusSelectors(state, ruleset)
+  ruleset = WUHAN_RULESET,
+}: UseWuhanGameOptions = {}) {
+  const state = createWuhanGameState()
+  const selectors = createWuhanSelectors(state, ruleset)
 
-  let openingTimeline!: ReturnType<typeof createLotusOpening>
-  let settlementTimeline!: ReturnType<typeof createLotusSettlement>
-  let kong!: ReturnType<typeof createLotusKong>
-  let turnOrchestrator!: ReturnType<typeof createLotusTurnOrchestrator>
-  let tileFlowExecutor!: ReturnType<typeof createLotusTileFlow>
-  let playerActions!: ReturnType<typeof createLotusHuman>
+  let openingTimeline!: ReturnType<typeof createWuhanOpening>
+  let settlementTimeline!: ReturnType<typeof createWuhanSettlement>
+  let kong!: ReturnType<typeof createWuhanKong>
+  let turnOrchestrator!: ReturnType<typeof createWuhanTurnOrchestrator>
+  let tileFlowExecutor!: ReturnType<typeof createWuhanTileFlow>
+  let playerActions!: ReturnType<typeof createWuhanHuman>
   let countdown!: ReturnType<typeof createLocalCountdownController>
   let transient!: ReturnType<typeof createLocalTransientEventPresenter>
 
@@ -105,7 +102,7 @@ export function useLotusGame({
     }).catch(() => {})
   }
 
-  const humanBridge: LotusHumanBridge = {
+  const humanBridge: WuhanHumanBridge = {
     isTurn: ref(false),
     canHu: ref(false),
     canKong: ref<TileType[]>([]),
@@ -139,18 +136,18 @@ export function useLotusGame({
       countdown?.stop()
     },
   }
-  const humanController = new LotusHumanController(humanBridge)
-  const controllers: LotusController[] = suppliedControllers ?? [
+  const humanController = new WuhanHumanController(humanBridge)
+  const controllers: WuhanController[] = suppliedControllers ?? [
     humanController,
-    ...(aiControllers && aiControllers.length ? aiControllers : [new LotusAiController(), new LotusAiController(), new LotusAiController()]),
+    ...(aiControllers && aiControllers.length ? aiControllers : [new WuhanAiController(), new WuhanAiController(), new WuhanAiController()]),
   ]
 
   // 设置页只在大厅开放；保存后替换内部数组，使下一次开局读取新的 AI 控制器。
   // 调用方不能直接替换 aiControllers 参数，因为下游编排器持有的是这个数组的引用。
-  function replaceAiControllers(nextControllers?: LotusController[] | null) {
+  function replaceAiControllers(nextControllers?: WuhanController[] | null) {
     const replacement = nextControllers && nextControllers.length
       ? nextControllers
-      : [new LotusAiController(), new LotusAiController(), new LotusAiController()]
+      : [new WuhanAiController(), new WuhanAiController(), new WuhanAiController()]
     controllers.splice(1, Math.max(0, controllers.length - 1), ...replacement)
   }
 
@@ -169,18 +166,7 @@ export function useLotusGame({
     onTableAction: playAnimeAction,
   })
 
-  // 跟庄：开局第一圈，庄家首弃后三闲家各出一张同牌 → 庄家向三家各付底分。
-  const followDealer = createFollowDealerTracker({
-    players: state.players,
-    dealerIndex: () => state.dealer.value,
-    baseScore: ruleset.baseScore,
-    onTrigger: (deltas) => {
-      transient.showScoreFlow(deltas)
-      transient.announce('跟庄')
-    },
-  })
-
-  function endGame(winnerIndex: number, options: LotusEndGameOptions = {}) {
+  function endGame(winnerIndex: number, options: WuhanEndGameOptions = {}) {
     return settlementTimeline.endGame(winnerIndex, options)
   }
 
@@ -192,7 +178,7 @@ export function useLotusGame({
     return turnOrchestrator.beginTurn(playerIndex, options)
   }
 
-  settlementTimeline = createLotusSettlement({
+  settlementTimeline = createWuhanSettlement({
     state,
     clearTimers: clearPresentation,
     later: timer.later,
@@ -214,7 +200,7 @@ export function useLotusGame({
     onPass: () => playerActions.userPass(),
   })
 
-  tileFlowExecutor = createLotusTileFlow({
+  tileFlowExecutor = createWuhanTileFlow({
     state,
     controllers,
     getTurnOrchestrator: () => turnOrchestrator,
@@ -230,10 +216,9 @@ export function useLotusGame({
     ),
     later: timer.later,
     stopCountdown: countdown.stop,
-    followDealer,
   })
 
-  openingTimeline = createLotusOpening({
+  openingTimeline = createWuhanOpening({
     state,
     clearTimers: clearPresentation,
     takeTile: tileFlowExecutor.takeTile,
@@ -249,10 +234,8 @@ export function useLotusGame({
     playerSeeds: aiPlayerSeeds,
     humanPlayerSeed,
   })
-  // 每局开局先复位跟庄窗口，再走开局时间线。
   const startGame = (mode?: Parameters<typeof openingTimeline.start>[0]) => {
     animeFixedTts?.reset()
-    followDealer.reset()
     return openingTimeline.start(mode)
   }
 
@@ -266,7 +249,7 @@ export function useLotusGame({
     scoreDiscardGang: (players, playerIndex, fromIndex) => ruleset.score.applyKongScore(players, playerIndex, 'discard', fromIndex),
   }
 
-  kong = createLotusKong({
+  kong = createWuhanKong({
     state,
     showTableAction: transient.showTableAction,
     showScoreFlow: transient.showScoreFlow,
@@ -275,14 +258,13 @@ export function useLotusGame({
     ruleset,
     beginTurn,
   })
-  turnOrchestrator = createLotusTurnOrchestrator({
+  turnOrchestrator = createWuhanTurnOrchestrator({
     state,
     controllers,
     tableContext,
     structuralMeldCount: (playerIndex) => structuralMeldCount(state.players[playerIndex]),
     drawFor: tileFlowExecutor.drawFor,
     performConcealedKong: kong.performConcealedKong,
-    performWindKong: kong.performWindKong,
     declareAddedKong: kong.declareAddedKong,
     settleAddedKong: kong.settleAddedKong,
     discardTile: tileFlowExecutor.discardTile,
@@ -291,10 +273,9 @@ export function useLotusGame({
     announce: transient.announce,
     later: timer.later,
     ruleset,
-    followDealer,
   })
 
-  playerActions = createLotusHuman({
+  playerActions = createWuhanHuman({
     state,
     humanController,
     tableContext,
@@ -304,7 +285,7 @@ export function useLotusGame({
     isUserTurn: () => selectors.isUserTurn.value,
     canUserHu: () => selectors.userCanHu.value,
     getUserKongs: () => selectors.userKongs.value,
-    userHasWindKong: () => selectors.userHasWindKong.value,
+    userHasWindKong: () => false,
     stopCountdown: countdown.stop,
     startTurnCountdown: countdown.startTurn,
     discardTile: tileFlowExecutor.discardTile,
@@ -318,7 +299,6 @@ export function useLotusGame({
   const matchLifecycle = createMatchLifecycle({ state, clearTimers: clearPresentation, startGame })
   const capabilities = computed(() => ({
     chi: { choose: playerActions.userChi },
-    windKong: { available: selectors.userHasWindKong.value, execute: playerActions.userWindKong },
     lotusTable: {
       flipTile: state.flipTile.value,
       jokerTiles: state.jokerTiles.value,
@@ -371,7 +351,7 @@ export function useLotusGame({
     userDiscardWaits: selectors.userDiscardWaits,
     userKongs: selectors.userKongs,
     capabilities,
-    // 莲花麻将专属
+    // 动态癞子与翻牌的共享牌桌能力。
     flipTile: state.flipTile,
     jokerTiles: state.jokerTiles,
     wildcardTiles: state.wildcardTiles,
@@ -386,4 +366,4 @@ export function useLotusGame({
   })
 }
 
-export type LotusGame = ReturnType<typeof useLotusGame>
+export type WuhanGame = ReturnType<typeof useWuhanGame>

@@ -1,5 +1,9 @@
 import type { TileType } from '../../core/contracts/types'
+import type { ChiOption } from '../../core/contracts/gamePort'
+import type { GamePlayer, ScoreDelta } from '../../core/contracts/types'
+import type { RuleEvaluationContext, RuleSet } from '../../core/rules/ruleset'
 import { WUHAN_TILE_TYPES, capWuhanPayment, type WuhanKongKind, wuhanKongMultiplier } from './ruleProfile'
+import { wuhanChiOptions } from './claims'
 
 type Counts = Map<TileType, number>
 const usable = WUHAN_TILE_TYPES.filter((tile) => tile !== 'red')
@@ -24,10 +28,22 @@ function melds(counts: Counts, jokers: number, left: number, memo = new Map<stri
   memo.set(key, false); return false
 }
 
-export function isWuhanStandardWin(tiles: readonly TileType[], exposed = 0, joker?: TileType): boolean {
+function splitJokers(tiles: readonly TileType[], joker?: TileType, ordinaryJokers: readonly TileType[] = []) {
+  if (!joker) return { wild: 0, natural: [...tiles] }
+  const naturalJokerCount = ordinaryJokers.filter((tile) => tile === joker).length
+  const allJokers = tiles.filter((tile) => tile === joker).length
+  return {
+    wild: Math.max(0, allJokers - naturalJokerCount),
+    natural: [...tiles.filter((tile) => tile !== joker), ...Array<TileType>(Math.min(allJokers, naturalJokerCount)).fill(joker)],
+  }
+}
+
+export function isWuhanStandardWin(
+  tiles: readonly TileType[], exposed = 0, joker?: TileType, ordinaryJokers: readonly TileType[] = [],
+): boolean {
   if (tiles.includes('red') || tiles.length !== (4 - exposed) * 3 + 2) return false
-  const jokers = joker ? tiles.filter(t => t === joker).length : 0
-  const counts = count(tiles.filter(t => t !== joker))
+  const { wild: jokers, natural } = splitJokers(tiles, joker, ordinaryJokers)
+  const counts = count(natural)
   if (jokers >= 2 && melds(counts, jokers - 2, 4 - exposed)) return true
   return usable.some(tile => (counts.get(tile) ?? 0) >= 2 && melds(take(counts, tile, 2), jokers, 4 - exposed))
     || usable.some(tile => (counts.get(tile) ?? 0) >= 1 && jokers > 0 && melds(take(counts, tile, 1), jokers - 1, 4 - exposed))
@@ -43,6 +59,8 @@ export interface WuhanWinContext {
   robbedKong?: boolean
   /** 见发财/白板的牌只能自摸或抢杠胡。 */
   selfDraw?: boolean
+  /** 点炮/抢杠带入的癞子按自身牌面计算，不作为万能牌。 */
+  ordinaryJokers?: readonly TileType[]
 }
 
 function tripletsOnly(counts: Counts, jokers: number, left: number): boolean {
@@ -58,10 +76,9 @@ export function evaluateWuhanWin(tiles: readonly TileType[], context: WuhanWinCo
   const exposed = context.exposed ?? 0
   const joker = context.joker
   if (tiles.includes('red')) return []
-  const wild = joker ? tiles.filter(t => t === joker).length : 0
-  const natural = tiles.filter(t => t !== joker)
+  const { wild, natural } = splitJokers(tiles, joker, context.ordinaryJokers)
   const kinds: WuhanWinKind[] = []
-  const standard = isWuhanStandardWin(tiles, exposed, joker)
+  const standard = isWuhanStandardWin(tiles, exposed, joker, context.ordinaryJokers)
   if (standard && wild <= 1) kinds.push('屁胡')
   if (standard) {
     const suits = new Set(natural.filter(t => /^[mps]/.test(t)).map(t => t[0])); const honors = natural.some(t => t === 'green' || t === 'white')
@@ -75,11 +92,32 @@ export function evaluateWuhanWin(tiles: readonly TileType[], context: WuhanWinCo
     })
     if (canPengPeng) kinds.push('碰碰胡')
   }
-  if (!exposed && tiles.length === 14) { const pairs = [...count(natural).values()].reduce((n, n0) => n + Math.floor(n0 / 2), 0) + Math.floor(wild / 2); if (pairs >= 7) { const quads = [...count(natural).values()].filter(n => n === 4).length; kinds.push(quads > 1 ? '双龙七对' : quads ? '龙七对' : '七对') } }
+  if (!exposed && tiles.length === 14) {
+    const values = [...count(natural).values()]
+    const singles = values.filter((amount) => amount % 2 === 1).length
+    const naturalPairs = values.reduce((total, amount) => total + Math.floor(amount / 2), 0)
+    const remainingWild = wild - singles
+    const pairs = remainingWild >= 0 && remainingWild % 2 === 0
+      ? naturalPairs + singles + remainingWild / 2
+      : 0
+    if (pairs === 7) {
+      const quads = values.filter((amount) => amount === 4).length
+      kinds.push(quads > 1 ? '双龙七对' : quads ? '龙七对' : '七对')
+    }
+  }
   return kinds
 }
 
 const countsFor = (tiles: readonly TileType[]) => count(tiles)
+
+export const matchingCount = (tiles: readonly TileType[], tile: TileType) => tiles.filter((item) => item === tile).length
+
+export type ChiMeld = ChiOption
+
+/** 武汉晃晃只允许下家吃普通数牌顺子；赖子按本身牌面参与。 */
+export function canChi(hand: readonly TileType[], tile: TileType, _jokers: readonly TileType[] = []): ChiMeld[] {
+  return wuhanChiOptions(hand, tile).map((tiles) => ({ kind: 'sequence', tiles }))
+}
 
 /** Adds scene-specific large hands after the base hand is independently legal. */
 export function withWuhanWinScenes(kinds: readonly WuhanWinKind[], tiles: readonly TileType[], context: WuhanWinContext): WuhanWinKind[] {
@@ -97,4 +135,60 @@ export function wuhanWinPayment(kinds: readonly WuhanWinKind[], selfDraw: boolea
   const base = big ? big * 10 : kinds.includes('屁胡') ? 1 : 0
   const points = base * (hard ? 2 : 1) * (selfDraw ? (big ? 1.5 : 2) : 1) * wuhanKongMultiplier(kongs)
   return capWuhanPayment(points)
+}
+
+function contextJoker(context?: RuleEvaluationContext) {
+  return context?.jokers?.[0]
+}
+
+function winningKinds(tiles: readonly TileType[], exposed: number, context?: RuleEvaluationContext) {
+  return evaluateWuhanWin(tiles, { exposed, joker: contextJoker(context), ordinaryJokers: context?.ordinaryJokers })
+}
+
+function waitingTiles(tiles: TileType[], exposed = 0, context?: RuleEvaluationContext): TileType[] {
+  return WUHAN_TILE_TYPES
+    .filter((tile) => tile !== 'red')
+    .filter((tile) => winningKinds([...tiles, tile], exposed, context).length > 0)
+}
+
+function applyNoImmediateKongScore(): ScoreDelta[] {
+  // 武汉晃晃的杠番随最终胡牌一起计算，不在开杠时重复收付。
+  return []
+}
+
+function applyWinnerPayment(
+  players: GamePlayer[], winnerIndex: number, points: number, payerIndex?: number | null,
+) {
+  let total = 0
+  players.forEach((player, index) => {
+    if (index === winnerIndex || (payerIndex != null && index !== payerIndex)) return
+    const payment = capWuhanPayment(points)
+    player.score -= payment
+    total += payment
+  })
+  players[winnerIndex].score += total
+  return total
+}
+
+export const WUHAN_RULESET: RuleSet = {
+  id: 'wuhan-huanghuang',
+  baseScore: 1,
+  flow: { mode: 'single-win', continueAfterWin: false, allowMultipleWinners: false },
+  win: {
+    isWinningHand: (tiles, exposed = 0, context) => winningKinds(tiles, exposed, context).length > 0,
+    waitingTiles,
+    canRobKong: (tiles, kongTile, exposed = 0, context) => (
+      winningKinds([...tiles, kongTile], exposed, context).length > 0
+    ),
+    concealedKongs: (tiles) => [...new Set(tiles.filter((tile) => tile !== 'red' && matchingCount(tiles, tile) === 4))],
+    evaluatePattern: (tiles, exposed, context) => {
+      const kinds = winningKinds(tiles, exposed, context)
+      return kinds.length ? { pattern: kinds.join('、'), fan: kinds.filter((kind) => kind !== '屁胡').length || 1 } : null
+    },
+  },
+  score: {
+    scoreHand: () => ({ multiplier: 1, totalMultiplier: 1, horsePoints: 0, points: 1, details: [] }),
+    applyKongScore: applyNoImmediateKongScore,
+    applyWinScore: applyWinnerPayment,
+  },
 }

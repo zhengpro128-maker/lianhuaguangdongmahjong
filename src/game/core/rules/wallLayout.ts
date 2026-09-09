@@ -14,7 +14,6 @@
 
 export const WALL_TOTAL = 136
 export const WALL_STACKS = 68
-const STACKS_PER_SIDE = WALL_STACKS / 4  // 17 墩/边
 const STACK_SPACING = 0.68               // 墩沿墙方向的间距（牌宽，径向放置时短边沿墙）
 
 // 环几何（内移环：在牌河外侧、各家手牌/副露内侧）。
@@ -24,7 +23,6 @@ const WALL_INWARD_SHIFT = 0.47
 const NEAR_Z = 5.2 - WALL_INWARD_SHIFT   // 4.73
 const FAR_Z = -8.5 + WALL_INWARD_SHIFT   // -8.03
 const SIDE_X = 7.9 - WALL_INWARD_SHIFT   // 7.43
-const SEGMENT_HALF = (STACKS_PER_SIDE - 1) * STACK_SPACING / 2  // 5.44
 const SIDE_CENTER_Z = (NEAR_Z + FAR_Z) / 2                      // -1.65（桌中心）
 
 export interface WallSlot {
@@ -72,36 +70,39 @@ export function wallTilePlacement(
   physicalHead: number,
   remainingCount = WALL_TOTAL,
   headDrawn = 0,
+  total = WALL_TOTAL,
 ) {
-  const tailDrawn = Math.max(0, WALL_TOTAL - headDrawn - remainingCount)
+  const tailDrawn = Math.max(0, total - headDrawn - remainingCount)
   const lastIndex = remainingCount - 1
   // 尾墩上层被 splice 掉后，数组末张仍是该墩底层，物理位置需跳过一个槽。
   const physicalIndex = tailDrawn % 2 === 1 && tileIndex === lastIndex ? tileIndex + 1 : tileIndex
-  const physical = (physicalHead + physicalIndex) % WALL_TOTAL
+  const physical = (physicalHead + physicalIndex) % total
   const stackIndex = Math.floor(physical / 2)
   const layer = 1 - (physical % 2)
   return { stackIndex, layer }
 }
 
 /** 环形第 stack 个墩（0..67）的位置。牌径向放置：长边指向桌中心（近/远墙沿 z，侧墙沿 x）。 */
-export function wallStackSlot(stackIndex: number): WallSlot {
-  const s = ((stackIndex % WALL_STACKS) + WALL_STACKS) % WALL_STACKS
-  if (s < STACKS_PER_SIDE) {
+export function wallStackSlot(stackIndex: number, wallStacks = WALL_STACKS): WallSlot {
+  const stacksPerSide = wallStacks / 4
+  const segmentHalf = (stacksPerSide - 1) * STACK_SPACING / 2
+  const s = ((stackIndex % wallStacks) + wallStacks) % wallStacks
+  if (s < stacksPerSide) {
     // 近侧墙：head 在右端，沿 x 向左推进
     const t = s
-    return { x: SEGMENT_HALF - t * STACK_SPACING, z: NEAR_Z, rotationY: 0 }
+    return { x: segmentHalf - t * STACK_SPACING, z: NEAR_Z, rotationY: 0 }
   }
-  if (s < 2 * STACKS_PER_SIDE) {
+  if (s < 2 * stacksPerSide) {
     // 左墙：z 从近到远（顺时针）
-    const t = s - STACKS_PER_SIDE
-    return { x: -SIDE_X, z: SIDE_CENTER_Z + SEGMENT_HALF - t * STACK_SPACING, rotationY: Math.PI / 2 }
+    const t = s - stacksPerSide
+    return { x: -SIDE_X, z: SIDE_CENTER_Z + segmentHalf - t * STACK_SPACING, rotationY: Math.PI / 2 }
   }
-  if (s < 3 * STACKS_PER_SIDE) {
+  if (s < 3 * stacksPerSide) {
     // 远侧墙：x 从左到右
-    const t = s - 2 * STACKS_PER_SIDE
-    return { x: -SEGMENT_HALF + t * STACK_SPACING, z: FAR_Z, rotationY: 0 }
+    const t = s - 2 * stacksPerSide
+    return { x: -segmentHalf + t * STACK_SPACING, z: FAR_Z, rotationY: 0 }
   }
   // 右墙：z 从远到近
-  const t = s - 3 * STACKS_PER_SIDE
-  return { x: SIDE_X, z: SIDE_CENTER_Z - SEGMENT_HALF + t * STACK_SPACING, rotationY: Math.PI / 2 }
+  const t = s - 3 * stacksPerSide
+  return { x: SIDE_X, z: SIDE_CENTER_Z - segmentHalf + t * STACK_SPACING, rotationY: Math.PI / 2 }
 }

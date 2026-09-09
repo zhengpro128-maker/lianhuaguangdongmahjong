@@ -13,4 +13,8 @@ describe('武汉晃晃胡牌', () => {
     expect(withWuhanWinScenes(['清一色'], ['m1'], { exposed: 4, discardWin: true, kongBloom: true })).toEqual(['清一色', '全求人', '杠上开花'])
     expect(wuhanWinPayment(['碰碰胡', '清一色'], true, true, ['concealed', 'added'])).toBe(50)
   })
+  it('uses jokers to complete odd tiles before counting seven pairs', () => {
+    const invalid = ['m1','m1','m2','m2','m3','m3','p1','p1','p2','p2','s1','s2','s3','white'] as const
+    expect(evaluateWuhanWin(invalid, { joker: 'white' })).not.toContain('七对')
+  })
 })

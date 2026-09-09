@@ -29,6 +29,7 @@ export interface ActionContext {
   showTableAction: (type: TableActionType, actorIndex: number, sourceIndex: number | null, tile: TileType, meldIndex: number) => void
   showScoreFlow: (deltas: ScoreDelta[]) => void
   playSound: (name: string, volume?: number) => void
+  scoreDiscardGang?: (players: GamePlayer[], playerIndex: number, fromIndex: number) => ScoreDelta[]
 }
 
 /**
@@ -62,7 +63,8 @@ export function performDiscardGang(ctx: ActionContext, playerIndex: number, tile
   player.hand = removeMatches(player.hand, tile, 3)
   if (ctx.sortHand) player.hand = ctx.sortHand(player.hand)
   player.melds.push({ type: 'gang', tile, from, tiles: [tile, tile, tile, tile] })
-  const scoreDeltas = applyKongScore(ctx.players, playerIndex, 'discard', from)
+  const scoreDeltas = ctx.scoreDiscardGang?.(ctx.players, playerIndex, from)
+    ?? applyKongScore(ctx.players, playerIndex, 'discard', from)
   ctx.currentPlayer.value = playerIndex
   ctx.showTableAction('discard-gang', playerIndex, from, tile, player.melds.length - 1)
   ctx.showScoreFlow(scoreDeltas)

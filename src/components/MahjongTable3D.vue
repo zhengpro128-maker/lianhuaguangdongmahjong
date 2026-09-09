@@ -36,6 +36,9 @@ const props = withDefaults(defineProps<TableProps>(), {
   revealHands: false, winnerIndex: -1, winEffect: null, winPresentation: null,
   jokerTiles: () => [],
   wildcardTiles: () => [],
+  jokerAsLaizi: false,
+  wallTotal: 136,
+  flipStackRemoved: true,
   dealAnimation: () => ({ playerIndex: -1, count: 0, serial: 0 }),
   openingStage: null, diceValues: () => [1, 1], dealerIndex: 0, diceThrowerIndex: 0,
   tableActionEvent: null,
@@ -205,7 +208,7 @@ function makeTableTile(topMaterial) {
 }
 
 function makeFaceTile(tileName) {
-  const marker = tileMarkerFor(tileName, props.jokerTiles, props.wildcardTiles)
+  const marker = tileMarkerFor(tileName, props.jokerTiles, props.wildcardTiles, props.jokerAsLaizi)
   return makeTableTile(tableScene.makeFaceMaterial(tileName, marker))
 }
 
@@ -493,9 +496,9 @@ onMounted(async () => {
     getJokerAtlasMaterial: tableScene.getJokerAtlasMaterial,
     getWildcardAtlasMaterial: tableScene.getWildcardAtlasMaterial,
     getLaiziAtlasMaterial: tableScene.getLaiziAtlasMaterial,
-    isJoker: (tile) => tileMarkerFor(tile, props.jokerTiles, props.wildcardTiles) === 'joker',
-    isWildcard: (tile) => tileMarkerFor(tile, props.jokerTiles, props.wildcardTiles) === 'wildcard',
-    isLaizi: (tile) => tileMarkerFor(tile, props.jokerTiles, props.wildcardTiles) === 'laizi',
+    isJoker: (tile) => tileMarkerFor(tile, props.jokerTiles, props.wildcardTiles, props.jokerAsLaizi) === 'joker',
+    isWildcard: (tile) => tileMarkerFor(tile, props.jokerTiles, props.wildcardTiles, props.jokerAsLaizi) === 'wildcard',
+    isLaizi: (tile) => tileMarkerFor(tile, props.jokerTiles, props.wildcardTiles, props.jokerAsLaizi) === 'laizi',
     contactShadowY: animeTable ? 0.075 : undefined,
   })
   tableTiles = createTableTilePresenter({
@@ -601,6 +604,7 @@ watch(
     props.horses?.length,
     props.jokerTiles?.join(','),
     props.wildcardTiles?.join(','),
+    props.jokerAsLaizi,
     props.flipStack,
     props.flipTile,
     props.wallBreakIndex,

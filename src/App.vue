@@ -12,6 +12,7 @@ import SettlementOverlay from './components/settlement/SettlementOverlay.vue'
 import { useGame } from './game/variants/guangma/game'
 import { useLotusGame } from './game/variants/lotus/lotusGame'
 import { useBloodFlowGame } from './game/variants/lotus/bloodFlow/useBloodFlowGame'
+import { useWuhanGame } from './game/variants/wuhan/useWuhanGame'
 import { bloodFlowEnabled } from './game/variants/lotus/bloodFlow/availability'
 import { BLOOD_FLOW_CONFIG } from './game/variants/lotus/bloodFlow/config'
 import { createLocalLlmControllers, createLotusLlmControllers } from './game/llm/runtime'
@@ -222,11 +223,23 @@ const bloodFlowGame = useBloodFlowGame({ playSound: playEffect, playSoundAndWait
   getThemeName: () => tableThemeName.value, animeFixedTts: lotusAnimeFixedTts,
   humanPlayerSeed: localHumanSeed, aiPlayerSeeds: lotusLlmSeeds })
 watch(gameMode, (mode) => {
-  if (mode === 'remote' && selectedRule.value === 'lotus-blood-flow') selectedRule.value = DEFAULT_RULE_VARIANT
+  if (mode === 'remote' && (selectedRule.value === 'lotus-blood-flow' || selectedRule.value === 'wuhan-huanghuang')) selectedRule.value = DEFAULT_RULE_VARIANT
+})
+watch(selectedRule, (rule) => {
+  if (rule === 'wuhan-huanghuang' && gameMode.value === 'remote') gameMode.value = 'local'
+})
+
+const wuhanGame = useWuhanGame({
+  playSound: playEffect,
+  playSoundAndWait: playEffectAndWait,
+  countdownEnabled: false,
+  humanPlayerSeed: localHumanSeed,
+  getThemeName: () => tableThemeName.value,
+  animeFixedTts: lotusAnimeFixedTts,
 })
 
 // 莲花麻将旧版翻精规则同时支持本地与联机对战。
-const singlePlayerOnly = computed(() => false)
+const singlePlayerOnly = computed(() => selectedRule.value === 'wuhan-huanghuang')
 const usesLotusLocalEngine = computed(() => selectedRule.value === 'lotus-legacy')
 watch(() => remoteGame.rulesetId.value, (value) => {
   if (value === 'lotus-classic' || value === 'lotus-legacy') selectedRule.value = value
@@ -236,7 +249,11 @@ watch(() => remoteGame.rulesetId.value, (value) => {
 // local 槽按所选玩法解析到「莲花广麻」或「莲花麻将」本地引擎。
 const game = createActiveGamePort(
   gameMode,
-  () => selectedRule.value === 'lotus-blood-flow' ? bloodFlowGame : usesLotusLocalEngine.value ? lotusGame : localGame,
+  () => selectedRule.value === 'lotus-blood-flow'
+    ? bloodFlowGame
+    : selectedRule.value === 'wuhan-huanghuang'
+      ? wuhanGame
+      : usesLotusLocalEngine.value ? lotusGame : localGame,
   remoteGame,
 )
 
@@ -260,7 +277,8 @@ const flipTile = computed(() => lotusTable.value?.flipTile ?? null)
 // 否则多人模式下白板无「癞」标记。莲花麻将（lotus-legacy）的精牌由快照下发，不受影响。
 const jokerTiles = computed<TileType[]>(() => {
   const jokers = lotusTable.value?.jokerTiles
-  return jokers && jokers.length ? jokers : ['white']
+  if (jokers && jokers.length) return jokers
+  return selectedRule.value === 'lotus-classic' ? ['white'] : []
 })
 const wildcardTiles = computed<TileType[]>(() => lotusTable.value?.wildcardTiles ?? [])
 const wallBreakIndex = computed(() => lotusTable.value?.wallBreakIndex)
@@ -459,7 +477,7 @@ function changeTableTheme(theme: TableThemeName) {
         :match-name="matchName"
         :round-label="roundLabel"
         :honba="honba"
-        :base-score="selectedRule === 'lotus-blood-flow' ? BLOOD_FLOW_CONFIG.basePoints : undefined"
+        :base-score="selectedRule === 'lotus-blood-flow' ? BLOOD_FLOW_CONFIG.basePoints : selectedRule === 'wuhan-huanghuang' ? 1 : undefined"
         :room-id="roomId"
         :signal-quality="signalQuality"
         :signal-warning-threshold="1"

@@ -400,26 +400,29 @@ function resolveBreakIndex() {
   // 都要按当前客户端的绝对座位旋转到本地视角。每个座位占 17 墩 / 34 张牌。
   const base = props.wallBreakIndex ?? wallBreakIndexForDealer(props.diceValues, props.dealerIndex ?? 0)
   const localSeat = ((props.localSeat ?? 0) % 4 + 4) % 4
-  return (base + localSeat * (WALL_TOTAL / 4)) % WALL_TOTAL
+  const total = props.wallTotal ?? WALL_TOTAL
+  return (base + localSeat * (total / 4)) % total
 }
 
 function resolveFlipStack() {
   if (props.flipStack == null) return null
+  const total = props.wallTotal ?? WALL_TOTAL
   const localSeat = ((props.localSeat ?? 0) % 4 + 4) % 4
-  return (props.flipStack + localSeat * (WALL_TOTAL / 8)) % (WALL_TOTAL / 2)
+  return (props.flipStack + localSeat * (total / 8)) % (total / 2)
 }
 
 // 牌山 head 位置 = 下一张要摸的牌所在处：wall[0] 经 wallHeadDrawn 沿环顺时针推进。
 function wallDrawHeadPos() {
   const headOffset = props.wallHeadDrawn ?? 0
   const breakIndex = resolveBreakIndex()
-  if (props.flipStack != null) {
+  const total = props.wallTotal ?? WALL_TOTAL
+  if (props.flipStack != null && props.flipStackRemoved !== false) {
     const physical = wallPhysicalIndex(headOffset, breakIndex)
-    const slot = wallStackSlot(Math.floor(physical / 2))
+    const slot = wallStackSlot(Math.floor(physical / 2), total / 2)
     return { x: slot.x, z: slot.z }
   }
-  const { stackIndex } = wallTilePlacement(0, (breakIndex + headOffset) % WALL_TOTAL, props.wall?.length ?? 0, headOffset)
-  const slot = wallStackSlot(stackIndex)
+  const { stackIndex } = wallTilePlacement(0, (breakIndex + headOffset) % total, props.wall?.length ?? 0, headOffset, total)
+  const slot = wallStackSlot(stackIndex, total / 2)
   return { x: slot.x, z: slot.z }
 }
 
@@ -428,15 +431,16 @@ function wallDrawHeadPos() {
  * 使翻精墩在环上留出空位（供指示牌翻出）。
  */
 function wallPhysicalIndex(index: number, head: number): number {
+  const total = props.wallTotal ?? WALL_TOTAL
   const flip = resolveFlipStack()
-  if (flip == null) return (head + index) % WALL_TOTAL
+  if (flip == null || props.flipStackRemoved === false) return (head + index) % total
   const skipA = flip * 2
   let physical = head
   while (physical === skipA || physical === skipA + 1) {
-    physical = (physical + 1) % WALL_TOTAL
+    physical = (physical + 1) % total
   }
   for (let step = 0; step < index; step += 1) {
-    do { physical = (physical + 1) % WALL_TOTAL } while (physical === skipA || physical === skipA + 1)
+    do { physical = (physical + 1) % total } while (physical === skipA || physical === skipA + 1)
   }
   return physical
 }
@@ -446,11 +450,12 @@ function wallPhysicalIndex(index: number, head: number): number {
 function addFlipIndicator() {
   const flipStack = resolveFlipStack()
   if (flipStack == null) return
-  const slot = wallStackSlot(flipStack)
+  const total = props.wallTotal ?? WALL_TOTAL
+  const slot = wallStackSlot(flipStack, total / 2)
   // 翻精墩底层牌保留在牌山上（背朝上，与周围牌墙一致）
   const baseQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, slot.rotationY, 0))
   baseQuat.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI, 0, 0)))
-  addTableTile(new THREE.Vector3(slot.x, .41, slot.z), baseQuat, null)
+  if (props.flipStackRemoved !== false) addTableTile(new THREE.Vector3(slot.x, .41, slot.z), baseQuat, null)
   // 顶层牌：翻精前背朝上占位（补足 136 张牌山），翻精后翻出指示牌（面朝上）
   const tile = props.flipTile
   if (!tile) {
@@ -496,21 +501,28 @@ function addWall() {
   if (!tiles.length) return
   const breakIndex = resolveBreakIndex()
   const headOffset = props.wallHeadDrawn ?? 0
-  const hasFlip = props.flipStack != null
+  const total = props.wallTotal ?? WALL_TOTAL
+  const hasRemovedFlip = props.flipStack != null && props.flipStackRemoved !== false
   tiles.forEach((_, index) => {
-    const { stackIndex, layer } = hasFlip
+    const placement = hasRemovedFlip
       ? (() => {
-        const tailDrawn = Math.max(0, WALL_TOTAL - 2 - headOffset - tiles.length)
+        const tailDrawn = Math.max(0, total - 2 - headOffset - tiles.length)
         // 补走一张顶层牌后，同墩剩余的底层牌仍应留在原物理张位。
         const physicalIndex = tailDrawn % 2 === 1 && index === tiles.length - 1 ? index + 1 : index
         const physical = wallPhysicalIndex(headOffset + physicalIndex, breakIndex)
         return {
           stackIndex: Math.floor(physical / 2),
           layer: 1 - (physical % 2),
+          physical,
         }
       })()
-      : wallTilePlacement(index, (breakIndex + headOffset) % WALL_TOTAL, tiles.length, headOffset)
-    const slot = wallStackSlot(stackIndex)
+      : (() => {
+        const result = wallTilePlacement(index, (breakIndex + headOffset) % total, tiles.length, headOffset, total)
+        return { ...result, physical: (result.stackIndex * 2) + (1 - result.layer) }
+      })()
+    if (!hasRemovedFlip && resolveFlipStack() != null && placement.physical === resolveFlipStack()! * 2) return
+    const { stackIndex, layer } = placement
+    const slot = wallStackSlot(stackIndex, total / 2)
     const y = .41 + layer * .47
     const quat = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, slot.rotationY, 0))
     // 背朝上：绕 X 转 180°，使 base 底面的牌背（backMaterial）朝上（与暗杠首尾一致）。

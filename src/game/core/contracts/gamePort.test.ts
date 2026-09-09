@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { GAME_PORT_ACTION_KEYS, GAME_PORT_STATE_KEYS, type GamePort } from './gamePort'
 import { useGame } from '../local/useGame'
 import { useRemoteGame } from '../../online/useRemoteGame'
+import { useWuhanGame } from '../../variants/wuhan/useWuhanGame'
 
 function assertCompileTimeContract<T extends GamePort>(port: T): T {
   return port
@@ -11,6 +12,7 @@ function assertCompileTimeContract<T extends GamePort>(port: T): T {
 describe.each([
   ['local', () => useGame()],
   ['remote', () => useRemoteGame()],
+  ['wuhan', () => useWuhanGame()],
 ] as const)('GamePort contract: %s adapter', (_name, createGame) => {
   it('exposes every shared state container', () => {
     const game = assertCompileTimeContract(createGame())

@@ -1,4 +1,4 @@
-export type RuleVariant = 'lotus-classic' | 'lotus-legacy' | 'lotus-blood-flow'
+export type RuleVariant = 'lotus-classic' | 'lotus-legacy' | 'lotus-blood-flow' | 'wuhan-huanghuang'
 
 export interface RuleVariantOption {
   id: RuleVariant
@@ -28,6 +28,14 @@ export const RULE_VARIANTS: readonly RuleVariantOption[] = [
     highlights: ['翻精癞子', '支持吃牌', '十三烂/七星/十三幺等胡型'],
     badge: '',
     rulesetId: 'lotus-legacy',
+  },
+  {
+    id: 'wuhan-huanghuang',
+    name: '武汉晃晃',
+    description: '武汉晃晃本地规则',
+    highlights: ['120 张牌 · 翻癞子', '可吃碰杠 · 单响截胡', '红中单杠 · 单家 50 分封顶'],
+    badge: '新增',
+    rulesetId: 'wuhan-huanghuang',
   },
 ]
 

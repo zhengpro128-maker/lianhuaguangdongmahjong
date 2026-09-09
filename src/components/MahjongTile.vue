@@ -16,6 +16,8 @@ const props = withDefaults(defineProps<{
   jokerTiles?: TileType[]
   /** 可替代精牌的实体牌；不参与精牌排序。 */
   wildcardTiles?: TileType[]
+  /** 武汉晃晃等玩法把动态万能牌标为“癞”，而非莲花麻将的“精”。 */
+  jokerAsLaizi?: boolean
 }>(), { tile: 'back', hidden: false, selected: false, drawn: false, disabled: false, small: false })
 
 const emit = defineEmits(['choose'])
@@ -25,6 +27,8 @@ const choose = (event?: Event) => {
 const shownTile = computed(() => (props.hidden ? 'back' : props.tile))
 const meta = computed(() => TILE_META[shownTile.value] || TILE_META.back)
 const isPrecision = computed(() => (
+  !props.jokerAsLaizi
+  &&
   props.tile !== 'back'
   && props.tile !== 'white'
   && Boolean(props.jokerTiles?.includes(props.tile))
@@ -43,10 +47,11 @@ const isWildcard = computed(() => {
   return Boolean(props.wildcardTiles?.includes(props.tile))
 })
 const isLaizi = computed(() => (
-  !isPrecision.value
+  props.tile !== 'back'
+  && !isPrecision.value
   && !isWhiteJoker.value
   && !isWildcard.value
-  && props.tile === 'white'
+  && (props.jokerAsLaizi || props.tile === 'white')
   && Boolean(props.jokerTiles?.includes(props.tile))
 ))
 const isJoker = computed(() => isPrecision.value || isWhiteJoker.value || isWildcard.value || isLaizi.value)

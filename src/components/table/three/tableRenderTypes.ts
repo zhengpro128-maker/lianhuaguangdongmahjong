@@ -22,11 +22,13 @@ export interface TableProps {
   wall?: TileType[]
   wallHeadDrawn?: number
   wallCount?: number
+  wallTotal?: number
   horses?: TileType[]
   /** 本局精牌集合，用于 3D 牌面标记和亮牌排序。 */
   jokerTiles?: TileType[]
   /** 可替代精牌的实体牌；不计入精牌集合。 */
   wildcardTiles?: TileType[]
+  jokerAsLaizi?: boolean
   revealHands?: boolean
   winnerIndex?: number
   winEffect?: WinEffect | null
@@ -43,6 +45,8 @@ export interface TableProps {
   flipTile?: TileType | null
   /** 翻精所在物理墩（0..67），指示牌在牌山上的位置 */
   flipStack?: number
+  /** false 表示指示牌仍属于牌墙，只翻开顶张；默认沿用莲花麻将的整墩移出。 */
+  flipStackRemoved?: boolean
 }
 
 export type ResolvedTableProps = {

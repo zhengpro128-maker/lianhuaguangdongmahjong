@@ -251,6 +251,7 @@ export function useGame({
     showTableAction: transientEvents.showTableAction,
     showScoreFlow: transientEvents.showScoreFlow,
     playSound: playPresentationSound,
+    scoreDiscardGang: (players, playerIndex, fromIndex) => ruleset.score.applyKongScore(players, playerIndex, 'discard', fromIndex),
   }
   kongActionExecutor = createLocalKongActionExecutor({
     state,

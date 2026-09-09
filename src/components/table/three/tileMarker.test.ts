@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { tileMarkerFor } from './tileMarker'
 
 describe('3D tile markers', () => {
+  it('can render a non-white dynamic joker as a laizi', () => {
+    expect(tileMarkerFor('m5', ['m5'], [], true)).toBe('laizi')
+  })
+
   it('marks white as 精 when white itself is a joker (white flipped jing)', () => {
     // 白板翻精：白板同时在精集合（[白板, 红中]）与替身集合 → 标精（可替代任意牌）
     expect(tileMarkerFor('white', ['white', 'red'], ['white'])).toBe('joker')

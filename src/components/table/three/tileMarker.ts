@@ -13,7 +13,9 @@ export function tileMarkerFor(
   tile: TileType,
   jokerTiles: readonly TileType[] = [],
   wildcardTiles: readonly TileType[] = [],
+  jokerAsLaizi = false,
 ): TileMarker {
+  if (jokerAsLaizi && jokerTiles.includes(tile)) return 'laizi'
   if (tile === 'white') {
     // 白板翻精时白板同时在精集合与替身集合：按「精」标记（可替代任意牌），
     // 而非替身（此前 wildcard 判定优先，白板翻精被误标为「替」）。
