@@ -129,7 +129,7 @@ export function withWuhanWinScenes(kinds: readonly WuhanWinKind[], tiles: readon
   return result
 }
 
-export const WUHAN_MIN_WIN_POINTS = 10
+export const WUHAN_MIN_WIN_POINTS = 9
 
 export function wuhanRawWinPoints(
   kinds: readonly WuhanWinKind[], selfDraw: boolean, hard: boolean,
