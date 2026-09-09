@@ -22,6 +22,7 @@ describe('武汉晃晃胡牌', () => {
     expect(wuhanMeetsMinimum(['屁胡'], true, false, [])).toBe(false)
     expect(wuhanMeetsMinimum(['屁胡'], true, false, ['concealed'])).toBe(true)
     expect(wuhanRawWinPoints(['屁胡', '门前清'], true, false, [])).toBe(9)
+    expect(wuhanMeetsMinimum(['屁胡', '门前清'], true, false, [])).toBe(true)
     expect(wuhanRawWinPoints(['清一色'], false, false, [], true)).toBe(12)
   })
   it('移除将一色、风一色和见字胡，门清牌加入门前清', () => {
