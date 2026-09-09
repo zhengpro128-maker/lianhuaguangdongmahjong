@@ -20,7 +20,7 @@ export interface WechatAccount {
 export interface WechatRoomInviteResponse {
   roomId: string
   inviteTicket: string
-  expiresAt?: string
+  expiresAt: number
 }
 
 export interface WechatJoinInviteResponse {
@@ -31,6 +31,31 @@ export interface WechatJoinInviteResponse {
   rejoinCode: string
   mode: MatchType
   rulesetId?: RuleVariant
+  rejoin?: boolean
+}
+
+export interface WechatRoomInfo {
+  roomId: string
+  mode: MatchType
+  rulesetId: RuleVariant
+  capacity: number
+  status: 'lobby' | 'playing' | 'finished' | 'error' | 'closed'
+  creatorSeat: number | null
+  seats: Array<{
+    seat: number
+    nickname: string
+    characterId: string
+    ready: boolean
+    connected: boolean
+  } | null>
+}
+
+export interface CreateWechatRoomOptions {
+  nickname: string
+  mode?: MatchType
+  capacity?: number
+  rulesetId?: RuleVariant
+  characterId?: string
 }
 
 export function createWechatGameRuntime(options: {
@@ -128,6 +153,26 @@ export function createWechatGameRuntime(options: {
     clearAuthSession(true)
   }
 
+  function normalizeNickname(nickname: string): string {
+    const value = nickname.trim()
+    if (!value || value.length > 20) throw new Error('INVALID_NICKNAME')
+    return value
+  }
+
+  function saveJoinedRoom(joined: WechatJoinInviteResponse) {
+    sessionStore.saveGuestId(joined.playerId)
+    sessionStore.saveNickname(joined.nickname)
+    sessionStore.saveSession({
+      roomId: joined.roomId,
+      seat: joined.seat,
+      rejoinCode: joined.rejoinCode,
+      nickname: joined.nickname,
+      playerId: joined.playerId,
+      mode: joined.mode,
+      rulesetId: joined.rulesetId,
+    })
+  }
+
   async function authenticatedRequest<T>(path: string, init: WechatRequestOptions = {}): Promise<T> {
     await login()
     try {
@@ -139,9 +184,87 @@ export function createWechatGameRuntime(options: {
     }
   }
 
+  async function joinRoom(roomId: string, nickname: string,
+    characterId?: string): Promise<WechatJoinInviteResponse> {
+    const joined = await authenticatedRequest<WechatJoinInviteResponse>(
+      `/api/rooms/${encodeURIComponent(roomId.trim().toUpperCase())}/join`,
+      {
+        method: 'POST',
+        body: { nickname: normalizeNickname(nickname), characterId },
+      },
+    )
+    saveJoinedRoom(joined)
+    return joined
+  }
+
+  async function createRoom(roomOptions: CreateWechatRoomOptions): Promise<WechatJoinInviteResponse> {
+    const created = await authenticatedRequest<WechatRoomInfo>('/api/rooms', {
+      method: 'POST',
+      body: {
+        mode: roomOptions.mode ?? 'east',
+        capacity: roomOptions.capacity ?? 4,
+        rulesetId: roomOptions.rulesetId ?? 'lotus-classic',
+      },
+    })
+    return joinRoom(created.roomId, roomOptions.nickname, roomOptions.characterId)
+  }
+
+  async function getCurrentRoom(): Promise<WechatRoomInfo | null> {
+    const session = sessionStore.loadSession()
+    if (!session) return null
+    return authenticatedRequest<WechatRoomInfo>(
+      `/api/rooms/${encodeURIComponent(session.roomId)}`,
+    )
+  }
+
+  async function leaveCurrentRoom(): Promise<void> {
+    const session = sessionStore.loadSession()
+    if (!session) return
+    if (!Number.isInteger(session.seat)) throw new Error('ROOM_SESSION_SEAT_MISSING')
+    await authenticatedRequest(`/api/rooms/${encodeURIComponent(session.roomId)}/leave`, {
+      method: 'POST',
+      body: { seat: session.seat, rejoinCode: session.rejoinCode },
+    })
+    sessionStore.clearSession()
+  }
+
+  async function setReady(ready: boolean): Promise<boolean> {
+    const session = sessionStore.loadSession()
+    if (!session || !Number.isInteger(session.seat)) throw new Error('ROOM_SESSION_NOT_FOUND')
+    const result = await authenticatedRequest<{ ready: boolean }>(
+      `/api/rooms/${encodeURIComponent(session.roomId)}/ready`,
+      {
+        method: 'POST',
+        body: { seat: session.seat, rejoinCode: session.rejoinCode, ready },
+      },
+    )
+    return result.ready
+  }
+
+  async function startCurrentRoom(): Promise<void> {
+    const session = sessionStore.loadSession()
+    if (!session) throw new Error('ROOM_SESSION_NOT_FOUND')
+    await authenticatedRequest(`/api/rooms/${encodeURIComponent(session.roomId)}/start`, {
+      method: 'POST',
+      body: {},
+    })
+  }
+
+  async function connectCurrentRoom() {
+    const session = sessionStore.loadSession()
+    if (!session) throw new Error('ROOM_SESSION_NOT_FOUND')
+    await login()
+    const websocketBase = options.apiBase.replace(/^http/i, 'ws').replace(/\/+$/, '')
+    return socketFactory(
+      `${websocketBase}/ws/room/${encodeURIComponent(session.roomId)}`
+      + `?rejoin_code=${encodeURIComponent(session.rejoinCode)}`,
+    )
+  }
+
   async function shareRoom(roomId: string): Promise<WechatRoomInviteResponse> {
+    const normalizedRoomId = roomId.trim().toUpperCase()
     const invite = await authenticatedRequest<WechatRoomInviteResponse>(
-      `/api/rooms/${encodeURIComponent(roomId)}/invites`,
+      `/api/rooms/${encodeURIComponent(normalizedRoomId)}/invites`,
       { method: 'POST' },
     )
     options.wx.shareAppMessage({
@@ -159,18 +282,10 @@ export function createWechatGameRuntime(options: {
       `/api/rooms/${encodeURIComponent(invite.roomId)}/join-by-invite`,
       {
         method: 'POST',
-        body: { inviteTicket: invite.ticket, nickname },
+        body: { inviteTicket: invite.ticket, nickname: normalizeNickname(nickname) },
       },
     )
-    sessionStore.saveNickname(joined.nickname)
-    sessionStore.saveSession({
-      roomId: joined.roomId,
-      rejoinCode: joined.rejoinCode,
-      nickname: joined.nickname,
-      playerId: joined.playerId,
-      mode: joined.mode,
-      rulesetId: joined.rulesetId,
-    })
+    saveJoinedRoom(joined)
     pendingInvite = null
     return joined
   }
@@ -184,6 +299,13 @@ export function createWechatGameRuntime(options: {
     refreshLogin: () => login(true),
     logout,
     authenticatedRequest,
+    createRoom,
+    joinRoom,
+    getCurrentRoom,
+    leaveCurrentRoom,
+    setReady,
+    startCurrentRoom,
+    connectCurrentRoom,
     shareRoom,
     joinPendingInvite,
     getPendingInvite: () => pendingInvite,

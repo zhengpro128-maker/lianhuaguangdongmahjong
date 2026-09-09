@@ -41,7 +41,7 @@ response: { "playerId": "wechat-...", "accessToken": "...", "expiresAt": 1234567
 
 POST /api/rooms/{roomId}/invites
 Authorization: Bearer <accessToken>
-response: { "roomId": "ABC123", "inviteTicket": "...", "expiresAt": "..." }
+response: { "roomId": "ABC123", "inviteTicket": "...", "expiresAt": 1234567890 }
 
 POST /api/rooms/{roomId}/join-by-invite
 Authorization: Bearer <accessToken>
@@ -53,8 +53,10 @@ response: {
 }
 ```
 
-`inviteTicket` 必须是短期、可撤销的邀请凭证，不能复用任一玩家的 `rejoinCode`。
-加入接口必须幂等，并校验房间未满、仍在大厅阶段且邀请未过期。
+`inviteTicket` 是短期 HMAC 签名凭证，不复用任一玩家的 `rejoinCode`。票据绑定
+房间码，默认 15 分钟过期，可供多位好友使用。只有房间内已占座玩家能生成票据；
+加入时校验签名、房间、有效期、容量和房间状态。同一玩家重复打开卡片会幂等恢复
+原座位。
 
 WebSocket 握手优先从 `Authorization` 请求头验证微信访问令牌；座位恢复仍使用服务端签发的
 `rejoinCode`。
@@ -63,9 +65,13 @@ WebSocket 握手优先从 `Authorization` 请求头验证微信访问令牌；�
 恢复；临近到期会重新登录；受保护接口返回 401 时只自动刷新并重试一次。微信的原始 OpenID
 和 `session_key` 始终留在服务端，不写入小游戏存储。
 
+小游戏运行时已提供 `createRoom` / `joinRoom` / `getCurrentRoom` /
+`leaveCurrentRoom` / `setReady` / `startCurrentRoom` / `shareRoom` /
+`joinPendingInvite` / `connectCurrentRoom` API。建房或受邀加入后会统一保存座位与
+`rejoinCode`；`connectCurrentRoom` 使用 `wss://`、Bearer 令牌和重进码建立实时对局连接。
+
 ## 后续开发
 
-1. 在 Python 后端实现房间邀请和凭邀请加入接口（微信登录接口已完成）。
-2. 增加 Canvas 大厅与分享/确认加入交互。
-3. 将 Three.js 渲染器接到小游戏 Canvas/WebGL，并逐步迁移牌桌 HUD。
-4. 将主题、图片和音频拆成分包或远程资源。
+1. 增加 Canvas 大厅与分享/确认加入交互。
+2. 将 Three.js 渲染器接到小游戏 Canvas/WebGL，并逐步迁移牌桌 HUD。
+3. 将主题、图片和音频拆成分包或远程资源。

@@ -3,6 +3,7 @@ import type { RuleVariant } from '../../core/rules/ruleVariants'
 
 export interface StoredSession {
   roomId: string
+  seat?: number
   rejoinCode: string
   nickname: string
   playerId: string
@@ -81,6 +82,7 @@ export function createRemoteSessionStore(
         if (rulesetId !== 'lotus-classic' && rulesetId !== 'lotus-legacy') return null
         return {
           roomId: session.roomId,
+          ...(Number.isInteger(session.seat) ? { seat: session.seat } : {}),
           rejoinCode: session.rejoinCode,
           nickname: session.nickname ?? '',
           playerId: session.playerId ?? '',
