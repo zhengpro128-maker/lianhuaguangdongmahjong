@@ -106,6 +106,10 @@ try {
   # after merging; they only reappear when master MODIFIES one of them
   # (modify/delete conflict). Resolve by keeping the deletion.
   $masterOnly = @(
+    '.env.wechat.example'
+    'docs/wechat-game-development.md'
+    'src/wechat-game'
+    'vite.config.wechat.ts'
     'src/game/online/api'
     'src/game/online/session/remoteRoomLifecycle.ts'
     'src/game/online/session/remoteRoomLifecycle.test.ts'
