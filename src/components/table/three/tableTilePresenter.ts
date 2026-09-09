@@ -2,18 +2,24 @@ import * as THREE from 'three'
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js'
 import { isHorseForSeat, sortTilesWithJokers } from '../../../game/core/rules/tiles'
 import { meldDisplayTiles, meldSourceTileIndex } from '../../../game/core/rules/rules'
-import { addedKongTileOffset } from '../../../game/core/presentation/tableLayout'
+import { addedKongTileOffset, TABLE_LAYOUT, meldTileCenter, discardTileLayout, meldTrackTransform, concealedMeldClear, concealedSideX } from '../../../game/core/presentation/tableLayout'
 import { wallBreakIndexForDealer, wallStackSlot, wallTilePlacement, WALL_TOTAL } from '../../../game/core/rules/wallLayout'
 import { splitWinningTile } from '../../../game/core/presentation/winEffect'
 import type { TableActionEvent, TileType } from '../../../game/core/contracts/types'
 import type { TileInstanceRenderer } from './tileInstanceRenderer'
 import type { ResolvedTableProps, TableTransform } from './tableRenderTypes'
+import { bloodFlowWinPiles } from './bloodFlowWinPile'
+import { prefersReducedMotion } from '../../../game/core/presentation/winEffect'
+import type { SourceTileEvent } from '../../../game/variants/lotus/bloodFlow/types'
+import type { BloodFlowCue } from '../../../game/variants/lotus/bloodFlow/presentation'
+import { sampleBloodFlowFlight, type FlightPose } from './bloodFlowTileFlight'
 import type { createStaticTableScene } from './staticTableScene'
 
 type TableScene = Pick<ReturnType<typeof createStaticTableScene>,
   'makeDimmedHorseTile' | 'makeGoldGlow' | 'makeGoldVerticalGlow'>
 
 interface InstanceTween {
+  motionKey: string
   baseIndex: number
   capIndex: number
   capMesh: THREE.InstancedMesh
@@ -35,6 +41,7 @@ interface MeldTween extends InstanceTween {
 }
 
 interface TableTilePresenterOptions {
+  projectOwnDraw?(point:{x:number;y:number}):THREE.Vector3|null
   props: Readonly<ResolvedTableProps>
   scene: THREE.Scene
   dynamicGroups: THREE.Object3D[]
@@ -47,8 +54,6 @@ interface TableTilePresenterOptions {
   playAreaOffsetZ: number
   tileGapOffset: number
   pointGapOffset: number
-  meldHandGap: number
-  meldUpMove: number
   wallDealOriginY: number
   addWinEffect(): void
   addWinningDisplayTile(): void
@@ -61,12 +66,20 @@ export function createTableTilePresenter(options: TableTilePresenterOptions) {
   const PLAY_AREA_OFFSET_Z = options.playAreaOffsetZ
   const TILE_GAP_OFFSET = options.tileGapOffset
   const POINT_GAP_OFFSET = options.pointGapOffset
-  const MELD_HAND_GAP = options.meldHandGap
-  const MELD_UP_MOVE = options.meldUpMove
   const WALL_DEAL_ORIGIN_Y = options.wallDealOriginY
   const dealTweens: DealTween[] = []
   const meldTweens: MeldTween[] = []
   const discardTweens: DealTween[] = []
+  let continuingDeals = new Map<string, DealTween>()
+  let continuingMelds = new Map<string, MeldTween>()
+  let continuingDiscards = new Map<string, DealTween>()
+  let animatedDealSerial = -1
+  let pendingDealAnimation = false
+  let animatedFlipKey: string | null = null
+  const sourceTransforms=new Map<string,FlightPose>(),drawnTransforms=new Map<number,FlightPose>(),addedTransforms=new Map<string,FlightPose>()
+  const ownDrawScreens = new Map<string,{x:number;y:number}>()
+  let sourceEpoch=''
+  const flights:{recordId:string;sourceId:string;kind:SourceTileEvent['kind'];level:number;column:number;source:FlightPose;target:FlightPose;cue:BloodFlowCue;instance:ReturnType<TileInstanceRenderer['add']>;current:FlightPose}[]=[]
   let animatedDiscardId = -1
   let animatedTableActionId = -1
   let pendingTableActionAnimation: TableActionEvent | null = null
@@ -108,38 +121,16 @@ function addConcealedHand(playerIndex) {
     const laidTiles = meldDisplayTiles(meld)
     const sourceTileIndex = meldSourceTileIndex({ ...meld, tiles: laidTiles }, playerIndex)
     const meldSpan = laidTiles.reduce(
-      (width, _, tileIndex) => width + (tileIndex === sourceTileIndex ? 1.025 : gap),
+      (width, _, tileIndex) => width + (tileIndex === sourceTileIndex ? POINT_GAP_OFFSET : gap),
       0,
     )
-    return span + meldSpan + (meldIndex > 0 ? .18 : 0)
+    return span + meldSpan + (meldIndex > 0 ? TABLE_LAYOUT.groupGap : 0)
   }, 0)
   const animatedFromIndex = Math.max(0, total - (props.dealAnimation.count || 0))
   const dealThisHand = props.dealAnimation.playerIndex === playerIndex
   // 副露带逼近手牌（半个牌宽内）→ 手牌让位到副露带外侧；否则手牌保持居中。
   // 对家/左右三家统一此规则（本家不在此函数内处理）。meldClear = 手牌 index 0 的让位起点。
-  const tileHalf = .34
-  let meldClear = null
-  if (melds.length) {
-    if (position === 'top') {
-      const handNear = -(arrangedTotal - 1) / 2 * gap
-      if (-9 + exposedSpan + tileHalf >= handNear - tileHalf) {
-        meldClear = -9 + exposedSpan + MELD_HAND_GAP
-      }
-    } else if (position === 'right') {
-      // 下家副露逼近时手牌让位：meldClear 以副露实际轨道（-6.1 - MELD_UP_MOVE）为基准，
-      // 使手牌与副露间距 = MELD_HAND_GAP（与上家/对家一致），避免副露上移后让位过多留出大缝。
-      const handNear = -(arrangedTotal - 1) / 2 * gap
-      if (-6.1 - MELD_UP_MOVE + exposedSpan + tileHalf >= handNear - tileHalf) {
-        meldClear = -6.1 - MELD_UP_MOVE + exposedSpan + MELD_HAND_GAP
-      }
-    } else if (position === 'left') {
-      const handNear = (arrangedTotal - 1) / 2 * gap
-      if (6.1 - exposedSpan - tileHalf <= handNear + tileHalf) {
-        // 副露在左家手牌上端：手牌整体下移，index 0 起点 = 副露下缘下方 - 手牌跨度
-        meldClear = 6.1 - exposedSpan - MELD_HAND_GAP - (arrangedTotal - 1) * gap
-      }
-    }
-  }
+  const meldClear = melds.length ? concealedMeldClear(playerIndex, exposedSpan, arrangedTotal, gap) : null
 
   for (let index = 0; index < total; index += 1) {
     const faceIndex = reverseRevealedFaces ? total - 1 - index : index
@@ -167,7 +158,7 @@ function addConcealedHand(playerIndex) {
       rotationY = props.revealHands
         ? (position === 'left' ? -Math.PI / 2 : Math.PI / 2)
         : (position === 'left' ? Math.PI / 2 : -Math.PI / 2)
-      x = position === 'left' ? -9.15 : 9.15
+      x = concealedSideX(position === 'left' ? 3 : 1)
       if (meldClear != null) {
         // 副露逼近手牌：手牌沿排布轴让位到副露带外侧，避开副露。
         // 下家（右）摸牌位在右侧（-z 顶端，与无副露时一致）；上家/其他摸牌位在手牌末尾。
@@ -187,22 +178,26 @@ function addConcealedHand(playerIndex) {
       }
     }
     const pos = new THREE.Vector3(x, tileY, z + TILE_LAYER_Z)
+    if(index===drawnTileIndex)drawnTransforms.set(playerIndex,{x:pos.x,y:pos.y,z:pos.z,rotation:rotationY,tilt:props.revealHands?0:-Math.PI/2})
     // 暗手为背面朝玩家的立牌：makeHiddenTile 内部 body 绕 X 转 -90°，合批时折进实例矩阵。
     const quat = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, rotationY, 0))
     if (!props.revealHands) quat.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0)))
-    if (dealThisHand && index >= animatedFromIndex) {
+    const motionKey = `deal:${props.dealAnimation.serial}:${playerIndex}:${index}`
+    const continuing = continuingDeals.get(motionKey)
+    if (dealThisHand && index >= animatedFromIndex && (pendingDealAnimation || continuing)) {
       // 发牌从牌山 head 槽位（下一张要摸的牌所在处）飞出，而不是从中控台上方。
       const head = wallDrawHeadPos()
-      const origin = new THREE.Vector3(head.x, WALL_DEAL_ORIGIN_Y, head.z)
+      const origin = continuing?.origin ?? new THREE.Vector3(head.x, WALL_DEAL_ORIGIN_Y, head.z)
       const inst = addTableTile(pos, quat, face, 1, origin)
       dealTweens.push({
+        motionKey,
         baseIndex: inst.baseIndex,
         capIndex: inst.capIndex,
         capMesh: inst.capMesh,
         origin,
         target: pos.clone(),
         quat,
-        startedAt: performance.now(),
+        startedAt: continuing?.startedAt ?? performance.now(),
         duration: props.dealAnimation.count === 4 ? 230 : 125,
       })
     } else {
@@ -212,31 +207,17 @@ function addConcealedHand(playerIndex) {
 }
 
 
-function discardTransform(playerIndex, index) {
-  // 四家牌河统一：1-3 行每行 6 张，第 4 行起每行 10 张。
-  // 宽行与窄行左对齐（共用 -2.5 起点），向右延伸，避免中心线跳动；
-  // 因此宽行的前 6 张与前三行的 6 张位置完全一致，只向右多出 4 张。
-  const wideStart = 18   // 前三行 6×3=18 张后进入 10 张/行
-  const isWide = index >= wideStart
-  const columnCount = isWide ? 10 : 6
-  const rowIndex = isWide ? index - wideStart : index
-  const column = rowIndex % columnCount
-  const discardGap = 0.95   // 牌河行间隙
-  const row = isWide ? 3 + Math.floor(rowIndex / columnCount) : Math.floor(rowIndex / columnCount)
-  const lateral = (column - 2.5) * TILE_GAP_OFFSET
-  if (playerIndex === 0) return { x: lateral, z: 2.48 + row * discardGap, rotation: 0 }
-  if (playerIndex === 1) return { x: 2.64 + row * discardGap, z: -lateral, rotation: Math.PI / 2 }
-  if (playerIndex === 2) return { x: -lateral, z: -2.48 - row * discardGap, rotation: Math.PI }
-  return { x: -2.64 - row * discardGap, z: lateral, rotation: -Math.PI / 2 }
+function discardTransform(playerIndex:number, index:number) {
+  return discardTileLayout(playerIndex,index)
 }
 
 // 出牌动画的起点 = 各家手牌位置（牌从手牌方向飞向牌河）。
 // 本家为底部 2D 手牌（屏幕底部 → 近桌沿），其余三家为各自立牌手牌中心。
 function discardSourcePos(playerIndex) {
   if (playerIndex === 0) return new THREE.Vector3(0, .56, 8.5)
-  if (playerIndex === 1) return new THREE.Vector3(9.15, .56, -2.15)
+  if (playerIndex === 1) return new THREE.Vector3(concealedSideX(1), .56, -2.15)
   if (playerIndex === 2) return new THREE.Vector3(0, .56, -9.69)
-  return new THREE.Vector3(-9.15, .56, -1.0)
+  return new THREE.Vector3(concealedSideX(3), .56, -1.0)
 }
 
 function addDiscards(playerIndex) {
@@ -247,21 +228,27 @@ function addDiscards(playerIndex) {
     const y = highlighted ? .48 : .28
     // 牌河保持原位（不与手牌一起向本家偏移）
     const pos = new THREE.Vector3(transform.x, y, transform.z + PLAY_AREA_OFFSET_Z)
+    const source=props.bloodFlowSourceEvent
+    if(highlighted&&source?.kind==='discard'&&(source.seat-(props.localSeat??0)+4)%4===playerIndex&&source.tile===tileName)
+      sourceTransforms.set(source.id,{x:pos.x,y:pos.y,z:pos.z,rotation:transform.rotation})
     const quat = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, transform.rotation, 0))
     // 最新一张弃牌：从手牌方向飞向牌河（带弧度 + 落地微弹），其余牌直接放置。
     const isNewDiscard = highlighted && props.lastDiscard?.id !== animatedDiscardId
-    if (isNewDiscard) {
+    const motionKey = `discard:${playerIndex}:${index}:${tileName}:${props.lastDiscard?.id}`
+    const continuing = continuingDiscards.get(motionKey)
+    if (isNewDiscard || continuing) {
       animatedDiscardId = props.lastDiscard?.id
-      const origin = discardSourcePos(playerIndex)
+      const origin = continuing?.origin ?? discardSourcePos(playerIndex)
       const inst = addTableTile(pos, quat, tileName, 1, origin)
       discardTweens.push({
+        motionKey,
         baseIndex: inst.baseIndex,
         capIndex: inst.capIndex,
         capMesh: inst.capMesh,
         origin,
         target: pos.clone(),
         quat,
-        startedAt: performance.now(),
+        startedAt: continuing?.startedAt ?? performance.now(),
         duration: 360,
       })
     } else {
@@ -283,14 +270,7 @@ function addDiscards(playerIndex) {
 }
 
 function meldTransform(playerIndex: number, trackOffset: number): TableTransform {
-  // 和参考界面一致：每家只有一条副露带，从玩家右手端连续排向手牌。
-  // 本家副露整体下移一个牌深（0.94），与牌河拉开距离。
-  // 下家（右）副露往右移、上家（左）副露往左移各一个牌宽（0.68），远离中间牌河/副露区。
-  if (playerIndex === 0) return { x: 9 - trackOffset, z: 6.79, rotation: 0 }
-  if (playerIndex === 1) return { x: 8.9, z: -6.1 - MELD_UP_MOVE + trackOffset, rotation: Math.PI / 2 }
-  // 对家副露随手牌一起向后（远离本家）移一个牌深（0.94）。
-  if (playerIndex === 2) return { x: -9 + trackOffset, z: -8.29, rotation: Math.PI }
-  return { x: -8.9, z: 6.1 - trackOffset, rotation: -Math.PI / 2 }
+  return meldTrackTransform(playerIndex, trackOffset)
 }
 
 function alignMeldBottom(transform: TableTransform, playerIndex: number, rotated: boolean): TableTransform {
@@ -318,6 +298,7 @@ function addMelds(playerIndex) {
   const melds = props.players[playerIndex]?.melds || []
   let trackOffset = 0
   melds.forEach((meld, meldIndex) => {
+    const motionPrefix = `meld:${playerIndex}:${meldIndex}:${meld.type}:${meld.tiles.join(',')}`
     const animatesThisMeld = pendingTableActionAnimation?.actorIndex === playerIndex
       && pendingTableActionAnimation?.meldIndex === meldIndex
     const laidTiles = meldDisplayTiles(meld)
@@ -332,7 +313,7 @@ function addMelds(playerIndex) {
       const pointsToSource = tileIndex === sourceTileIndex
       const face = concealed ? null : tileName
       const tileSpan = pointsToSource ? POINT_GAP_OFFSET : TILE_GAP_OFFSET
-      const centerOffset = trackOffset + (tileSpan - .725) / 2
+      const centerOffset = meldTileCenter(trackOffset, tileSpan)
       const sourceRot = pointsToSource ? sourceTileRotationOffset(relativeSource) : 0
       const transform = alignMeldBottom(
         meldTransform(playerIndex, centerOffset),
@@ -353,9 +334,12 @@ function addMelds(playerIndex) {
           rotation: rotationY,
         }
       }
-      if (animatesThisMeld && pendingTableActionAnimation.type !== 'added-gang') {
+      const motionKey = `${motionPrefix}:${tileIndex}`
+      const continuing = continuingMelds.get(motionKey)
+      if (continuing || (animatesThisMeld && pendingTableActionAnimation.type !== 'added-gang')) {
         const inst = addTableTile(pos, quat, face, 1, new THREE.Vector3(pos.x, pos.y + .72, pos.z), .78)
         meldTweens.push({
+          motionKey,
           baseIndex: inst.baseIndex,
           capIndex: inst.capIndex,
           capMesh: inst.capMesh,
@@ -364,7 +348,7 @@ function addMelds(playerIndex) {
           targetY: .28,
           extraY: bodyOffsetY,
           quat,
-          startedAt: performance.now(),
+          startedAt: continuing?.startedAt ?? performance.now(),
           duration: 430,
         })
       } else {
@@ -372,6 +356,10 @@ function addMelds(playerIndex) {
       }
       trackOffset += tileSpan
     })
+    if(meld.type==='peng'&&sourcePlacement){
+      const offset=addedKongTileOffset(playerIndex,TILE_GAP_OFFSET)
+      addedTransforms.set(`${playerIndex}/${meld.tile}`,{x:sourcePlacement.x+offset.x,y:.28,z:sourcePlacement.z+offset.z+TILE_LAYER_Z,rotation:sourcePlacement.rotation})
+    }
     if (meld.added && sourcePlacement) {
       // 补杠牌与原横牌同样横摆，平放在它靠牌桌中心的一侧，形成 T/L 形。
       const addedOffset = addedKongTileOffset(playerIndex, TILE_GAP_OFFSET)
@@ -381,9 +369,12 @@ function addMelds(playerIndex) {
         sourcePlacement.z + addedOffset.z + TILE_LAYER_Z,
       )
       const quat = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, sourcePlacement.rotation, 0))
-      if (animatesThisMeld && pendingTableActionAnimation.type === 'added-gang') {
+      const motionKey = `${motionPrefix}:added`
+      const continuing = continuingMelds.get(motionKey)
+      if (continuing || (animatesThisMeld && pendingTableActionAnimation.type === 'added-gang')) {
         const inst = addTableTile(pos, quat, meld.tile, 1, new THREE.Vector3(pos.x, pos.y + .72, pos.z), .78)
         meldTweens.push({
+          motionKey,
           baseIndex: inst.baseIndex,
           capIndex: inst.capIndex,
           capMesh: inst.capMesh,
@@ -391,14 +382,14 @@ function addMelds(playerIndex) {
           baseZ: pos.z,
           targetY: pos.y,
           quat,
-          startedAt: performance.now(),
+          startedAt: continuing?.startedAt ?? performance.now(),
           duration: 430,
         })
       } else {
         addTableTile(pos, quat, meld.tile)
       }
     }
-    trackOffset += .18
+    trackOffset += TABLE_LAYOUT.groupGap
   })
 }
 
@@ -409,26 +400,29 @@ function resolveBreakIndex() {
   // 都要按当前客户端的绝对座位旋转到本地视角。每个座位占 17 墩 / 34 张牌。
   const base = props.wallBreakIndex ?? wallBreakIndexForDealer(props.diceValues, props.dealerIndex ?? 0)
   const localSeat = ((props.localSeat ?? 0) % 4 + 4) % 4
-  return (base + localSeat * (WALL_TOTAL / 4)) % WALL_TOTAL
+  const total = props.wallTotal ?? WALL_TOTAL
+  return (base + localSeat * (total / 4)) % total
 }
 
 function resolveFlipStack() {
   if (props.flipStack == null) return null
+  const total = props.wallTotal ?? WALL_TOTAL
   const localSeat = ((props.localSeat ?? 0) % 4 + 4) % 4
-  return (props.flipStack + localSeat * (WALL_TOTAL / 8)) % (WALL_TOTAL / 2)
+  return (props.flipStack + localSeat * (total / 8)) % (total / 2)
 }
 
 // 牌山 head 位置 = 下一张要摸的牌所在处：wall[0] 经 wallHeadDrawn 沿环顺时针推进。
 function wallDrawHeadPos() {
   const headOffset = props.wallHeadDrawn ?? 0
   const breakIndex = resolveBreakIndex()
-  if (props.flipStack != null) {
+  const total = props.wallTotal ?? WALL_TOTAL
+  if (props.flipStack != null && props.flipStackRemoved !== false) {
     const physical = wallPhysicalIndex(headOffset, breakIndex)
-    const slot = wallStackSlot(Math.floor(physical / 2))
+    const slot = wallStackSlot(Math.floor(physical / 2), total / 2)
     return { x: slot.x, z: slot.z }
   }
-  const { stackIndex } = wallTilePlacement(0, (breakIndex + headOffset) % WALL_TOTAL, props.wall?.length ?? 0, headOffset)
-  const slot = wallStackSlot(stackIndex)
+  const { stackIndex } = wallTilePlacement(0, (breakIndex + headOffset) % total, props.wall?.length ?? 0, headOffset, total)
+  const slot = wallStackSlot(stackIndex, total / 2)
   return { x: slot.x, z: slot.z }
 }
 
@@ -437,15 +431,16 @@ function wallDrawHeadPos() {
  * 使翻精墩在环上留出空位（供指示牌翻出）。
  */
 function wallPhysicalIndex(index: number, head: number): number {
+  const total = props.wallTotal ?? WALL_TOTAL
   const flip = resolveFlipStack()
-  if (flip == null) return (head + index) % WALL_TOTAL
+  if (flip == null || props.flipStackRemoved === false) return (head + index) % total
   const skipA = flip * 2
   let physical = head
   while (physical === skipA || physical === skipA + 1) {
-    physical = (physical + 1) % WALL_TOTAL
+    physical = (physical + 1) % total
   }
   for (let step = 0; step < index; step += 1) {
-    do { physical = (physical + 1) % WALL_TOTAL } while (physical === skipA || physical === skipA + 1)
+    do { physical = (physical + 1) % total } while (physical === skipA || physical === skipA + 1)
   }
   return physical
 }
@@ -455,11 +450,12 @@ function wallPhysicalIndex(index: number, head: number): number {
 function addFlipIndicator() {
   const flipStack = resolveFlipStack()
   if (flipStack == null) return
-  const slot = wallStackSlot(flipStack)
+  const total = props.wallTotal ?? WALL_TOTAL
+  const slot = wallStackSlot(flipStack, total / 2)
   // 翻精墩底层牌保留在牌山上（背朝上，与周围牌墙一致）
   const baseQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, slot.rotationY, 0))
   baseQuat.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI, 0, 0)))
-  addTableTile(new THREE.Vector3(slot.x, .41, slot.z), baseQuat, null)
+  if (props.flipStackRemoved !== false) addTableTile(new THREE.Vector3(slot.x, .41, slot.z), baseQuat, null)
   // 顶层牌：翻精前背朝上占位（补足 136 张牌山），翻精后翻出指示牌（面朝上）
   const tile = props.flipTile
   if (!tile) {
@@ -472,18 +468,22 @@ function addFlipIndicator() {
   // 与牌墙第一层（顶层）平齐。
   const pos = new THREE.Vector3(slot.x, .75, slot.z)
   const quat = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, slot.rotationY, 0))
-  if (props.openingStage === 'flip') {
+  const motionKey = `flip:${flipStack}:${tile}`
+  const continuing = continuingDeals.get(motionKey)
+  if (props.openingStage === 'flip' && (animatedFlipKey !== motionKey || continuing)) {
+    animatedFlipKey = motionKey
     // 从墙内（底层之下）升起，模拟「翻出来」
-    const origin = new THREE.Vector3(slot.x, .1, slot.z)
+    const origin = continuing?.origin ?? new THREE.Vector3(slot.x, .1, slot.z)
     const inst = addTableTile(pos, quat, tile, 1, origin)
     dealTweens.push({
+      motionKey,
       baseIndex: inst.baseIndex,
       capIndex: inst.capIndex,
       capMesh: inst.capMesh,
       origin,
       target: pos.clone(),
       quat,
-      startedAt: performance.now(),
+      startedAt: continuing?.startedAt ?? performance.now(),
       duration: 520,
     })
   } else {
@@ -501,21 +501,28 @@ function addWall() {
   if (!tiles.length) return
   const breakIndex = resolveBreakIndex()
   const headOffset = props.wallHeadDrawn ?? 0
-  const hasFlip = props.flipStack != null
+  const total = props.wallTotal ?? WALL_TOTAL
+  const hasRemovedFlip = props.flipStack != null && props.flipStackRemoved !== false
   tiles.forEach((_, index) => {
-    const { stackIndex, layer } = hasFlip
+    const placement = hasRemovedFlip
       ? (() => {
-        const tailDrawn = Math.max(0, WALL_TOTAL - 2 - headOffset - tiles.length)
+        const tailDrawn = Math.max(0, total - 2 - headOffset - tiles.length)
         // 补走一张顶层牌后，同墩剩余的底层牌仍应留在原物理张位。
         const physicalIndex = tailDrawn % 2 === 1 && index === tiles.length - 1 ? index + 1 : index
         const physical = wallPhysicalIndex(headOffset + physicalIndex, breakIndex)
         return {
           stackIndex: Math.floor(physical / 2),
           layer: 1 - (physical % 2),
+          physical,
         }
       })()
-      : wallTilePlacement(index, (breakIndex + headOffset) % WALL_TOTAL, tiles.length, headOffset)
-    const slot = wallStackSlot(stackIndex)
+      : (() => {
+        const result = wallTilePlacement(index, (breakIndex + headOffset) % total, tiles.length, headOffset, total)
+        return { ...result, physical: (result.stackIndex * 2) + (1 - result.layer) }
+      })()
+    if (!hasRemovedFlip && resolveFlipStack() != null && placement.physical === resolveFlipStack()! * 2) return
+    const { stackIndex, layer } = placement
+    const slot = wallStackSlot(stackIndex, total / 2)
     const y = .41 + layer * .47
     const quat = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, slot.rotationY, 0))
     // 背朝上：绕 X 转 180°，使 base 底面的牌背（backMaterial）朝上（与暗杠首尾一致）。
@@ -558,9 +565,46 @@ function addHorses() {
   })
 }
 
+function sourcePose(source:SourceTileEvent):FlightPose {
+  // A new level can widen the public camera after the DOM draw tile was sampled.
+  // Reproject its screen origin with that same camera before starting the shared flight.
+  const screen = ownDrawScreens.get(source.id)
+  const projected = screen ? options.projectOwnDraw?.(screen) : null
+  if(projected) return {x:projected.x,y:projected.y,z:projected.z,rotation:0}
+  const cached=sourceTransforms.get(source.id)
+  if(cached)return cached
+  const seat=(source.seat-(props.localSeat??0)+4)%4
+  if(source.kind==='added-kong'){
+    const added=addedTransforms.get(`${seat}/${source.tile}`)
+    if(added)return {...added}
+  }
+  if(source.kind==='discard'){
+    const t=discardTransform(seat,props.players[seat]?.discards.length??0)
+    return {x:t.x,y:.28,z:t.z+PLAY_AREA_OFFSET_Z,rotation:t.rotation}
+  }
+  const drawn=drawnTransforms.get(seat)
+  if(seat!==0&&drawn)return {...drawn}
+  const p=discardSourcePos(seat)
+  return {x:seat===0?5.8:p.x,y:p.y,z:p.z,rotation:seat*Math.PI/2,tilt:seat===0?0:-Math.PI/2}
+}
 function rebuildTableTiles({ reuseInstances = false }: { reuseInstances?: boolean } = {}) {
   if (!scene || !props.players.length || !scene.userData.tileImages) return
   const reuse = reuseInstances && tileInstances.canReuse()
+  const epoch=`${props.bloodFlowPresentationKey}/${props.localSeat}`
+  // Rebind active motions to the newly built instances. Refreshing a snapshot
+  // or a blood-flow overlay must not erase a normal discard/meld mid-flight.
+  const now = performance.now()
+  const retain = sourceEpoch === epoch && !props.revealHands
+  const active = <T extends InstanceTween>(tweens: T[]) => new Map(
+    (retain ? tweens.filter(t => now < t.startedAt + t.duration) : []).map(t => [t.motionKey, t]),
+  )
+  continuingDeals = active(dealTweens)
+  continuingMelds = active(meldTweens)
+  continuingDiscards = active(discardTweens)
+  pendingDealAnimation = props.dealAnimation.serial !== animatedDealSerial
+  if (props.openingStage !== 'flip') animatedFlipKey = null
+  if(epoch!==sourceEpoch){sourceEpoch=epoch;sourceTransforms.clear();ownDrawScreens.clear()}
+  drawnTransforms.clear();addedTransforms.clear();flights.length=0
   if (!reuse) clearDynamicScene()
   dealTweens.length = 0
   meldTweens.length = 0
@@ -576,7 +620,36 @@ function rebuildTableTiles({ reuseInstances = false }: { reuseInstances?: boolea
   }
   addWall()
   addHorses()
+  const liveSource=props.bloodFlowSourceEvent
+  if(liveSource){
+    const own=props.bloodFlowOwnDraw
+    if(own?.sourceId===liveSource.id) ownDrawScreens.set(liveSource.id,{x:own.x,y:own.y})
+    const projected=own?.sourceId===liveSource.id?options.projectOwnDraw?.(own):null
+    if(projected)sourceTransforms.set(liveSource.id,{x:projected.x,y:projected.y,z:projected.z,rotation:0})
+    else if(!sourceTransforms.has(liveSource.id))sourceTransforms.set(liveSource.id,sourcePose(liveSource))
+  }
+  const hidden=new Set(props.bloodFlowHiddenRecords??[]),cue=props.bloodFlowCue
+  for(const batch of props.bloodFlowBatches??[])if(!sourceTransforms.has(batch.source.id))sourceTransforms.set(batch.source.id,sourcePose(batch.source))
+  // Pile tiles are public display references, independent from wall/discard accounting.
+  // Rebuilds place current records directly; historical wins never replay here.
+  for (const pile of bloodFlowWinPiles(props.bloodFlowBatches ?? [], props.localSeat ?? 0, props.bloodFlowCompact ?? false)) {
+    for (const tile of pile.tiles) {
+      const target={x:tile.x,y:tile.y,z:tile.z+TILE_LAYER_Z,rotation:tile.rotation}
+      const flight=cue?.flights.find(f=>f.record.id===tile.record.id)
+      if(hidden.has(tile.record.id)){
+        if(!cue||!flight)continue
+        const source=sourcePose(flight.source),current=sampleBloodFlowFlight(source,target,cue,performance.now(),prefersReducedMotion())
+        const instance=addTableTile(new THREE.Vector3(current.x,current.y,current.z),new THREE.Quaternion().setFromEuler(new THREE.Euler(0,current.rotation,0)),tile.tile)
+        flights.push({recordId:tile.record.id,sourceId:flight.source.id,kind:flight.source.kind,level:tile.level,column:tile.column,source,target,cue,instance,current})
+      }else addTableTile(new THREE.Vector3(target.x,target.y,target.z),new THREE.Quaternion().setFromEuler(new THREE.Euler(0,tile.rotation,0)),tile.tile)
+    }
+  }
   finishTableInstances()
+  animatedDealSerial = props.dealAnimation.serial
+  // Sample the original timeline before this rebuilt frame is rendered, so the
+  // tile neither snaps to its destination nor restarts from its origin.
+  animate(now, new THREE.Vector3())
+  continuingDeals.clear(); continuingMelds.clear(); continuingDiscards.clear()
   if (pendingTableActionAnimation) animatedTableActionId = pendingTableActionAnimation.id
   pendingTableActionAnimation = null
   options.addWinEffect()
@@ -584,6 +657,11 @@ function rebuildTableTiles({ reuseInstances = false }: { reuseInstances?: boolea
 }
 
   function animate(time: number, scratchVector: THREE.Vector3) {
+    for(const flight of flights){
+      const p=sampleBloodFlowFlight(flight.source,flight.target,flight.cue,time,prefersReducedMotion());flight.current=p
+      const q=new THREE.Quaternion().setFromEuler(new THREE.Euler(0,p.rotation,0)).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(p.tilt??0,0,0)))
+      tileInstances.set(flight.instance.baseIndex,flight.instance.capMesh,flight.instance.capIndex,scratchVector.set(p.x,p.y,p.z),q,1)
+    }
     const keepDeal = dealTweens.filter((tween) => {
       const progress = Math.min(1, (time - tween.startedAt) / tween.duration)
       const eased = 1 - (1 - progress) ** 3
@@ -613,8 +691,9 @@ function rebuildTableTiles({ reuseInstances = false }: { reuseInstances?: boolea
       return progress < 1
     })
     discardTweens.splice(0, discardTweens.length, ...keepDiscard)
-    return dealTweens.length + meldTweens.length + discardTweens.length > 0
+    return dealTweens.length + meldTweens.length + discardTweens.length + flights.length > 0
   }
 
-  return { rebuild: rebuildTableTiles, animate, meldTransform, alignMeldBottom, sourceTileRotationOffset }
+  return { rebuild: rebuildTableTiles, animate, meldTransform, alignMeldBottom, sourceTileRotationOffset,
+    flightDebug:()=>flights.map(f=>({recordId:f.recordId,sourceId:f.sourceId,kind:f.kind,level:f.level,column:f.column,source:f.source,target:f.target,current:f.current})) }
 }

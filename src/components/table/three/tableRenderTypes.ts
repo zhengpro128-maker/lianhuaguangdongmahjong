@@ -1,8 +1,17 @@
 import type { DealAnimation, LastDiscard, OpeningStage, WinEffect } from '../../../game/core/contracts/gamePort'
 import type { GamePlayer, TableActionEvent, TileType, WinPresentation } from '../../../game/core/contracts/types'
 import type { TableThemeName } from './tableTheme'
+import type { WinBatch, SourceTileEvent } from '../../../game/variants/lotus/bloodFlow/types'
+import type { BloodFlowCue } from '../../../game/variants/lotus/bloodFlow/presentation'
 
 export interface TableProps {
+  bloodFlowBatches?: readonly WinBatch[]
+  bloodFlowCompact?: boolean
+  bloodFlowPresentationKey?: string
+  bloodFlowCue?: BloodFlowCue | null
+  bloodFlowHiddenRecords?: readonly string[]
+  bloodFlowSourceEvent?: SourceTileEvent
+  bloodFlowOwnDraw?: {sourceId:string;x:number;y:number} | null
   /** 当前牌桌主题；切换时只重建 3D 牌桌，不刷新页面。 */
   themeName?: TableThemeName
   players?: GamePlayer[]
@@ -13,11 +22,13 @@ export interface TableProps {
   wall?: TileType[]
   wallHeadDrawn?: number
   wallCount?: number
+  wallTotal?: number
   horses?: TileType[]
   /** 本局精牌集合，用于 3D 牌面标记和亮牌排序。 */
   jokerTiles?: TileType[]
   /** 可替代精牌的实体牌；不计入精牌集合。 */
   wildcardTiles?: TileType[]
+  jokerAsLaizi?: boolean
   revealHands?: boolean
   winnerIndex?: number
   winEffect?: WinEffect | null
@@ -34,6 +45,8 @@ export interface TableProps {
   flipTile?: TileType | null
   /** 翻精所在物理墩（0..67），指示牌在牌山上的位置 */
   flipStack?: number
+  /** false 表示指示牌仍属于牌墙，只翻开顶张；默认沿用莲花麻将的整墩移出。 */
+  flipStackRemoved?: boolean
 }
 
 export type ResolvedTableProps = {

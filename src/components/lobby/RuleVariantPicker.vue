@@ -1,18 +1,23 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { RULE_VARIANTS, type RuleVariant } from '../../game/core/rules/ruleVariants'
+import { computed, ref } from 'vue'
+import { RULE_VARIANTS, BLOOD_FLOW_RULE, type RuleVariant } from '../../game/core/rules/ruleVariants'
 
-const props = defineProps<{ modelValue: RuleVariant }>()
+const props = defineProps<{ modelValue: RuleVariant; allowBloodFlow?: boolean; allowWuhan?: boolean }>()
 const emit = defineEmits<{ close: []; confirm: [value: RuleVariant]; viewRules: [] }>()
 const pending = ref(props.modelValue)
+const options = computed(() => [
+  ...RULE_VARIANTS.filter((option) => props.allowWuhan || option.id !== 'wuhan-huanghuang'),
+  ...(props.allowBloodFlow ? [BLOOD_FLOW_RULE] : []),
+])
 </script>
 
 <template>
   <div class="picker-options rule-picker-options">
     <button
-      v-for="option in RULE_VARIANTS"
+      v-for="option in options"
       :key="option.id"
       type="button"
+      data-action-role="secondary"
       :class="{ active: pending === option.id }"
       @click="pending = option.id"
     >
@@ -23,9 +28,9 @@ const pending = ref(props.modelValue)
       </span>
     </button>
   </div>
-  <button class="view-rules-link" type="button" @click="emit('viewRules')">查看详细规则 →</button>
+  <button class="view-rules-link" type="button" data-action-role="light" @click="emit('viewRules')">查看详细规则 →</button>
   <div class="dialog-actions">
-    <button class="secondary" type="button" @click="emit('close')">取消</button>
-    <button class="primary" type="button" @click="emit('confirm', pending)">确定</button>
+    <button class="secondary" type="button" data-action-role="light" @click="emit('close')">取消</button>
+    <button class="primary" type="button" data-action-role="primary" @click="emit('confirm', pending)">确定</button>
   </div>
 </template>

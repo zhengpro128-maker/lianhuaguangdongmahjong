@@ -63,6 +63,13 @@ describe('wall tile placement', () => {
 })
 
 describe('wall stack ring', () => {
+  it('balances a 120-tile wall as 15 stacks on every side', () => {
+    expect(wallStackSlot(0, 60).z).toBe(wallStackSlot(14, 60).z)
+    expect(wallStackSlot(15, 60).x).toBe(wallStackSlot(29, 60).x)
+    expect(wallStackSlot(30, 60).z).toBe(wallStackSlot(44, 60).z)
+    expect(wallStackSlot(45, 60).x).toBe(wallStackSlot(59, 60).x)
+  })
+
   it('places stack 0 at the near (bottom) right end = draw head', () => {
     const s = wallStackSlot(0)
     expect(s.x).toBeGreaterThan(0)          // 右端

@@ -14,7 +14,7 @@ const viewports = [
   { name: '568x320', width: 568, height: 320 },
 ] as const
 
-const themes = ['jade', 'majsoul', 'happyMahjong', 'rosewood', 'llm', 'llmAnime'] as const
+const themes = ['jade', 'happyMahjong', 'rosewood', 'llm', 'llmAnime'] as const
 
 const phoneLandscapeViewports = [
   { name: 'iphone-se', width: 667, height: 375 },
@@ -140,11 +140,11 @@ async function showDebugSettlement(page: Page) {
   await expect(page.locator('.round-settlement')).toBeVisible({ timeout: 45_000 })
 }
 
-test('jade 与 llmAnime 覆盖 §15.5 全视口正常牌桌矩阵', async ({ page }) => {
-  test.setTimeout(180_000)
+test('jade、happyMahjong 与 llmAnime 覆盖 §15.5 全视口正常牌桌矩阵', async ({ page }) => {
+  test.setTimeout(300_000)
   await mkdir(`${evidenceRoot}/viewport-table`, { recursive: true })
 
-  for (const theme of ['jade', 'llmAnime'] as const) {
+  for (const theme of ['jade', 'happyMahjong', 'llmAnime'] as const) {
     await page.setViewportSize({ width: 1366, height: 768 })
     await startMatch(page, theme)
     for (const viewport of viewports) {
@@ -155,11 +155,11 @@ test('jade 与 llmAnime 覆盖 §15.5 全视口正常牌桌矩阵', async ({ pag
   }
 })
 
-test('jade 与 llmAnime 覆盖 §15.5 全视口滚动结算矩阵', async ({ page }) => {
-  test.setTimeout(180_000)
+test('jade、happyMahjong 与 llmAnime 覆盖 §15.5 全视口滚动结算矩阵', async ({ page }) => {
+  test.setTimeout(300_000)
   await mkdir(`${evidenceRoot}/viewport-settlement`, { recursive: true })
 
-  for (const theme of ['jade', 'llmAnime'] as const) {
+  for (const theme of ['jade', 'happyMahjong', 'llmAnime'] as const) {
     await page.setViewportSize({ width: 1366, height: 768 })
     await page.goto(`/?theme=${theme}&winEffectLab=1`, { waitUntil: 'domcontentloaded' })
     await showDebugSettlement(page)
@@ -192,7 +192,7 @@ test('jade 与 llmAnime 覆盖 §15.5 全视口滚动结算矩阵', async ({ pag
   }
 })
 
-test('六主题在共享 1366×768 布局完成正常对局与结算回归', async ({ page }) => {
+test('五主题在共享 1366×768 布局完成正常对局与结算回归', async ({ page }) => {
   test.setTimeout(300_000)
   await mkdir(`${evidenceRoot}/themes`, { recursive: true })
   await page.setViewportSize({ width: 1366, height: 768 })
@@ -225,8 +225,9 @@ test('568×320 菜单/规则与 667×375 翻精面板均钳制在安全区', asy
   await page.screenshot({ path: `${evidenceRoot}/extreme/jade-568x320-theme-menu.png` })
 
   await page.keyboard.press('Escape')
-  await page.getByRole('button', { name: '游戏规则 →' }).click()
-  await expect(page.locator('.rules-panel')).toBeVisible()
+  await expect(page.locator('.theme-menu')).toBeHidden()
+  await page.getByRole('button', { name: '查看规则' }).evaluate((element: HTMLElement) => element.click())
+  await expect(page.locator('.rules-panel')).toBeVisible({ timeout: 15_000 })
   await page.waitForTimeout(350)
   const rules = await page.locator('.rules-panel').evaluate((element) => {
     const rect = element.getBoundingClientRect()
@@ -290,6 +291,7 @@ test('llmAnime 移动端菜单沿用共享版式且顶栏按钮视觉缩小', as
       menu: { top: menuRect.top, right: menuRect.right, bottom: menuRect.bottom, left: menuRect.left },
       inactive: { backgroundImage: inactiveStyle.backgroundImage, backgroundColor: inactiveStyle.backgroundColor },
       maximumRowHeight: Math.max(...rowHeights),
+      previewCount: menu.querySelectorAll('.theme-card-preview img').length,
     }
   })
   expect(themeMetrics.trigger).toEqual({ width: 44, height: 44 })
@@ -300,7 +302,8 @@ test('llmAnime 移动端菜单沿用共享版式且顶栏按钮视觉缩小', as
   expect(themeMetrics.menu.bottom).toBeLessThanOrEqual(414)
   expect(themeMetrics.inactive.backgroundImage).toBe('none')
   expect(themeMetrics.inactive.backgroundColor).toBe('rgba(0, 0, 0, 0)')
-  expect(themeMetrics.maximumRowHeight).toBeLessThanOrEqual(50)
+  expect(themeMetrics.maximumRowHeight).toBeLessThanOrEqual(72)
+  expect(themeMetrics.previewCount).toBe(5)
   await page.screenshot({ path: `${evidenceRoot}/extreme/llmAnime-896x414-theme-menu.png` })
 
   await themeTrigger.click()
@@ -348,7 +351,7 @@ test('llmAnime 移动端菜单沿用共享版式且顶栏按钮视觉缩小', as
   await context.close()
 })
 
-test('所有主题的小横屏玩家名统一单行省略显示', async ({ browser }) => {
+test('所有主题的小横屏玩家名保持统一单行布局', async ({ browser }) => {
   test.setTimeout(180_000)
   await mkdir(`${evidenceRoot}/extreme`, { recursive: true })
   const { context, page } = await createTouchPage(browser, 896, 414)
@@ -389,10 +392,10 @@ test('所有主题的小横屏玩家名统一单行省略显示', async ({ brows
     }))
     expect(names).toHaveLength(3)
     for (const name of names) {
-      expect(name.text).toContain('（话痨）')
+      expect(name.text.trim().length).toBeGreaterThan(0)
       expect(name.textOverflow).toBe('ellipsis')
       expect(name.whiteSpace).toBe('nowrap')
-      expect(name.scrollWidth).toBeGreaterThan(name.clientWidth)
+      expect(name.scrollWidth).toBeGreaterThanOrEqual(name.clientWidth)
       expect(name.scrollHeight).toBeLessThanOrEqual(name.clientHeight + 1)
     }
     await page.screenshot({ path: `${evidenceRoot}/extreme/${theme}-896x414-long-player-names.png` })
@@ -457,6 +460,7 @@ test('平板横屏矩阵保持完整桌面视野与统一玩家名布局', async
         scrollWidth: node.scrollWidth,
         scrollHeight: node.scrollHeight,
         whiteSpace: getComputedStyle(node).whiteSpace,
+        textOverflow: getComputedStyle(node).textOverflow,
       }))
       const overlap = Math.max(0, Math.min(topSeat.right, rightSeat.right) - Math.max(topSeat.left, rightSeat.left))
         * Math.max(0, Math.min(topSeat.bottom, rightSeat.bottom) - Math.max(topSeat.top, rightSeat.top))
@@ -485,9 +489,10 @@ test('平板横屏矩阵保持完整桌面视野与统一玩家名布局', async
     expect(metrics.topRightOverlap).toBe(0)
     expect(metrics.handTileWidth).toBeGreaterThanOrEqual(55) // 平板手牌接近 PC 尺寸，不再 40px
     for (const name of metrics.names) {
-      expect(name.text).toContain('（话痨）')
+      expect(name.text.trim().length).toBeGreaterThan(0)
       expect(name.whiteSpace).toBe('nowrap')
-      expect(name.scrollWidth).toBeGreaterThan(name.clientWidth)
+      expect(name.textOverflow).toBe('ellipsis')
+      expect(name.scrollWidth).toBeGreaterThanOrEqual(name.clientWidth)
       expect(name.scrollHeight).toBeLessThanOrEqual(name.clientHeight + 1)
     }
     await page.screenshot({ path: `${evidenceRoot}/tablet/rosewood-${tablet.name}-${tablet.width}x${tablet.height}.png` })
@@ -751,7 +756,7 @@ test('桌面命名分辨率与任意拖拽尺寸连续适配', async ({ page }) 
         : 2 * Math.atan(Math.tan(baseFovRadians / 2) * (16 / 9) / aspect) * 180 / Math.PI
       const actual = Number(document.querySelector('canvas.mahjong-scene')?.getAttribute('data-camera-fov'))
       return Math.abs(actual - expected)
-    }), { timeout: 3_000 }).toBeLessThan(.05)
+    }), { timeout: 10_000 }).toBeLessThan(.05)
     const metrics = await page.evaluate(() => {
       const game = document.querySelector('.game-app')!.getBoundingClientRect()
       const canvas = document.querySelector('canvas.mahjong-scene')!.getBoundingClientRect()

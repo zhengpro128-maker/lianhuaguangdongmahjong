@@ -1,4 +1,4 @@
-export type RuleVariant = 'lotus-classic' | 'lotus-legacy'
+export type RuleVariant = 'lotus-classic' | 'lotus-legacy' | 'lotus-blood-flow' | 'wuhan-huanghuang'
 
 export interface RuleVariantOption {
   id: RuleVariant
@@ -29,8 +29,24 @@ export const RULE_VARIANTS: readonly RuleVariantOption[] = [
     badge: '',
     rulesetId: 'lotus-legacy',
   },
+  {
+    id: 'wuhan-huanghuang',
+    name: '武汉晃晃',
+    description: '武汉晃晃本地规则',
+    highlights: ['120 张牌 · 翻癞子', '可吃碰杠 · 单响截胡', '红中单杠 · 单家 50 分封顶'],
+    badge: '新增',
+    rulesetId: 'wuhan-huanghuang',
+  },
 ]
 
 export function getRuleVariant(id: RuleVariant) {
-  return RULE_VARIANTS.find((variant) => variant.id === id) ?? RULE_VARIANTS[0]
+  if (id === 'lotus-blood-flow') return BLOOD_FLOW_RULE
+  const variant = RULE_VARIANTS.find((variant) => variant.id === id)
+  if (!variant) throw new Error(`Unknown ruleset: ${id}`)
+  return variant
+}
+
+export const BLOOD_FLOW_RULE: RuleVariantOption = {
+  id: 'lotus-blood-flow', name: '莲花麻将·血流', description: '翻精血流规则',
+  highlights: ['多次胡牌', '首胡锁手', '硬胡 ×2 · 单家 64 倍封顶'], badge: '测试', rulesetId: 'lotus-blood-flow',
 }

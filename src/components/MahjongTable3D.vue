@@ -22,16 +22,23 @@ import {
 } from './table/three/sceneRenderProfile'
 import { tableThemeByName, type TableTheme } from './table/three/tableTheme'
 import { createTileInstanceRenderer } from './table/three/tileInstanceRenderer'
+import { TABLE_LAYOUT } from '../game/core/presentation/tableLayout'
 import { createWinEffectPresenter } from './table/three/winEffectPresenter'
 import { createTableTilePresenter } from './table/three/tableTilePresenter'
 import { tileMarkerFor } from './table/three/tileMarker'
 import type { TableProps } from './table/three/tableRenderTypes'
+import { bloodFlowPileAnchor } from './table/three/bloodFlowWinPile'
+import { createBloodFlowWinEffects } from './table/three/bloodFlowWinEffects'
+import { cuePhase } from '../game/variants/lotus/bloodFlow/presentation'
 
 const props = withDefaults(defineProps<TableProps>(), {
   players: () => [], localSeat: 0, currentPlayer: -1, lastDiscard: null, wall: () => [], wallHeadDrawn: 0, wallCount: 0, horses: () => [],
   revealHands: false, winnerIndex: -1, winEffect: null, winPresentation: null,
   jokerTiles: () => [],
   wildcardTiles: () => [],
+  jokerAsLaizi: false,
+  wallTotal: 136,
+  flipStackRemoved: true,
   dealAnimation: () => ({ playerIndex: -1, count: 0, serial: 0 }),
   openingStage: null, diceValues: () => [1, 1], dealerIndex: 0, diceThrowerIndex: 0,
   tableActionEvent: null,
@@ -39,6 +46,7 @@ const props = withDefaults(defineProps<TableProps>(), {
 const emit = defineEmits<{
   ready: []
   loadError: [message: string]
+  pileAnchors: [anchors: { left: number; top: number }[]]
 }>()
 
 const canvas = ref(null)
@@ -49,8 +57,10 @@ let camera
 let resizeObserver
 let animationFrame
 let destroyed = false
+let lastPileAnchors = ''
 let dynamicGroups = []
 let winEffectPresenter: ReturnType<typeof createWinEffectPresenter> | null = null
+let bloodFlowWinEffects: ReturnType<typeof createBloodFlowWinEffects> | null = null
 let dicePresenter: ReturnType<typeof createDicePresenter> | null = null
 let perfHud: ReturnType<typeof createPerfHud> | null = null
 const staticResources = []
@@ -60,13 +70,13 @@ let tableTiles: ReturnType<typeof createTableTilePresenter>
 // 中控台与墨玉台面的 Z 中心（桌身中心，保持不变）
 const PLAY_AREA_OFFSET_Z = -1.65
 // 牌层（牌墙/牌河/手牌/副露/骰子）的 Z 中心：单独向本家（+z）偏移，靠近玩家侧
+function applyTableCamera(position: readonly number[]) {
+  camera.position.set(position[0], position[1], position[2])
+  camera.lookAt(0, 0, renderProfile.camera.lookAtZ)
+}
 const TILE_LAYER_Z = -1.0
-const TILE_GAP_OFFSET = .685    // 手牌间隙和加杠偏移量
-const POINT_GAP_OFFSET = 0.965  // 副露指向的偏移量
-// 副露带逼近手牌时，手牌让位后的「副露-暗手」间距：原 .62 ≈ 半个麻将，改为 1.24 ≈ 一个麻将牌。
-const MELD_HAND_GAP = 1.24
-// 下家（右家）副露整体向上（-z）移动 3 个麻将牌（3 × 牌宽 0.68），给摸牌位（右侧 -z 顶端）留出间隙。
-const MELD_UP_MOVE = 3 * .68
+const TILE_GAP_OFFSET = TABLE_LAYOUT.tilePitch    // 手牌间隙和加杠偏移量
+const POINT_GAP_OFFSET = TABLE_LAYOUT.sourcePitch  // 副露指向的偏移量
 const WALL_DEAL_ORIGIN_Y = 1.1  // 发牌从牌山 head 槽位上方起飞的初始高度（略高于两墩牌顶）
 
 // 触屏设备（真机）判定：主指针 coarse 且无 hover。
@@ -79,14 +89,21 @@ let pixelRatioCap = parseFloat(new URLSearchParams(window.location.search).get('
 // 抗锯齿：默认开（二次元渲染已足够轻，真机也能扛）；?aa=off 可关。
 const aaEnabled = new URLSearchParams(window.location.search).get('aa') !== 'off'
 const cameraLabEnabled = import.meta.env.DEV && new URLSearchParams(window.location.search).has('cameraLab')
-// 廉价真3D 实验开关（dev）：?cheapTable=1 关闭实时阴影/描边/环境反射/面光，走雀魂式低成本渲染。
+// 低成本真 3D 实验开关（dev）：?cheapTable=1 关闭实时阴影/描边/环境反射/面光。
 const cheapTable = import.meta.env.DEV && new URLSearchParams(window.location.search).has('cheapTable')
 // 二次元 cel 渲染：llmAnime 主题默认启用（?animeTable=0 强制关闭回退写实）。
 let animeTable = false
 // 开发态调试钩子：暴露累计渲染帧数 + 最近一帧 draw calls，供 E2E 验证按需渲染与廉价档收益。
+type TableDebugWindow = Window & {
+  __tableRenderedFrames?: () => number
+  __tableDrawCalls?: () => number
+}
+const tableDebugWindow = window as TableDebugWindow
+const renderedFramesProbe = () => renderedFrames
+const drawCallsProbe = () => renderer?.info.render.calls ?? 0
 if (import.meta.env.DEV) {
-  ;(window as unknown as { __tableRenderedFrames?: () => number }).__tableRenderedFrames = () => renderedFrames
-  ;(window as unknown as { __tableDrawCalls?: () => number }).__tableDrawCalls = () => renderer?.info.render.calls ?? 0
+  tableDebugWindow.__tableRenderedFrames = renderedFramesProbe
+  tableDebugWindow.__tableDrawCalls = drawCallsProbe
 }
 const adaptiveQuality = createAdaptiveQualityController({
   override: parseQualityOverride(window.location.search),
@@ -191,7 +208,7 @@ function makeTableTile(topMaterial) {
 }
 
 function makeFaceTile(tileName) {
-  const marker = tileMarkerFor(tileName, props.jokerTiles, props.wildcardTiles)
+  const marker = tileMarkerFor(tileName, props.jokerTiles, props.wildcardTiles, props.jokerAsLaizi)
   return makeTableTile(tableScene.makeFaceMaterial(tileName, marker))
 }
 
@@ -293,6 +310,10 @@ function render(time = 0) {
     const diceActive = dicePresenter?.animate(time) ?? false
     const tilesActive = tableTiles.animate(time, scratchVector)
     const winFrame = winEffectPresenter?.animate(time)
+    const bloodFlowFrame = bloodFlowWinEffects?.animate(time)
+    const bloodFlowActive = bloodFlowFrame?.active ?? false
+    if (props.bloodFlowBatches && canvas.value) canvas.value.dataset.bloodFlowEffects = String(bloodFlowWinEffects?.activeCount ?? 0)
+    if(props.bloodFlowBatches&&canvas.value){canvas.value.dataset.bloodFlowCue=props.bloodFlowCue?.id??'';canvas.value.dataset.bloodFlowCueStart=String(props.bloodFlowCue?.startedAt??'');canvas.value.dataset.bloodFlowPhase=props.bloodFlowCue?cuePhase(props.bloodFlowCue,time):''}
     if (winFrame) {
       // 胡牌演出的 exposure 以旧牌桌 .92 为基准；主题只叠加同样的亮度变化，
       // 不把 llmAnime 的主题基础曝光瞬间拉回旧值。
@@ -300,21 +321,36 @@ function render(time = 0) {
       cameraShakeX = winFrame.shakeX
       cameraShakeZ = winFrame.shakeZ
     }
+    if(bloodFlowFrame&&!winFrame){exposure+=bloodFlowFrame.exposureDelta;cameraShakeX=bloodFlowFrame.shakeX;cameraShakeZ=bloodFlowFrame.shakeZ}
     renderer.toneMappingExposure = exposure
     const cameraPosition = tableCameraPosition(renderProfile, cameraShakeX, cameraShakeZ)
-    camera.position.set(...cameraPosition)
-    camera.lookAt(0, 0, renderProfile.camera.lookAtZ)
+    applyTableCamera(cameraPosition)
+    if (props.bloodFlowBatches) {
+      camera.updateMatrixWorld()
+      if(import.meta.env.DEV&&canvas.value)canvas.value.dataset.bloodFlowFlights=JSON.stringify(tableTiles.flightDebug().map(f=>{
+        const p=new THREE.Vector3(f.source.x,f.source.y,f.source.z).project(camera)
+        return {...f,sourceScreen:{x:(p.x+1)/2,y:(1-p.y)/2}}
+      }))
+      const anchors = [0, 1, 2, 3].map(seat => {
+        const { badge } = bloodFlowPileAnchor(seat, props.bloodFlowCompact)
+        const point = new THREE.Vector3(badge.x, badge.y, badge.z + TILE_LAYER_Z).project(camera)
+        return { left: Number(((point.x + 1) * 50).toFixed(3)), top: Number(((1 - point.y) * 50).toFixed(3)) }
+      })
+      const key = JSON.stringify(anchors)
+      if (key !== lastPileAnchors) { lastPileAnchors = key; emit('pileAnchors', anchors) }
+    }
     if (cameraLabEnabled && canvas.value) {
       const canvasElement = canvas.value as HTMLCanvasElement
-      canvasElement.dataset.cameraPosition = cameraPosition
+      canvasElement.dataset.cameraPosition = camera.position.toArray()
         .map((value) => value.toFixed(6))
         .join(',')
       canvasElement.dataset.cameraFov = camera.fov.toFixed(6)
+      canvasElement.dataset.cameraDirection = camera.getWorldDirection(new THREE.Vector3()).toArray().join(',')
     }
     if (outlineEffect) outlineEffect.render(scene, camera)
     else renderer.render(scene, camera)
     renderedFrames += 1
-    keepGoing = diceActive || tilesActive || Boolean(winFrame) || dirty
+    keepGoing = diceActive || tilesActive || Boolean(winFrame) || bloodFlowActive || dirty
   } finally {
     rendering = false
   }
@@ -440,7 +476,7 @@ onMounted(async () => {
     isGlossy: () => glossyMaterials,
     animeTable,
   })
-  // 描边：二次元档不用后处理描边（雀魂靠 cel 明暗 + 倒角勾边，后处理描边会产生「薄膜」壳）；写实档保留轻薄描边。
+  // 描边：二次元档依靠 cel 明暗与倒角勾边；后处理描边会产生「薄膜」壳，写实档仅保留轻薄描边。
   if (renderProfile.outline && !cheapTable && !animeTable && !isMobileLike) {
     outlineEffect = new OutlineEffect(renderer, {
       defaultThickness: animeTable ? 0.003 : renderProfile.outline.thickness,
@@ -450,6 +486,7 @@ onMounted(async () => {
     })
   }
   tileInstances = createTileInstanceRenderer({
+    capacity: props.bloodFlowBatches ? 512 : undefined,
     scene,
     ownDynamic,
     dynamicGroups,
@@ -459,12 +496,13 @@ onMounted(async () => {
     getJokerAtlasMaterial: tableScene.getJokerAtlasMaterial,
     getWildcardAtlasMaterial: tableScene.getWildcardAtlasMaterial,
     getLaiziAtlasMaterial: tableScene.getLaiziAtlasMaterial,
-    isJoker: (tile) => tileMarkerFor(tile, props.jokerTiles, props.wildcardTiles) === 'joker',
-    isWildcard: (tile) => tileMarkerFor(tile, props.jokerTiles, props.wildcardTiles) === 'wildcard',
-    isLaizi: (tile) => tileMarkerFor(tile, props.jokerTiles, props.wildcardTiles) === 'laizi',
+    isJoker: (tile) => tileMarkerFor(tile, props.jokerTiles, props.wildcardTiles, props.jokerAsLaizi) === 'joker',
+    isWildcard: (tile) => tileMarkerFor(tile, props.jokerTiles, props.wildcardTiles, props.jokerAsLaizi) === 'wildcard',
+    isLaizi: (tile) => tileMarkerFor(tile, props.jokerTiles, props.wildcardTiles, props.jokerAsLaizi) === 'laizi',
     contactShadowY: animeTable ? 0.075 : undefined,
   })
   tableTiles = createTableTilePresenter({
+    projectOwnDraw:point=>{applyTableCamera(tableCameraPosition(renderProfile));camera.updateMatrixWorld();const ray=new THREE.Raycaster();ray.setFromCamera(new THREE.Vector2(point.x*2-1,1-point.y*2),camera);return ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0,1,0),-.56),new THREE.Vector3())},
     props,
     scene,
     dynamicGroups,
@@ -477,13 +515,11 @@ onMounted(async () => {
     playAreaOffsetZ: PLAY_AREA_OFFSET_Z,
     tileGapOffset: TILE_GAP_OFFSET,
     pointGapOffset: POINT_GAP_OFFSET,
-    meldHandGap: MELD_HAND_GAP,
-    meldUpMove: MELD_UP_MOVE,
     wallDealOriginY: WALL_DEAL_ORIGIN_Y,
     addWinEffect: () => winEffectPresenter?.addWinEffect(),
     addWinningDisplayTile: () => winEffectPresenter?.addWinningDisplayTile(),
   })
-  winEffectPresenter = createWinEffectPresenter({
+  const winEffectOptions = {
     scene,
     camera,
     props,
@@ -495,7 +531,10 @@ onMounted(async () => {
     meldTransform: tableTiles.meldTransform,
     alignMeldBottom: tableTiles.alignMeldBottom,
     sourceTileRotationOffset: tableTiles.sourceTileRotationOffset,
-  })
+  }
+  winEffectPresenter = createWinEffectPresenter(winEffectOptions)
+  bloodFlowWinEffects = createBloodFlowWinEffects(winEffectOptions)
+  bloodFlowWinEffects.sync()
   dicePresenter = createDicePresenter({
     scene,
     own,
@@ -565,14 +604,26 @@ watch(
     props.horses?.length,
     props.jokerTiles?.join(','),
     props.wildcardTiles?.join(','),
+    props.jokerAsLaizi,
     props.flipStack,
     props.flipTile,
     props.wallBreakIndex,
+    props.bloodFlowBatches?.map(b => b.batchId).join(','),
+    props.bloodFlowCompact,
+    props.bloodFlowPresentationKey,
+    props.bloodFlowCue?.id,
+    props.bloodFlowHiddenRecords?.join('|'),
+    props.bloodFlowSourceEvent?.id,
+    props.bloodFlowOwnDraw?.sourceId,
+    props.bloodFlowOwnDraw?.x,
+    props.bloodFlowOwnDraw?.y,
+    props.localSeat,
   ),
   // 发牌批次只刷新已有实例的 count / matrix / UV，避免每 150-260ms
   // 销毁并重建整套 InstancedMesh 与 GPU buffer。
   () => {
     tableTiles?.rebuild({ reuseInstances: props.openingStage === 'deal' })
+    bloodFlowWinEffects?.sync()
     invalidate()
   },
 )
@@ -606,14 +657,17 @@ onBeforeUnmount(() => {
   perfHud?.destroy()
   perfHud = null
   resizeObserver?.disconnect()
+  bloodFlowWinEffects?.dispose()
   if (scene) clearDynamicScene()
   staticResources.forEach((resource) => resource.dispose?.())
   renderer?.dispose()
+  if (tableDebugWindow.__tableRenderedFrames === renderedFramesProbe) delete tableDebugWindow.__tableRenderedFrames
+  if (tableDebugWindow.__tableDrawCalls === drawCallsProbe) delete tableDebugWindow.__tableDrawCalls
   outlineEffect = null
   renderer = null
 })
 </script>
 
 <template>
-  <canvas ref="canvas" class="mahjong-scene" aria-hidden="true"></canvas>
+  <canvas ref="canvas" class="mahjong-scene" :data-table-theme="props.themeName ?? 'jade'" aria-hidden="true"></canvas>
 </template>

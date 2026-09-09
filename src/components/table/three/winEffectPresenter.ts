@@ -1,13 +1,14 @@
 import * as THREE from 'three'
-import { addedKongTileOffset } from '../../../game/core/presentation/tableLayout'
+import { addedKongTileOffset, TABLE_LAYOUT, meldTileSpan, meldTileCenter } from '../../../game/core/presentation/tableLayout'
 import { meldDisplayTiles, meldSourceTileIndex } from '../../../game/core/rules/rules'
 import { WIN_EFFECT_DURATION, winDisplayLayout } from '../../../game/core/presentation/winEffect'
 import type { WinEffect } from '../../../game/core/contracts/gamePort'
 import type { TileType } from '../../../game/core/contracts/types'
 import type { ResolvedTableProps, TableTransform } from './tableRenderTypes'
+import { sampleWinningTileFlight, type FlightPose, type WinningTileFlightTiming } from './winningTileFlight'
 
 interface DiamondParticle {
-  mesh: THREE.Mesh<THREE.OctahedronGeometry, THREE.MeshBasicMaterial>
+  mesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>
   direction: THREE.Vector3
   speed: number
   spin: number
@@ -31,7 +32,12 @@ interface WinEffectAnimation {
   reducedMotion: boolean
 }
 
-interface WinEffectPresenterOptions {
+export interface WinEffectPresenterOptions {
+  tileFlight?: { source:FlightPose; target:FlightPose; timing:WinningTileFlightTiming }
+  visual?: {color:number;sparks:readonly number[];shape:string;particleCount:number;particleSpeed:number;beamHeight:number;beamRadius:number;intensity:number;starburstScale:number}
+  winLayout?: (playerIndex: number) => { x: number; y: number; z: number; rotation: number }
+  showWinningTile?: boolean
+  startedAt?: number
   scene: THREE.Scene
   camera: THREE.Camera
   props: Readonly<ResolvedTableProps>
@@ -49,10 +55,11 @@ export function createWinEffectPresenter(options: WinEffectPresenterOptions) {
   const { scene, camera, props, dynamicGroups, own, ownDynamic, makeFaceTile } = options
   const { meldTransform, alignMeldBottom, sourceTileRotationOffset } = options
   const TILE_LAYER_Z = options.tileLayerZ
+  const effectLayout = options.winLayout ?? (options.tileFlight ? () => options.tileFlight!.target : winDisplayLayout)
   let winEffectAnimation: WinEffectAnimation | null = null
 
 function winEffectAnchor(playerIndex) {
-  const layout = winDisplayLayout(playerIndex)
+  const layout = effectLayout(playerIndex)
   return new THREE.Vector3(layout.x, layout.y, layout.z)
 }
 
@@ -101,8 +108,8 @@ function robbedKongSourceTransform(effect: WinEffect) {
     let sourcePlacement: TableTransform | null = null
     laidTiles.forEach((_, tileIndex) => {
       const pointsToSource = tileIndex === sourceTileIndex
-      const tileSpan = pointsToSource ? 1.025 : .725
-      const centerOffset = trackOffset + (tileSpan - .725) / 2
+      const tileSpan = meldTileSpan(pointsToSource)
+      const centerOffset = meldTileCenter(trackOffset, tileSpan)
       const sourceRot = pointsToSource ? sourceTileRotationOffset(relativeSource) : 0
       const transform = alignMeldBottom(
         meldTransform(playerIndex, centerOffset),
@@ -119,7 +126,7 @@ function robbedKongSourceTransform(effect: WinEffect) {
       trackOffset += tileSpan
     })
     if (meldIndex === effect.robbedKongMeldIndex && sourcePlacement) {
-      const offset = addedKongTileOffset(playerIndex)
+      const offset = addedKongTileOffset(playerIndex, TABLE_LAYOUT.tilePitch)
       return {
         position: new THREE.Vector3(
           sourcePlacement.x + offset.x,
@@ -129,7 +136,7 @@ function robbedKongSourceTransform(effect: WinEffect) {
         rotation: sourcePlacement.rotation,
       }
     }
-    trackOffset += .18
+    trackOffset += TABLE_LAYOUT.groupGap
   }
   return null
 }
@@ -146,7 +153,10 @@ function getFlareTexture() {
   flareCanvas.height = 64
   const flareContext = flareCanvas.getContext('2d')
   const flareGradient = flareContext.createRadialGradient(32, 32, 0, 32, 32, 31)
-  if (key === 'anime') {
+  if(options.visual){
+    const color=options.visual.color,r=(color>>16)&255,g=(color>>8)&255,b=color&255
+    flareGradient.addColorStop(0,'rgba(255,255,255,1)');flareGradient.addColorStop(.2,`rgba(${r},${g},${b},.95)`);flareGradient.addColorStop(1,`rgba(${r},${g},${b},0)`)
+  } else if (key === 'anime') {
     flareGradient.addColorStop(0, 'rgba(255,255,255,1)')
     flareGradient.addColorStop(.18, 'rgba(255,151,190,.95)')
     flareGradient.addColorStop(.52, 'rgba(108,220,255,.42)')
@@ -202,14 +212,14 @@ function getBeamTexture() {
 // 信标内芯光束（细、亮）
 let beamGeometry: THREE.CylinderGeometry | null = null
 function getBeamGeometry() {
-  if (!beamGeometry) beamGeometry = own(new THREE.CylinderGeometry(.05, .1, 8.5, 12, 1, true))
+  if (!beamGeometry) beamGeometry = own(new THREE.CylinderGeometry(options.visual?.beamRadius??.05,(options.visual?.beamRadius??.05)*2,options.visual?.beamHeight||8.5,12,1,true))
   return beamGeometry
 }
 
 // 信标外层光晕（宽、柔）
 let beamGlowGeometry: THREE.CylinderGeometry | null = null
 function getBeamGlowGeometry() {
-  if (!beamGlowGeometry) beamGlowGeometry = own(new THREE.CylinderGeometry(.16, .26, 7, 12, 1, true))
+  if (!beamGlowGeometry) beamGlowGeometry = own(new THREE.CylinderGeometry((options.visual?.beamRadius??.08)*2,(options.visual?.beamRadius??.08)*3.25,options.visual?Math.max(.1,options.visual.beamHeight*.82):7,12,1,true))
   return beamGlowGeometry
 }
 
@@ -272,9 +282,9 @@ function getStarburstTexture() {
 }
 
 // 金色菱形粒子几何体（八面体 = 立体菱形）。
-let diamondGeometry: THREE.OctahedronGeometry | null = null
+let diamondGeometry: THREE.BufferGeometry | null = null
 function getDiamondGeometry() {
-  if (!diamondGeometry) diamondGeometry = own(new THREE.OctahedronGeometry(.06, 0))
+  if (!diamondGeometry) diamondGeometry = own(options.visual?.shape==='confetti'?new THREE.PlaneGeometry(.14,.23):options.visual?.shape==='square'?new THREE.PlaneGeometry(.12,.12):new THREE.OctahedronGeometry(.06,0))
   return diamondGeometry
 }
 
@@ -291,7 +301,7 @@ function addWinEffect() {
   // 信标式竖直光束：从胡牌牌垂直射向天空（垂直于牌面），带光晕
   const beamMaterial = ownDynamic(new THREE.MeshBasicMaterial({
     map: getBeamTexture(),
-    color: animeEffect ? 0x36dfff : 0xffffff,
+    color: options.visual?.color ?? (animeEffect ? 0x36dfff : 0xffffff),
     transparent: true,
     opacity: 0,
     blending: THREE.AdditiveBlending,
@@ -301,11 +311,12 @@ function addWinEffect() {
   }))
   beamMaterial.userData.outlineParameters = { visible: false }
   const beam = new THREE.Mesh(getBeamGeometry(), beamMaterial)
-  beam.position.set(anchor.x, anchor.y + .25 + 8.5 / 2, anchor.z)
+  beam.position.set(anchor.x, anchor.y + .25 + (options.visual?.beamHeight??8.5) / 2, anchor.z)
+  if(options.visual)beam.visible=options.visual.beamHeight>0
   group.add(beam)
   const beamGlowMaterial = ownDynamic(new THREE.MeshBasicMaterial({
     map: getBeamTexture(),
-    color: animeEffect ? 0xff4f9a : 0xffffff,
+    color: options.visual?.color ?? (animeEffect ? 0xff4f9a : 0xffffff),
     transparent: true,
     opacity: 0,
     blending: THREE.AdditiveBlending,
@@ -315,13 +326,14 @@ function addWinEffect() {
   }))
   beamGlowMaterial.userData.outlineParameters = { visible: false }
   const beamGlow = new THREE.Mesh(getBeamGlowGeometry(), beamGlowMaterial)
-  beamGlow.position.set(anchor.x, anchor.y + .3 + 7 / 2, anchor.z)
+  beamGlow.position.set(anchor.x, anchor.y + .3 + (options.visual?options.visual.beamHeight*.82:7) / 2, anchor.z)
+  if(options.visual)beamGlow.visible=options.visual.beamHeight>0
   group.add(beamGlow)
 
   // 星芒：光束底部向外爆发的光芒（与信标光束叠加）
   const starburstMaterial = ownDynamic(new THREE.SpriteMaterial({
     map: getStarburstTexture(),
-    color: animeEffect ? 0xffffff : 0xffd86e,
+    color: options.visual?.color ?? (animeEffect ? 0xffffff : 0xffd86e),
     transparent: true,
     opacity: 0,
     blending: THREE.AdditiveBlending,
@@ -337,7 +349,7 @@ function addWinEffect() {
   // 金色光晕：落在牌上的强光晕
   const glowMaterial = ownDynamic(new THREE.SpriteMaterial({
     map: getFlareTexture(),
-    color: animeEffect ? 0xffffff : 0xffc23d,
+    color: options.visual?.color ?? (animeEffect ? 0xffffff : 0xffc23d),
     transparent: true,
     opacity: 0,
     blending: THREE.AdditiveBlending,
@@ -360,14 +372,16 @@ function addWinEffect() {
     toneMapped: !animeEffect,
   }))
   diamondMaterial.userData.outlineParameters = { visible: false }
-  const diamonds = Array.from({ length: 40 }, (_, index) => {
-    const y = (index / 40) * 2 - 1
+  const particleCount=options.visual?.particleCount??40
+  const diamonds = Array.from({ length: particleCount }, (_, index) => {
+    const y = (index / particleCount) * 2 - 1
     const radius = Math.sqrt(Math.max(0, 1 - y * y))
     const theta = index * 2.39996
-    const speed = 1.5 + index % 8 * .26
+    const speed = (1.5 + index % 8 * .26)*(options.visual?.particleSpeed??1)
     const diamond = new THREE.Mesh(getDiamondGeometry(), diamondMaterial.clone())
     ownDynamic(diamond.material)
-    if (animeEffect) {
+    if(options.visual){diamond.material.color.set(options.visual.sparks[index%options.visual.sparks.length]);diamond.material.side=THREE.DoubleSide}
+    else if (animeEffect) {
       diamond.material.color.set([0xff9fc2, 0x8fe5ff, 0xffe3a8][index % 3])
     }
     diamond.scale.setScalar(.6 + index % 4 * .22)
@@ -383,12 +397,12 @@ function addWinEffect() {
 
   // 胡牌牌：飞入 + 落地弹跳。四红中时 4 张红中已在花杠区，不单独飞牌（避免多一张红中）。
   const isFourRed = isFourRedWin()
-  const winningTile = isFourRed ? null : makeFaceTile(props.winEffect.tile)
+  const winningTile = isFourRed || options.showWinningTile === false ? null : makeFaceTile(props.winEffect.tile)
   const robbedKongSource = robbedKongSourceTransform(props.winEffect)
-  const startPosition = robbedKongSource?.position
+  const startPosition = (options.tileFlight ? new THREE.Vector3(options.tileFlight.source.x, options.tileFlight.source.y, options.tileFlight.source.z) : null) ?? robbedKongSource?.position
     ?? anchor.clone().addScaledVector(outward, 1.08).setY(anchor.y)
-  const seatRotation = winDisplayLayout(props.winEffect.winnerIndex).rotation
-  const startRotation = robbedKongSource?.rotation ?? seatRotation
+  const seatRotation = effectLayout(props.winEffect.winnerIndex).rotation
+  const startRotation = options.tileFlight?.source.rotation ?? robbedKongSource?.rotation ?? seatRotation
   if (winningTile) {
     winningTile.position.copy(startPosition)
     winningTile.rotation.y = startRotation
@@ -399,7 +413,7 @@ function addWinEffect() {
   scene.add(group)
   dynamicGroups.push(group)
   winEffectAnimation = {
-    startedAt: performance.now(), anchor, burstAnchor, outward,
+    startedAt: options.startedAt ?? performance.now(), anchor, burstAnchor, outward,
     beam, beamGlow, starburst, glow, diamonds, winningTile,
     startPosition, startRotation, seatRotation,
     duration: props.winEffect.duration ?? WIN_EFFECT_DURATION,
@@ -412,22 +426,26 @@ function addWinEffect() {
     const effect = winEffectAnimation
     const progress = Math.max(0, Math.min(1, (time - effect.startedAt) / effect.duration))
     if (progress >= 1) return null
-    const approach = effect.reducedMotion ? 1 : THREE.MathUtils.smoothstep(progress, .02, .15)
     if (effect.winningTile) {
-      effect.winningTile.position.lerpVectors(effect.startPosition, effect.anchor, approach)
-      effect.winningTile.rotation.set(0, THREE.MathUtils.lerp(effect.startRotation, effect.seatRotation, approach), 0)
-      const pop = Math.sin(Math.min(1, approach) * Math.PI) * .28
-      effect.winningTile.scale.setScalar(THREE.MathUtils.lerp(.7, 1, approach) + pop)
+      const external=options.tileFlight
+      const pose=sampleWinningTileFlight(
+        external?.source??{...effect.startPosition,rotation:effect.startRotation},
+        external?.target??{...effect.anchor,rotation:effect.seatRotation},
+        external?.timing??{takeoffAt:effect.startedAt+effect.duration*.02,
+          impactAt:effect.startedAt+effect.duration*.15,landedAt:effect.startedAt+effect.duration*.15},time,effect.reducedMotion)
+      effect.winningTile.position.set(pose.x,pose.y,pose.z)
+      effect.winningTile.rotation.set(pose.tilt,pose.rotation,0)
+      effect.winningTile.scale.setScalar(pose.scale)
     }
     const beamIn = THREE.MathUtils.smoothstep(progress, .08, .15)
     const beamOut = 1 - THREE.MathUtils.smoothstep(progress, .55, 1)
     const beamVis = beamIn * beamOut
-    effect.beam.material.opacity = beamVis * (props.themeName === 'llmAnime' ? .92 : .8)
-    effect.beamGlow.material.opacity = beamVis * (props.themeName === 'llmAnime' ? .62 : .32)
+    effect.beam.material.opacity = beamVis * (props.themeName === 'llmAnime' ? .92 : .8)*(options.visual?.intensity??1)
+    effect.beamGlow.material.opacity = beamVis * (props.themeName === 'llmAnime' ? .62 : .32)*(options.visual?.intensity??1)
     const burstIn = THREE.MathUtils.smoothstep(progress, .08, .16)
     const burstOut = 1 - THREE.MathUtils.smoothstep(progress, .3, .42)
     effect.starburst.material.opacity = burstIn * burstOut * .85
-    effect.starburst.scale.setScalar(THREE.MathUtils.lerp(.4, 3, burstIn) * (1 + (1 - burstOut) * .2))
+    effect.starburst.scale.setScalar(THREE.MathUtils.lerp(.4, options.visual?.starburstScale??3, burstIn) * (1 + (1 - burstOut) * .2))
     const glowIn = THREE.MathUtils.smoothstep(progress, .3, .5)
     const glowOut = 1 - THREE.MathUtils.smoothstep(progress, .85, 1)
     effect.glow.material.opacity = glowIn * glowOut * .85
