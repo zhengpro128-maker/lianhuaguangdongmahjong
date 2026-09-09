@@ -15,7 +15,7 @@
 
 ## 构建
 
-复制示例环境变量并配置正式 HTTPS API：
+复制示例环境变量，配置正式 HTTPS API 和小游戏 AppID：
 
 ```bash
 cp .env.wechat.example .env.wechat.local
@@ -27,8 +27,11 @@ cp .env.wechat.example .env.wechat.local
 npm run build:wechat -- --mode wechat
 ```
 
-使用微信开发者工具导入 `dist-wechat-game/`。取得正式 AppID 后，将生成产物中的
-`project.config.json` 的 `appid` 改为正式值；不要提交 AppSecret。
+使用微信开发者工具导入 `dist-wechat-game/`。生成产物中的 `project.config.json`
+会自动写入 `VITE_WECHAT_APP_ID`；不要手工修改生成文件，也不要提交 AppSecret。
+
+当前 Canvas 启动页用于联机链路调试：会显示微信登录、云托管请求和 WebSocket 状态，
+并提供创建房间、加入分享邀请、准备、分享和房主开局操作。完整牌桌仍需继续迁移。
 
 ## 后端接口契约
 

@@ -5,6 +5,9 @@ export default defineConfig(({ mode }) => {
   if (!env.VITE_WECHAT_API_BASE) {
     throw new Error('VITE_WECHAT_API_BASE is required for the WeChat build')
   }
+  if (!env.VITE_WECHAT_APP_ID || env.VITE_WECHAT_APP_ID === 'touristappid') {
+    throw new Error('VITE_WECHAT_APP_ID is required for the WeChat build')
+  }
 
   return {
     publicDir: false,
@@ -37,7 +40,7 @@ export default defineConfig(({ mode }) => {
           type: 'asset',
           fileName: 'project.config.json',
           source: JSON.stringify({
-            appid: 'touristappid',
+            appid: env.VITE_WECHAT_APP_ID,
             compileType: 'game',
             projectname: 'lianhua-guangma-wechat',
             setting: { es6: true, minified: true, urlCheck: true },
