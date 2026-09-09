@@ -1,9 +1,9 @@
 import type { RoundResult } from '../../core/contracts/gamePort'
-import type { Meld, TableActionType, TileType } from '../../core/contracts/types'
+import type { TableActionType, TileType } from '../../core/contracts/types'
 import { removeLastDiscard } from '../../core/rules/actions'
 import { createSettlementTimeline } from '../../shared/settlement/settlementTimeline'
-import type { WuhanKongKind } from './ruleProfile'
-import { evaluateWuhanWin, withWuhanWinScenes, wuhanWinPayment, WUHAN_RULESET } from './rules'
+import { wuhanKongKinds } from './ruleProfile'
+import { evaluateWuhanWin, withWuhanWinScenes, wuhanMeetsMinimum, wuhanWinPayment, WUHAN_RULESET } from './rules'
 import type { WuhanEndGameOptions, WuhanGameState } from './wuhanState'
 import type { RuleSet } from '../../core/rules/ruleset'
 
@@ -19,15 +19,6 @@ interface Options {
   ruleset?: RuleSet
   getThemeName?: () => string
   animeFixedTts?: unknown
-}
-
-function kongKinds(melds: readonly Meld[], joker: TileType | undefined): WuhanKongKind[] {
-  return melds.flatMap((meld): WuhanKongKind[] => {
-    if (meld.type === 'flower' && meld.tile === 'red') return ['red']
-    if (meld.type === 'angang') return [meld.tile === joker ? 'joker' : 'concealed']
-    if (meld.type === 'gang') return [meld.added ? 'added' : 'discard']
-    return []
-  })
 }
 
 export function createWuhanSettlement(options: Options) {
@@ -62,7 +53,8 @@ export function createWuhanSettlement(options: Options) {
       const exposed = options.structuralMeldCount(winnerIndex)
       const joker = state.jokerTiles.value[0]
       const ordinaryJokers = !endOptions.selfDraw && endOptions.winTile === joker ? [endOptions.winTile] : []
-      const baseKinds = evaluateWuhanWin(winHand, { exposed, joker, ordinaryJokers })
+      const menQianQing = winner.melds.every(meld => meld.type === 'angang' || meld.type === 'flower')
+      const baseKinds = evaluateWuhanWin(winHand, { exposed, joker, ordinaryJokers, menQianQing })
       const kinds = withWuhanWinScenes(baseKinds, winHand, {
         exposed,
         joker,
@@ -72,8 +64,10 @@ export function createWuhanSettlement(options: Options) {
         robbedKong: Boolean(endOptions.robbedKong),
       })
       const hard = !joker || !winHand.includes(joker)
-      const payment = wuhanWinPayment(kinds, Boolean(endOptions.selfDraw || endOptions.robbedKong), hard, kongKinds(winner.melds, joker))
-      const payer = endOptions.selfDraw || endOptions.robbedKong ? null : endOptions.sourceFrom
+      const selfDrawStyle = Boolean(endOptions.selfDraw || endOptions.robbedKong)
+      const discardWin = !endOptions.selfDraw && !endOptions.robbedKong
+      const payment = wuhanWinPayment(kinds, selfDrawStyle, hard, wuhanKongKinds(winner.melds, joker), discardWin)
+      const payer = discardWin ? endOptions.sourceFrom : null
       const totalWon = ruleset.score.applyWinScore(state.players, winnerIndex, payment, payer)
       return {
         winnerIndex,
@@ -85,7 +79,9 @@ export function createWuhanSettlement(options: Options) {
         details: [
           ...kinds.map((label) => ({ label })),
           { label: hard ? '硬胡' : '软胡', multiplier: hard ? 2 : 1 },
-          ...kongKinds(winner.melds, joker).map((kind) => ({ label: `杠番·${kind}`, multiplier: kind === 'concealed' || kind === 'joker' ? 4 : 2 })),
+          ...(discardWin && kinds.some(kind => kind !== '屁胡') ? [{ label: '大胡点炮', multiplier: 1.2 }] : []),
+          ...(discardWin ? [{ label: '放炮者额外支付', points: 2 }] : []),
+          ...wuhanKongKinds(winner.melds, joker).map((kind) => ({ label: `杠番·${kind}`, multiplier: kind === 'concealed' || kind === 'joker' ? 4 : 2 })),
         ],
         winType: endOptions.robbedKong ? 'robbed-kong' : endOptions.selfDraw ? 'self-draw' : 'discard',
         ...endOptions,
@@ -109,14 +105,36 @@ export function createWuhanSettlement(options: Options) {
       : endOptions.winTile ? [...winner.hand, endOptions.winTile] : null
     if (!hand) return false
     if (!endOptions.selfDraw && !endOptions.robbedKong && (hand.includes('green') || hand.includes('white'))) return false
-    return ruleset.win.isWinningHand(hand, options.structuralMeldCount(winnerIndex), {
+    const exposed = options.structuralMeldCount(winnerIndex)
+    const ordinaryJokers = endOptions.winTile === state.jokerTiles.value[0] && !endOptions.selfDraw ? [endOptions.winTile] : []
+    if (!ruleset.win.isWinningHand(hand, exposed, {
       jokers: state.jokerTiles.value,
-      ordinaryJokers: endOptions.winTile === state.jokerTiles.value[0] && !endOptions.selfDraw ? [endOptions.winTile] : [],
+      ordinaryJokers,
+    })) return false
+    const joker = state.jokerTiles.value[0]
+    const menQianQing = winner.melds.every(meld => meld.type === 'angang' || meld.type === 'flower')
+    const baseKinds = evaluateWuhanWin(hand, { exposed, joker, ordinaryJokers, menQianQing })
+    const kinds = withWuhanWinScenes(baseKinds, hand, {
+      exposed,
+      joker,
+      selfDraw: Boolean(endOptions.selfDraw),
+      discardWin: !endOptions.selfDraw && !endOptions.robbedKong,
+      kongBloom: Boolean(endOptions.kongBloom),
+      robbedKong: Boolean(endOptions.robbedKong),
     })
+    const selfDrawStyle = Boolean(endOptions.selfDraw || endOptions.robbedKong)
+    return wuhanMeetsMinimum(
+      kinds,
+      selfDrawStyle,
+      !joker || !hand.includes(joker),
+      wuhanKongKinds(winner.melds, joker),
+      !endOptions.selfDraw && !endOptions.robbedKong,
+    )
   }
 
   return {
     ...timeline,
+    isLegalWin,
     endGame(winnerIndex: number, endOptions: WuhanEndGameOptions = {}) {
       if (!isLegalWin(winnerIndex, endOptions)) return
       return timeline.endGame(winnerIndex, endOptions)

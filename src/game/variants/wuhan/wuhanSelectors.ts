@@ -8,7 +8,11 @@ import type { WuhanGameState } from './wuhanState'
 
 export { structuralMeldCount }
 
-export function createWuhanSelectors(state: WuhanGameState, ruleset: RuleSet = WUHAN_RULESET) {
+export function createWuhanSelectors(
+  state: WuhanGameState,
+  ruleset: RuleSet = WUHAN_RULESET,
+  canSelfDraw?: (playerIndex: number) => boolean,
+) {
   const common = createCommonGameSelectors(state, MATCH_NAMES)
   const playerSelectors = createRulePlayerSelectors({
     players: state.players,
@@ -23,5 +27,9 @@ export function createWuhanSelectors(state: WuhanGameState, ruleset: RuleSet = W
     waitingTiles: (hand, meldCount) => ruleset.win.waitingTiles(hand, meldCount, { jokers: state.jokerTiles.value }),
     matchingCount,
   })
-  return { ...common, ...playerSelectors, userHasWindKong: computed(() => false) }
+  const userCanHu = computed(() => Boolean(common.user.value)
+    && common.isUserTurn.value
+    && state.userDrewThisTurn.value
+    && (canSelfDraw?.(0) ?? playerSelectors.userCanHu.value))
+  return { ...common, ...playerSelectors, userCanHu, userHasWindKong: computed(() => false) }
 }

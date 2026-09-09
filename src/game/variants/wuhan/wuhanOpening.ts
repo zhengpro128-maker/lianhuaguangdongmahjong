@@ -19,6 +19,7 @@ interface Options {
   getRoundLabel(): string
   beginTurn(playerIndex: number, options?: { skipDraw?: boolean; fromTail?: boolean; preDrawn?: boolean }): unknown
   endGame(winnerIndex: number, options?: WuhanEndGameOptions): unknown
+  isLegalWin(winnerIndex: number, options: WuhanEndGameOptions): boolean
   ruleset?: RuleSet
   playerSeeds?: Array<PlayerSeed | undefined>
   humanPlayerSeed?: PlayerSeed
@@ -145,8 +146,9 @@ export function createWuhanOpening(options: Options) {
     state.dealAnimation.value = { playerIndex: -1, count: 0, serial: state.dealAnimation.value.serial + 1 }
     options.announce(`${options.getRoundLabel()} · 武汉晃晃开牌`)
     const dealer = state.players[state.dealer.value]
-    if (ruleset.win.isWinningHand(dealer.hand, 0, { jokers: state.jokerTiles.value })) {
-      return options.endGame(state.dealer.value, { selfDraw: true, winHand: [...dealer.hand] })
+    const openingWin = { selfDraw: true, winHand: [...dealer.hand] }
+    if (options.isLegalWin(state.dealer.value, openingWin)) {
+      return options.endGame(state.dealer.value, openingWin)
     }
     if (startOptions.waitForOpeningReady) {
       await startOptions.waitForOpeningReady()

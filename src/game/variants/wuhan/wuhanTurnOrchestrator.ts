@@ -37,6 +37,7 @@ interface WuhanTurnOrchestratorOptions {
   discardTile(playerIndex: number, handIndex: number): unknown
   endDraw(): unknown
   endGame(winnerIndex: number, options?: WuhanEndGameOptions): unknown
+  isLegalWin(winnerIndex: number, options: WuhanEndGameOptions): boolean
   announce(text: string, tone?: string): void
   later(callback: () => void, delay: number): number
   ruleset?: RuleSet
@@ -70,32 +71,25 @@ export function createWuhanTurnOrchestrator(options: WuhanTurnOrchestratorOption
     return (to - from + state.players.length) % state.players.length
   }
 
-  function canWinDiscard(playerIndex: number, tile: TileType) {
+  function canWinDiscard(playerIndex: number, tile: TileType, from: number) {
     const player = state.players[playerIndex]
     if (!player) return false
     const winHand = [...player.hand, tile]
     // 发财、白板在武汉晃晃中见字只能自摸（抢杠另行判定）。
     if (winHand.includes('green') || winHand.includes('white')) return false
-    return ruleset.win.isWinningHand(
-      [...player.hand, tile],
-      options.structuralMeldCount(playerIndex),
-      {
-        jokers: state.jokerTiles.value,
-        ordinaryJokers: (state.jokerTiles.value.includes(tile) || state.wildcardTiles.value.includes(tile)) ? [tile] : [],
-        jokerSubstitutes: state.wildcardTiles.value,
-      },
-    )
+    return options.isLegalWin(playerIndex, { winTile: tile, winHand, sourceFrom: from })
   }
 
   function canRobKong(playerIndex: number, tile: TileType) {
     const player = state.players[playerIndex]
     if (!player) return false
-    return ruleset.win.canRobKong(
-      player.hand,
-      tile,
-      options.structuralMeldCount(playerIndex),
-      { jokers: state.jokerTiles.value, jokerSubstitutes: state.wildcardTiles.value },
-    )
+    return options.isLegalWin(playerIndex, {
+      robbedKong: true,
+      robbedKongPlayerIndex: state.currentPlayer.value,
+      winTile: tile,
+      winHand: [...player.hand, tile],
+      sourceFrom: state.currentPlayer.value,
+    })
   }
 
   function beginTurn(playerIndex: number, turnOptions: TurnOptions = {}) {
@@ -109,7 +103,7 @@ export function createWuhanTurnOrchestrator(options: WuhanTurnOrchestratorOption
       .map((player, playerIndex) => ({
         playerIndex,
         distance: seatDistance(from, playerIndex),
-        canHu: playerIndex !== from && canWinDiscard(playerIndex, tile),
+        canHu: playerIndex !== from && canWinDiscard(playerIndex, tile, from),
       }))
       .filter(({ canHu }) => canHu)
       .sort((a, b) => a.distance - b.distance)
@@ -160,7 +154,7 @@ export function createWuhanTurnOrchestrator(options: WuhanTurnOrchestratorOption
     }
     const action = await options.controllers[playerIndex].requestDiscardHu(ctx)
     if (hasSettled()) return
-    if (action.kind !== 'win' || !canWinDiscard(playerIndex, tile)) {
+    if (action.kind !== 'win' || !canWinDiscard(playerIndex, tile, from)) {
       decisions.set(playerIndex, action)
       if (action.kind === 'win') decisions.set(playerIndex, { kind: 'pass' })
       void offerHu(remaining, from, tile, isFirstDiscard, decisions)
@@ -491,9 +485,10 @@ export function createWuhanTurnOrchestrator(options: WuhanTurnOrchestratorOption
     handleAction: async (action, playerIndex, player, _turnOptions, api) => {
         switch (action.kind) {
           case 'win':
-            if (!ruleset.win.isWinningHand(player.hand, options.structuralMeldCount(playerIndex), {
-              jokers: state.jokerTiles.value,
-              jokerSubstitutes: state.wildcardTiles.value,
+            if (!options.isLegalWin(playerIndex, {
+              selfDraw: true,
+              kongBloom: api.isKongDraw(playerIndex),
+              winHand: [...player.hand],
             })) {
               return options.discardTile(playerIndex, player.hand.length - 1)
             }

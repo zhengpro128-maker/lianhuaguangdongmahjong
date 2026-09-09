@@ -1,4 +1,4 @@
-import type { TileType } from '../../core/contracts/types'
+import type { Meld, TileType } from '../../core/contracts/types'
 import { shuffle } from '../../core/rules/tiles'
 
 /** 武汉晃晃只使用三门数牌和中发白，共 120 张。 */
@@ -31,6 +31,15 @@ export function createWuhanWall(random: () => number = Math.random): TileType[] 
 }
 
 export type WuhanKongKind = 'red' | 'discard' | 'added' | 'concealed' | 'joker'
+
+export function wuhanKongKinds(melds: readonly Meld[], joker: TileType | undefined): WuhanKongKind[] {
+  return melds.flatMap((meld): WuhanKongKind[] => {
+    if (meld.type === 'flower' && meld.tile === 'red') return ['red']
+    if (meld.type === 'angang') return [meld.tile === joker ? 'joker' : 'concealed']
+    if (meld.type === 'gang') return [meld.added ? 'added' : 'discard']
+    return []
+  })
+}
 
 /** 以“番”为指数：1 番=×2，2 番=×4；多次杠相乘。 */
 export function wuhanKongMultiplier(kongs: readonly WuhanKongKind[]): number {
