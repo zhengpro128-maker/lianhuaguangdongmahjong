@@ -10,9 +10,7 @@ export default defineConfig(({ mode }) => {
   }
 
   return {
-    // 小游戏包内直接使用浏览器版同一套牌面、牌背和主题资源。这里不能关闭
-    // publicDir，否则运行时只能画出临时占位图，导致小游戏与现有牌桌视觉脱节。
-    publicDir: 'public',
+    publicDir: false,
     build: {
       outDir: 'dist-wechat-game',
       emptyOutDir: true,
