@@ -22,6 +22,24 @@ export interface WxCanvasLike {
   getContext(contextId: '2d'): CanvasRenderingContext2D | null
 }
 
+/** 小游戏原生图片对象。不要依赖浏览器 Image / HTMLImageElement。 */
+export interface WxImageLike {
+  src: string
+  width?: number
+  height?: number
+  onload: (() => void) | null
+  onerror: ((error: unknown) => void) | null
+}
+
+export interface WxInnerAudioContextLike {
+  src: string
+  volume: number
+  loop: boolean
+  play(): void
+  stop(): void
+  destroy(): void
+}
+
 export interface WxTouchEvent {
   changedTouches?: Array<{
     clientX?: number
@@ -59,12 +77,26 @@ export interface WxGameApi {
   getLaunchOptionsSync(): WxLaunchOptions
   onShow(callback: (options: WxLaunchOptions) => void): void
   createCanvas(): WxCanvasLike
+  createImage(): WxImageLike
+  createInnerAudioContext?(): WxInnerAudioContextLike
   getSystemInfoSync(): {
     screenWidth: number
     screenHeight: number
     pixelRatio?: number
   }
   onTouchEnd(callback: (event: WxTouchEvent) => void): void
+  showKeyboard?(options: {
+    defaultValue?: string
+    maxLength?: number
+    multiple?: boolean
+    confirmType?: 'done' | 'next' | 'search' | 'go' | 'send'
+    success?: () => void
+    fail?: (error: unknown) => void
+  }): void
+  hideKeyboard?(): void
+  onKeyboardConfirm?(callback: (event: { value: string }) => void): void
+  offKeyboardConfirm?(callback: (event: { value: string }) => void): void
+  setClipboardData?(options: { data: string; success?: () => void; fail?: (error: unknown) => void }): void
   showShareMenu?(options: {
     withShareTicket?: boolean
     menus?: string[]

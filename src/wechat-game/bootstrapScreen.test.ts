@@ -46,7 +46,9 @@ describe('wechat bootstrap screen', () => {
     expect(value.wx.showShareMenu).toHaveBeenCalled()
 
     await screen.runAction('create')
-    expect(value.runtime.createRoom).toHaveBeenCalledWith({ nickname: '微信玩家' })
+    expect(value.runtime.createRoom).toHaveBeenCalledWith({
+      nickname: '微信玩家', mode: 'east', rulesetId: 'lotus-classic',
+    })
     expect(screen.getState().headline).toBe('房间 ABC123')
     expect(screen.getState().socketStatus).toBe('连接中')
     value.socket.onopen()
