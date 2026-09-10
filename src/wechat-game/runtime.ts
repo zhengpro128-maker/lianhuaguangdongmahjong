@@ -212,9 +212,19 @@ export function createWechatGameRuntime(options: {
   async function getCurrentRoom(): Promise<WechatRoomInfo | null> {
     const session = sessionStore.loadSession()
     if (!session) return null
-    return authenticatedRequest<WechatRoomInfo>(
-      `/api/rooms/${encodeURIComponent(session.roomId)}`,
-    )
+    try {
+      return await authenticatedRequest<WechatRoomInfo>(
+        `/api/rooms/${encodeURIComponent(session.roomId)}`,
+      )
+    } catch (error) {
+      // A persisted room can disappear after the server expires or closes it. Treat that as
+      // a completed restore instead of trapping every subsequent launch on a startup error.
+      if (error instanceof WechatRemoteApiError && (error.status === 404 || error.status === 410)) {
+        sessionStore.clearSession()
+        return null
+      }
+      throw error
+    }
   }
 
   async function leaveCurrentRoom(): Promise<void> {

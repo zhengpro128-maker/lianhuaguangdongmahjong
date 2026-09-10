@@ -136,6 +136,25 @@ describe('wechat game runtime', () => {
     })
   })
 
+  it('clears a persisted session when its room no longer exists', async () => {
+    const harness = createWxHarness()
+    const runtime = createWechatGameRuntime({
+      wx: harness.wx, apiBase: 'https://api.example.com', now: () => 1_000_000,
+    })
+    await runtime.createRoom({ nickname: '房主' })
+    const request = harness.wx.request
+    harness.wx.request = (options: any) => {
+      if (options.url.endsWith('/ABC123') && options.method === 'GET') {
+        options.success({ statusCode: 404, data: { detail: 'Not Found' } })
+        return
+      }
+      request(options)
+    }
+
+    await expect(runtime.getCurrentRoom()).resolves.toBeNull()
+    expect(runtime.sessionStore.loadSession()).toBeNull()
+  })
+
   it('restores a non-expired login without calling wx.login', async () => {
     const harness = createWxHarness()
     harness.values.set('lgm_wechat_auth_session', JSON.stringify({
