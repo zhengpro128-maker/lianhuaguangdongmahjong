@@ -29,7 +29,7 @@ cp .env.wechat.example .env.wechat.local
 构建：
 
 ```bash
-npm run build:wechat -- --mode wechat
+pnpm build:wechat
 ```
 
 使用微信开发者工具导入 `dist-wechat-game/`。生成产物中的 `project.config.json`
