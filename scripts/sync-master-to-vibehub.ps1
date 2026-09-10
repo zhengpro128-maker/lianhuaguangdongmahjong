@@ -108,7 +108,9 @@ try {
   $masterOnly = @(
     '.env.wechat.example'
     'docs/wechat-game-development.md'
+    'scripts/build-wechat-miniprogram.mjs'
     'src/wechat-game'
+    'src/wechat-miniprogram'
     'vite.config.wechat.ts'
     'src/game/online/api'
     'src/game/online/session/remoteRoomLifecycle.ts'

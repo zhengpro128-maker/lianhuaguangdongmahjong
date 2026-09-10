@@ -1,0 +1,12 @@
+{
+  "appid": "__WECHAT_APP_ID__",
+  "compileType": "miniprogram",
+  "miniprogramRoot": "./",
+  "projectname": "lianhua-guangma-wechat",
+  "setting": {
+    "es6": true,
+    "postcss": true,
+    "minified": true,
+    "urlCheck": true
+  }
+}

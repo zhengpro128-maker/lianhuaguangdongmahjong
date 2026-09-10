@@ -1,0 +1,9 @@
+{
+  "desc": "莲花广麻标准小程序入口",
+  "rules": [
+    {
+      "action": "allow",
+      "page": "pages/index/index"
+    }
+  ]
+}

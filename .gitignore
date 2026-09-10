@@ -92,6 +92,7 @@ out
 .nuxt
 dist
 dist-wechat-game/
+dist-wechat-miniprogram/
 .output
 
 # Gatsby files
