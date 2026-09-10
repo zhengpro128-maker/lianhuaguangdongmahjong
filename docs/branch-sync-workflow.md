@@ -38,8 +38,10 @@
   `src/game/variants/lotus/lotusGame.ts`（P2P 权威边界/无头房主扩展）
 - `index.html`、`vite.config.ts`、`playwright.config.ts`、`src/content/disclaimer.ts`
 
-微信小游戏使用 WebSocket 后端，`src/wechat-game/`、`vite.config.wechat.ts`、
-`.env.wechat.example` 与 `docs/wechat-game-development.md` 仅保留在 master。
+微信端仅在 master 维护：标准小程序模板位于 `src/wechat-miniprogram/`，旧版原生
+Canvas 小游戏位于 `src/wechat-game/`；`scripts/build-wechat-miniprogram.mjs`、
+`vite.config.wechat.ts`、`.env.wechat.example` 与 `docs/wechat-game-development.md`
+也仅保留在 master。
 
 ## 注意
 
