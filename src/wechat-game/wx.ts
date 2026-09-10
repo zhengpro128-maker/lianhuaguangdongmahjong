@@ -22,6 +22,15 @@ export interface WxCanvasLike {
   getContext(contextId: '2d'): CanvasRenderingContext2D | null
 }
 
+/** 小游戏原生图片对象。不要用浏览器的 Image / HTMLImageElement。 */
+export interface WxImageLike {
+  src: string
+  width?: number
+  height?: number
+  onload: (() => void) | null
+  onerror: ((error: unknown) => void) | null
+}
+
 export interface WxTouchEvent {
   changedTouches?: Array<{
     clientX?: number
@@ -59,6 +68,7 @@ export interface WxGameApi {
   getLaunchOptionsSync(): WxLaunchOptions
   onShow(callback: (options: WxLaunchOptions) => void): void
   createCanvas(): WxCanvasLike
+  createImage(): WxImageLike
   getSystemInfoSync(): {
     screenWidth: number
     screenHeight: number

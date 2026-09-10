@@ -1,5 +1,7 @@
 import type { WechatGameRuntime, WechatRoomInfo } from './runtime'
 import { errorMessage, type WxGameApi, type WxTouchEvent } from './wx'
+import { createWechatNativeTable } from './nativeTable'
+import { decodeServerMessage } from '../game/online/protocol/decoder'
 
 interface Button {
   id: 'create' | 'join' | 'refresh' | 'ready' | 'share' | 'start'
@@ -60,6 +62,17 @@ export function mountWechatBootstrapScreen(options: {
   }
   let buttons: Button[] = []
   let socket: ReturnType<WechatGameRuntime['socketFactory']> | null = null
+  const table = createWechatNativeTable({
+    wx: options.wx,
+    context,
+    width,
+    height,
+    dpr,
+    send(message) {
+      if (!socket || socket.readyState !== 1) return
+      socket.send(JSON.stringify(message))
+    },
+  })
 
   function drawText(text: string, x: number, y: number, maxWidth: number) {
     context.fillText(text.length > 54 ? `${text.slice(0, 51)}...` : text, x, y, maxWidth)
@@ -76,6 +89,10 @@ export function mountWechatBootstrapScreen(options: {
   }
 
   function render() {
+    if (table.active()) {
+      table.render()
+      return
+    }
     context.setTransform(dpr, 0, 0, dpr, 0, 0)
     context.fillStyle = '#071711'
     context.fillRect(0, 0, width, height)
@@ -150,6 +167,25 @@ export function mountWechatBootstrapScreen(options: {
       state.socketStatus = '已断开'
       render()
     }
+    socket.onmessage = (event) => {
+      try {
+        const message = decodeServerMessage(JSON.parse(event.data))
+        if (!message) return
+        if (message.kind === 'state_snapshot') {
+          table.receive(message)
+          return
+        }
+        if (message.kind === 'turn_request' || message.kind === 'claim_request' || message.kind === 'rob_kong_request') {
+          table.receiveMessage(message)
+          return
+        }
+        if (message.kind === 'error' || message.kind === 'rejoin_err') {
+          table.showDetail(`服务器提示：${readableError(message.code)}`)
+        }
+      } catch {
+        table.showDetail('服务端消息解析失败')
+      }
+    }
   }
 
   async function loadRoom(connect = false) {
@@ -191,6 +227,10 @@ export function mountWechatBootstrapScreen(options: {
   }
 
   function handleTouch(event: WxTouchEvent) {
+    if (table.active()) {
+      table.handleTouch(event)
+      return
+    }
     const touch = event.changedTouches?.[0]
     const x = touch?.clientX ?? touch?.pageX
     const y = touch?.clientY ?? touch?.pageY
