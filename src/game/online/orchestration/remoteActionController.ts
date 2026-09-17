@@ -127,6 +127,11 @@ export function createRemoteActionController({
     if (!tile || !user || !isUserTurn()) return
     clearCountdown()
     playSound('click.mp3', 0.65)
+    if (tile === 'red') {
+      const redIndex = user.hand.indexOf('red')
+      if (redIndex >= 0) send({ type: 'discard', handIndex: redIndex })
+      return
+    }
     const hasPengMeld = user.melds.some((meld) => meld.type === 'peng' && meld.tile === tile)
     send({ type: 'gang', kind: hasPengMeld ? 'added' : 'concealed', tile })
   }

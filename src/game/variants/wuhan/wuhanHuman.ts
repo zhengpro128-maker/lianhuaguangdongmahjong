@@ -26,6 +26,7 @@ interface WuhanHumanOptions {
   announce(text: string, tone?: string): void
   playSound(name: string, volume?: number): unknown
   later(callback: () => void, delay: number): number
+  performRedKong(): boolean
 }
 
 export function createWuhanHuman(options: WuhanHumanOptions) {
@@ -90,6 +91,12 @@ export function createWuhanHuman(options: WuhanHumanOptions) {
   function userGang(tile = options.getUserKongs()[0]) {
     const user = options.getUser()
     if (!tile || !user) return
+    if (tile === 'red') {
+      if (!options.isUserTurn()) return
+      state.userDrewThisTurn.value = false
+      options.stopCountdown()
+      return options.performRedKong()
+    }
     if (humanController.hasPendingTurn()) {
       const meldIndex = user.melds.findIndex((meld) => meld.type === 'peng' && meld.tile === tile)
       return meldIndex >= 0

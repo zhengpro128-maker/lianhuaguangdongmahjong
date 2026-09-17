@@ -218,7 +218,8 @@ export function useRemoteGame({
     const added = user.value.melds
       .filter((meld) => meld.type === 'peng' && user.value!.hand.includes(meld.tile))
       .map((meld) => meld.tile)
-    return [...new Set([...concealed, ...added])]
+    const red = rulesetId.value === 'wuhan-huanghuang' && user.value.hand.includes('red') ? ['red' as TileType] : []
+    return [...new Set([...concealed, ...added, ...red])]
   })
   const remoteUserCanHu = computed(() => (
     rulesetId.value === 'lotus-legacy' || rulesetId.value === 'wuhan-huanghuang' ? turnCanHu.value : (turnCanHu.value || userCanHu.value)
