@@ -83,6 +83,7 @@ export function createWuhanSettlement(options: Options) {
             label,
             points: label === '门前清' ? 6 : label === '屁胡' ? (selfDrawStyle ? 3 : 1) : 10,
           })),
+          ...(selfDrawStyle && kinds.some(kind => kind !== '屁胡') ? [{ label: '大胡自摸', multiplier: 1.5 }] : []),
           { label: hard ? '硬胡' : '软胡', multiplier: hard ? 2 : 1 },
           ...(discardWin && kinds.some(kind => kind !== '屁胡') ? [{ label: '大胡点炮', multiplier: 1.2 }] : []),
           ...(discardWin ? [{ label: '放炮者额外支付', points: 2 }] : []),
