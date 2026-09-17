@@ -110,7 +110,8 @@ export function evaluateWuhanWin(tiles: readonly TileType[], context: WuhanWinCo
   }
   const sevenPairs = kinds.some(kind => kind === '七对' || kind === '龙七对' || kind === '双龙七对')
   // 七对按专属 10 分结算，不再与门前清叠加；其它大牌可与门前清相乘。
-  if (!sevenPairs && (context.menQianQing ?? exposed === 0) && kinds.length) kinds.push('门前清')
+  // 门前清必须以自摸（或抢杠）收尾；点炮一律按普通牌型结算。
+  if (!sevenPairs && context.selfDraw && (context.menQianQing ?? exposed === 0) && kinds.length) kinds.push('门前清')
   return kinds
 }
 
@@ -151,9 +152,7 @@ export function wuhanRawWinPoints(
   const base = bigKinds.length
     ? bigKinds.reduce((points, kind) => points * wuhanPatternPoints(kind), 1)
     : kinds.includes('屁胡') ? (selfDraw ? 3 : 1) : 0
-  const winTypeMultiplier = selfDraw
-    ? (bigKinds.length ? 1.5 : 1)
-    : discardWin && bigKinds.length ? 1.2 : 1
+  const winTypeMultiplier = selfDraw && bigKinds.length ? 1.5 : 1
   return base * (hard ? 2 : 1) * winTypeMultiplier * wuhanKongMultiplier(kongs)
 }
 
@@ -164,7 +163,8 @@ export function wuhanMeetsMinimum(
   // 起胡门槛按本次胡牌的总收分算，而不是按单家付款额算：
   // 自摸三家各付一份（屁胡 3 分 × 三家，硬胡再翻倍即共 18 分）。
   const perPayer = wuhanRawWinPoints(kinds, selfDraw, hard, kongs, discardWin)
-  const total = perPayer * 3 + (discardWin ? 2 : 0)
+  // 点炮三家都付款，但只有放炮者翻倍。
+  const total = selfDraw ? perPayer * 3 : perPayer * 4
   return total >= WUHAN_MIN_WIN_POINTS
 }
 
@@ -200,7 +200,7 @@ function applyWinnerPayment(
   let total = 0
   players.forEach((player, index) => {
     if (index === winnerIndex) return
-    const payment = capWuhanPayment(points + (index === payerIndex ? 2 : 0))
+    const payment = capWuhanPayment(points * (index === payerIndex ? 2 : 1))
     player.score -= payment
     total += payment
   })

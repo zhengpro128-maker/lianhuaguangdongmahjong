@@ -98,6 +98,7 @@ function isRoundResult(value: unknown): value is RoundResult {
     && isOptional(value.points, isNumber)
     && isOptional(value.totalWon, isNumber)
     && isOptional(value.paymentPerPayer, isNumber)
+    && isOptional(value.discarderPayment, isNumber)
     && isOptional(value.tenpai, (item): item is number[] => isArrayOf(item, isNumber))
     && isOptional(value.dealerTenpai, isBoolean)
     && isOptional(value.fourRed, isBoolean)

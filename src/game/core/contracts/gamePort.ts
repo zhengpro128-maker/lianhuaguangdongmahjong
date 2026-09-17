@@ -93,6 +93,8 @@ export interface RoundResult {
   totalWon?: number
   /** 武汉晃晃的 points 是单个付款者应付的分数，不是“倍数”。 */
   paymentPerPayer?: number
+  /** 点炮局中，放炮者翻倍后的实际应付分。 */
+  discarderPayment?: number
   details?: RoundScoreDetail[]
   scoreChanges?: RoundScoreChange[]
   tenpai?: number[]

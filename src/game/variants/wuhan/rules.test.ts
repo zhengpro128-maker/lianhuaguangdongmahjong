@@ -26,17 +26,17 @@ describe('武汉晃晃胡牌', () => {
     expect(wuhanMeetsMinimum(['屁胡'], true, false, ['concealed'])).toBe(true)
     expect(wuhanRawWinPoints(['屁胡', '门前清'], true, false, [])).toBe(9)
     expect(wuhanMeetsMinimum(['屁胡', '门前清'], true, false, [])).toBe(true)
-    expect(wuhanRawWinPoints(['清一色'], false, false, [], true)).toBe(12)
+    expect(wuhanRawWinPoints(['清一色'], false, false, [], true)).toBe(10)
     expect(wuhanRawWinPoints(['七对'], true, false, ['red'])).toBe(30)
     expect(wuhanRawWinPoints(['龙七对'], true, false, ['red'])).toBe(60)
     expect(wuhanPatternPoints('双龙七对')).toBe(40)
     expect(wuhanRawWinPoints(['清一色', '门前清'], true, false, [])).toBe(90)
   })
   it('移除将一色、风一色和见字胡，门清牌加入门前清', () => {
-    expect(evaluateWuhanWin(standard, { joker: 'white' })).toContain('门前清')
+    expect(evaluateWuhanWin(standard, { joker: 'white', selfDraw: true })).toContain('门前清')
     expect(evaluateWuhanWin(standard, { joker: 'white' }).join(',')).not.toMatch(/将一色|风一色|见字胡/)
     const afterConcealedKong = ['m1','m2','m3','m4','m5','m6','p2','p3','p4','green','green'] as const
-    expect(evaluateWuhanWin(afterConcealedKong, { exposed: 1, joker: 'white', menQianQing: true })).toContain('门前清')
+    expect(evaluateWuhanWin(afterConcealedKong, { exposed: 1, joker: 'white', menQianQing: true, selfDraw: true })).toContain('门前清')
   })
   it('清一色会把吃碰杠的副露牌一并检查', () => {
     const hand = ['m1','m1','m1','m2','m2','m2','m3','m3','m3','m4','m4'] as const
@@ -52,7 +52,7 @@ describe('武汉晃晃胡牌', () => {
     const players = Array.from({ length: 4 }, (_, seat) => ({
       name: String(seat), avatar: '', score: 1000, seat, hand: [], discards: [], melds: [], redCount: 0, drawnTileIndex: -1,
     }))
-    expect(WUHAN_RULESET.score.applyWinScore(players, 0, 12, 2)).toBe(38)
-    expect(players.map(player => player.score)).toEqual([1038, 988, 986, 988])
+    expect(WUHAN_RULESET.score.applyWinScore(players, 0, 12, 2)).toBe(48)
+    expect(players.map(player => player.score)).toEqual([1048, 988, 976, 988])
   })
 })

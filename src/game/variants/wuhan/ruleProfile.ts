@@ -42,6 +42,14 @@ export function wuhanKongKinds(melds: readonly Meld[], joker: TileType | undefin
   })
 }
 
+/** 胡牌结算使用的杠番：红中杠、癞子杠、明杠、暗杠均统计全桌四家。 */
+export function wuhanPlayersKongKinds(
+  players: ReadonlyArray<{ melds: readonly Meld[] }>,
+  joker: TileType | undefined,
+): WuhanKongKind[] {
+  return players.flatMap((player) => wuhanKongKinds(player.melds, joker))
+}
+
 /** 以“番”为指数：1 番=×2，2 番=×4；多次杠相乘。 */
 export function wuhanKongMultiplier(kongs: readonly WuhanKongKind[]): number {
   return kongs.reduce((factor, kind) => factor * (kind === 'concealed' || kind === 'joker' ? 4 : 2), 1)

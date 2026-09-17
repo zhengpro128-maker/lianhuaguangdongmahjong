@@ -150,7 +150,12 @@ const relativeSeat = computed<0 | 1 | 2 | 3>(() => {
         <h2>{{ result.roundLabel }} · {{ resultPresentation.label }}</h2>
         <div v-if="resultPresentation.kind !== 'draw'" class="score-total">
           <template v-if="result.paymentPerPayer != null">
-            <span>每家应付</span><strong>{{ result.paymentPerPayer }} 分</strong><em>总收 +{{ result.totalWon ?? result.paymentPerPayer * 3 }} 分</em>
+            <template v-if="result.discarderPayment != null">
+              <span>闲家 {{ result.paymentPerPayer }} · 放炮者</span><strong>{{ result.discarderPayment }} 分</strong><em>总收 +{{ result.totalWon }}</em>
+            </template>
+            <template v-else>
+              <span>每家应付</span><strong>{{ result.paymentPerPayer }} 分</strong><em>总收 +{{ result.totalWon ?? result.paymentPerPayer * 3 }} 分</em>
+            </template>
           </template>
           <template v-else>
             <span>总倍数</span><strong>×{{ result.totalMultiplier ?? result.multiplier }}</strong><em>+{{ result.totalWon ?? result.points * 3 }} 分</em>
