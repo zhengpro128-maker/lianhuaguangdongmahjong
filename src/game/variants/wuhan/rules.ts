@@ -149,8 +149,11 @@ export function wuhanRawWinPoints(
   kongs: readonly WuhanKongKind[], discardWin = false,
 ) {
   const bigKinds = kinds.filter(k => k !== '屁胡')
+  const hasOtherBigKind = bigKinds.some(kind => kind !== '门前清')
   const base = bigKinds.length
-    ? bigKinds.reduce((points, kind) => points * wuhanPatternPoints(kind), 1)
+    ? bigKinds.reduce((points, kind) => (
+      points * (kind === '门前清' && hasOtherBigKind ? 2 : wuhanPatternPoints(kind))
+    ), 1)
     : kinds.includes('屁胡') ? (selfDraw ? 3 : 1) : 0
   const winTypeMultiplier = selfDraw && bigKinds.length ? 1.5 : 1
   return base * (hard ? 2 : 1) * winTypeMultiplier * wuhanKongMultiplier(kongs)

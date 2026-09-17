@@ -93,7 +93,7 @@ export function createWuhanSettlement(options: Options) {
             return {
               label: menQianQingMultiplier ? '门前清' : `底分·${label}`,
               ...(menQianQingMultiplier
-                ? { multiplier: 6 }
+                ? { multiplier: 2 }
                 : { points: label === '屁胡' ? (selfDrawStyle ? 3 : 1) : wuhanPatternPoints(label) }),
             }
           }),
