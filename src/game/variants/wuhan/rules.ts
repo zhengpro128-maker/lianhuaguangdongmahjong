@@ -108,7 +108,9 @@ export function evaluateWuhanWin(tiles: readonly TileType[], context: WuhanWinCo
       kinds.push(quads > 1 ? '双龙七对' : quads ? '龙七对' : '七对')
     }
   }
-  if ((context.menQianQing ?? exposed === 0) && kinds.length) kinds.push('门前清')
+  const sevenPairs = kinds.some(kind => kind === '七对' || kind === '龙七对' || kind === '双龙七对')
+  // 七对按专属 10 分结算，不再与门前清叠加；其它大牌可与门前清相乘。
+  if (!sevenPairs && (context.menQianQing ?? exposed === 0) && kinds.length) kinds.push('门前清')
   return kinds
 }
 
@@ -140,7 +142,7 @@ export function wuhanRawWinPoints(
 ) {
   const bigKinds = kinds.filter(k => k !== '屁胡')
   const base = bigKinds.length
-    ? bigKinds.reduce((points, kind) => points + (kind === '门前清' ? 6 : 10), 0)
+    ? bigKinds.reduce((points, kind) => points * (kind === '门前清' ? 6 : 10), 1)
     : kinds.includes('屁胡') ? (selfDraw ? 3 : 1) : 0
   const winTypeMultiplier = selfDraw
     ? (bigKinds.length ? 1.5 : 1)
