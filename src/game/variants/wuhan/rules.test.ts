@@ -30,7 +30,8 @@ describe('武汉晃晃胡牌', () => {
     expect(wuhanRawWinPoints(['七对'], true, false, ['red'])).toBe(30)
     expect(wuhanRawWinPoints(['龙七对'], true, false, ['red'])).toBe(60)
     expect(wuhanPatternPoints('双龙七对')).toBe(40)
-    expect(wuhanRawWinPoints(['清一色', '门前清'], true, false, [])).toBe(90)
+    expect(wuhanRawWinPoints(['清一色', '门前清'], false, false, [])).toBe(20)
+    expect(wuhanRawWinPoints(['清一色', '门前清'], true, false, [])).toBe(30)
   })
   it('移除将一色、风一色和见字胡，门清牌加入门前清', () => {
     expect(evaluateWuhanWin(standard, { joker: 'white', selfDraw: true })).toContain('门前清')
