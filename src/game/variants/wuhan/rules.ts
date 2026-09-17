@@ -136,13 +136,20 @@ export function withWuhanWinScenes(kinds: readonly WuhanWinKind[], tiles: readon
 
 export const WUHAN_MIN_WIN_POINTS = 9
 
+export function wuhanPatternPoints(kind: WuhanWinKind): number {
+  if (kind === '双龙七对') return 40
+  if (kind === '龙七对') return 20
+  if (kind === '门前清') return 6
+  return 10
+}
+
 export function wuhanRawWinPoints(
   kinds: readonly WuhanWinKind[], selfDraw: boolean, hard: boolean,
   kongs: readonly WuhanKongKind[], discardWin = false,
 ) {
   const bigKinds = kinds.filter(k => k !== '屁胡')
   const base = bigKinds.length
-    ? bigKinds.reduce((points, kind) => points * (kind === '门前清' ? 6 : 10), 1)
+    ? bigKinds.reduce((points, kind) => points * wuhanPatternPoints(kind), 1)
     : kinds.includes('屁胡') ? (selfDraw ? 3 : 1) : 0
   const winTypeMultiplier = selfDraw
     ? (bigKinds.length ? 1.5 : 1)
