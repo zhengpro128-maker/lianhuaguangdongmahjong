@@ -75,19 +75,14 @@ describe('shared normal tile animations survive state refreshes', () => {
     expect(s.presenter.animate(200, new THREE.Vector3())).toBe(false)
   })
 
-  it('continues the existing flip motion without replaying a finished flip', () => {
+  it('keeps the flip stack face-down while the HUD reports the indicator', () => {
     const s = setup()
     s.props.flipStack = 0; s.props.flipTile = 'p9'; s.props.openingStage = 'flip'
     s.props.wall = ['east']; s.props.wallCount = 1
     s.presenter.rebuild()
-    s.setNow(100); s.presenter.animate(100, new THREE.Vector3())
-    const before = s.rendered.find(r => r.face === 'p9')!.position.y
+    expect(s.rendered.some(r => r.face === 'p9')).toBe(false)
     s.presenter.rebuild()
-    expect(s.rendered.find(r => r.face === 'p9')!.position.y).toBe(before)
-    expect(s.presenter.animate(300, new THREE.Vector3())).toBe(true)
-    expect(s.presenter.animate(600, new THREE.Vector3())).toBe(false)
-    s.setNow(700); s.presenter.rebuild()
-    expect(s.presenter.animate(700, new THREE.Vector3())).toBe(false)
+    expect(s.rendered.some(r => r.face === 'p9')).toBe(false)
   })
 
   it('continues the original discard arc after an identical snapshot rebuild', () => {

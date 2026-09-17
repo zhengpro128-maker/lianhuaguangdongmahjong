@@ -445,8 +445,10 @@ function wallPhysicalIndex(index: number, head: number): number {
   return physical
 }
 
-/** 精指示牌：翻出牌面朝上，图案面与牌墙顶层表面平齐（不凸起）。
- * 翻精墩底层牌仍保留显示（视觉上牌山完整）；翻精阶段（openingStage==='flip'）指示牌从墙内升起。 */
+/**
+ * 翻牌墩维持完整牌墙背面。具体的翻癞/翻精信息由右上角 HUD 展示，避免把一张
+ * 面朝上的实体指示牌放在本家牌前方，遮挡牌河和手牌视线。
+ */
 function addFlipIndicator() {
   const flipStack = resolveFlipStack()
   if (flipStack == null) return
@@ -456,39 +458,8 @@ function addFlipIndicator() {
   const baseQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, slot.rotationY, 0))
   baseQuat.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI, 0, 0)))
   if (props.flipStackRemoved !== false) addTableTile(new THREE.Vector3(slot.x, .41, slot.z), baseQuat, null)
-  // 顶层牌：翻精前背朝上占位（补足 136 张牌山），翻精后翻出指示牌（面朝上）
-  const tile = props.flipTile
-  if (!tile) {
-    addTableTile(new THREE.Vector3(slot.x, .88, slot.z), baseQuat, null)
-    return
-  }
-  // 指示牌翻出：牌面朝上。面朝上的 base/cap 偏移与背朝上的牌墙方向相反：
-  // 若沿用占位牌位置 y=.88，图案面顶面（y+.13+.17=1.18）会比牌墙顶层表面
-  // （0.88+.06+.11=1.05）凸出 0.13；降到 y=.75 使图案面顶面（.75+.30=1.05）
-  // 与牌墙第一层（顶层）平齐。
-  const pos = new THREE.Vector3(slot.x, .75, slot.z)
-  const quat = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, slot.rotationY, 0))
-  const motionKey = `flip:${flipStack}:${tile}`
-  const continuing = continuingDeals.get(motionKey)
-  if (props.openingStage === 'flip' && (animatedFlipKey !== motionKey || continuing)) {
-    animatedFlipKey = motionKey
-    // 从墙内（底层之下）升起，模拟「翻出来」
-    const origin = continuing?.origin ?? new THREE.Vector3(slot.x, .1, slot.z)
-    const inst = addTableTile(pos, quat, tile, 1, origin)
-    dealTweens.push({
-      motionKey,
-      baseIndex: inst.baseIndex,
-      capIndex: inst.capIndex,
-      capMesh: inst.capMesh,
-      origin,
-      target: pos.clone(),
-      quat,
-      startedAt: continuing?.startedAt ?? performance.now(),
-      duration: 520,
-    })
-  } else {
-    addTableTile(pos, quat, tile)
-  }
+  // 顶层始终背朝上，补足牌墙，不再渲染实体翻出的指示牌。
+  addTableTile(new THREE.Vector3(slot.x, .88, slot.z), baseQuat, null)
 }
 
 // 四边环状牌山（参考欢乐麻将）：wall[i] → 物理槽 (breakIndex + headOffset + i) % 136。
