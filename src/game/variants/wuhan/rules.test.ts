@@ -34,6 +34,11 @@ describe('武汉晃晃胡牌', () => {
     const afterConcealedKong = ['m1','m2','m3','m4','m5','m6','p2','p3','p4','green','green'] as const
     expect(evaluateWuhanWin(afterConcealedKong, { exposed: 1, joker: 'white', menQianQing: true })).toContain('门前清')
   })
+  it('清一色会把吃碰杠的副露牌一并检查', () => {
+    const hand = ['m1','m1','m1','m2','m2','m2','m3','m3','m3','m4','m4'] as const
+    expect(evaluateWuhanWin(hand, { exposed: 1, exposedTiles: ['m5', 'm6', 'm7'], joker: 'white' })).toContain('清一色')
+    expect(evaluateWuhanWin(hand, { exposed: 1, exposedTiles: ['p5', 'p6', 'p7'], joker: 'white' })).not.toContain('清一色')
+  })
   it('点炮时三家付款且放炮者多付 2 分', () => {
     const players = Array.from({ length: 4 }, (_, seat) => ({
       name: String(seat), avatar: '', score: 1000, seat, hand: [], discards: [], melds: [], redCount: 0, drawnTileIndex: -1,
