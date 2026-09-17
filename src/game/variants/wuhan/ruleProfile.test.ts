@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { Meld } from '../../core/contracts/types'
 import {
   WUHAN_DRAW_STOP_COUNT, WUHAN_TILE_TYPES, WUHAN_WALL_SIZE, capWuhanPayment,
   createWuhanWall, wuhanJokerForIndicator, wuhanKongMultiplier, wuhanPlayersKongKinds,
@@ -27,7 +28,7 @@ describe('武汉晃晃规则档案', () => {
   })
 
   it('counts kongs from all four players when settling a win', () => {
-    const players = [
+    const players: ReadonlyArray<{ melds: readonly Meld[] }> = [
       { melds: [{ type: 'flower', tile: 'red', tiles: ['red'] }] },
       { melds: [{ type: 'gang', tile: 'm1', tiles: ['m1', 'm1', 'm1', 'm1'], added: false }] },
       { melds: [{ type: 'angang', tile: 'p2', tiles: ['p2', 'p2', 'p2', 'p2'] }] },
