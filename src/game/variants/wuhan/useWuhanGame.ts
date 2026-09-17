@@ -299,6 +299,7 @@ export function useWuhanGame({
     announce: transient.announce,
     playSound: playPresentationSound,
     later: timer.later,
+    performRedKong: () => tileFlowExecutor.performRedKong(0),
   })
 
   const matchLifecycle = createMatchLifecycle({ state, clearTimers: clearPresentation, startGame })

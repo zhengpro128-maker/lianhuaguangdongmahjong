@@ -30,15 +30,19 @@ export function createWuhanTileFlow(options: Options) {
     takeTailTile: (wall, headDrawn) => wall.length <= WUHAN_DRAW_STOP_COUNT
       ? null
       : takeStackTailTile(wall, headDrawn, WUHAN_WALL_SIZE),
-    async handleSpecialDraw(playerIndex, tile, drawAgain) {
-      if (tile !== 'red') return undefined
+    handleSpecialDiscard(playerIndex, handIndex, tile) {
+      const joker = options.state.jokerTiles.value[0]
+      if (tile !== 'red' && tile !== joker) return false
       const player = options.state.players[playerIndex]
-      player.redCount += 1
-      player.melds.push({ type: 'flower', tile: 'red', tiles: ['red'] })
+      player.hand.splice(handIndex, 1)
+      player.hand = sortTilesWithJokers(player.hand, options.state.jokerTiles.value)
       player.drawnTileIndex = -1
-      options.getTurnOrchestrator().showRedKong(playerIndex, player.melds.length - 1)
+      player.redCount += tile === 'red' ? 1 : 0
+      player.melds.push({ type: 'flower', tile, tiles: [tile] })
+      options.getTurnOrchestrator().showRedKong(playerIndex, player.melds.length - 1, tile)
       options.playSound('gang.mp3')
-      return drawAgain()
+      options.later(() => { options.getTurnOrchestrator().beginTurn(playerIndex, { fromTail: true }) }, 350)
+      return true
     },
   })
 
@@ -55,5 +59,12 @@ export function createWuhanTileFlow(options: Options) {
     return common.drawFor(playerIndex, fromTail)
   }
 
-  return { ...common, takeTile, drawFor }
+  function performRedKong(playerIndex: number) {
+    const player = options.state.players[playerIndex]
+    const index = player?.hand.indexOf('red') ?? -1
+    if (index < 0) return false
+    return common.discardTile(playerIndex, index), true
+  }
+
+  return { ...common, takeTile, drawFor, performRedKong }
 }

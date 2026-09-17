@@ -63,8 +63,8 @@ export function createWuhanTurnOrchestrator(options: WuhanTurnOrchestratorOption
     options.followDealer?.interrupt()
   }
 
-  function showRedKong(playerIndex: number, meldIndex: number) {
-    options.tableContext.showTableAction('flower-gang', playerIndex, null, 'red', meldIndex)
+  function showRedKong(playerIndex: number, meldIndex: number, tile: TileType = 'red') {
+    options.tableContext.showTableAction('flower-gang', playerIndex, null, tile, meldIndex)
   }
 
   function seatDistance(from: number, to: number) {

@@ -23,7 +23,7 @@ export function createWuhanSelectors(
     selectedIndex: state.selectedIndex,
     availableWaitTiles: () => [...WUHAN_TILE_TYPES].filter((tile) => tile !== 'red'),
     isWinningHand: (hand, meldCount) => ruleset.win.isWinningHand(hand, meldCount, { jokers: state.jokerTiles.value }),
-    concealedKongs: (hand) => ruleset.win.concealedKongs(hand, { jokers: state.jokerTiles.value }),
+    concealedKongs: (hand) => [...ruleset.win.concealedKongs(hand, { jokers: state.jokerTiles.value }), ...(hand.includes('red') ? ['red' as const] : [])],
     waitingTiles: (hand, meldCount) => ruleset.win.waitingTiles(hand, meldCount, { jokers: state.jokerTiles.value }),
     matchingCount,
   })

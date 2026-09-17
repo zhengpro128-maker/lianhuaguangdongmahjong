@@ -39,27 +39,6 @@ export function createWuhanOpening(options: Options) {
     resetLocalPlayers(state, 1000, options.playerSeeds as PlayerSeed[] | undefined, options.humanPlayerSeed)
   }
 
-  async function resolveOpeningRedKongs(currentSequence: number) {
-    const order = state.players.map((_, offset) => (state.dealer.value + offset) % state.players.length)
-    for (const playerIndex of order) {
-      const player = state.players[playerIndex]
-      while (player.hand.includes('red')) {
-        player.hand.splice(player.hand.indexOf('red'), 1)
-        player.redCount += 1
-        player.melds.push({ type: 'flower', tile: 'red', tiles: ['red'] })
-        options.announce(`${player.name} 红中杠`)
-        options.playSound('gang.mp3')
-        await options.wait(220)
-        if (currentSequence !== sequence) return false
-        const replacement = options.takeTile(true)
-        if (!replacement) return false
-        player.hand.push(replacement)
-      }
-      player.hand = sortTilesWithJokers(player.hand, state.jokerTiles.value)
-    }
-    return true
-  }
-
   async function start(mode?: MatchType, startOptions: {
     waitForTableReady?: () => Promise<void>
     waitForOpeningReady?: () => Promise<void>
@@ -139,7 +118,7 @@ export function createWuhanOpening(options: Options) {
       sortHand: (hand) => sortTilesWithJokers(hand, state.jokerTiles.value),
       isCancelled: () => currentSequence !== sequence,
     })
-    if (!dealt || !await resolveOpeningRedKongs(currentSequence)) return
+    if (!dealt) return
 
     state.phase.value = 'opening'
     state.openingStage.value = null

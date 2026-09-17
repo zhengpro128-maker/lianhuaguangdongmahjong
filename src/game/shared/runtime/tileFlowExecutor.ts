@@ -35,6 +35,8 @@ interface TileFlowOptions {
     tile: TileType,
     drawAgain: () => Promise<boolean>,
   ) => Promise<boolean | undefined>
+  /** 在普通弃牌落入牌河前接管特殊牌（例如玩法专属的单张杠）。 */
+  handleSpecialDiscard?: (playerIndex: number, handIndex: number, tile: TileType) => boolean
   takeTailTile?: (wall: TileType[], headDrawn: number) => TileType | null
   initialWallSize?: number
   /** 牌墙达到此张数后不再允许从头或尾摸牌。 */
@@ -87,6 +89,8 @@ export function createTileFlowExecutor(options: TileFlowOptions) {
   function discardTile(playerIndex: number, requestedIndex: number) {
     const player = state.players[playerIndex]
     const handIndex = Math.min(requestedIndex, player.hand.length - 1)
+    const requestedTile = player.hand[handIndex]
+    if (requestedTile && options.handleSpecialDiscard?.(playerIndex, handIndex, requestedTile)) return
     const [tile] = player.hand.splice(handIndex, 1)
     if (!tile) return
     player.hand = options.sortHand?.(player.hand) ?? sortTiles(player.hand)
