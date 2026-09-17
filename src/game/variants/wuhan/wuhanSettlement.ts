@@ -3,7 +3,7 @@ import type { TableActionType, TileType } from '../../core/contracts/types'
 import { removeLastDiscard } from '../../core/rules/actions'
 import { createSettlementTimeline } from '../../shared/settlement/settlementTimeline'
 import { wuhanKongKinds } from './ruleProfile'
-import { evaluateWuhanWin, withWuhanWinScenes, wuhanMeetsMinimum, wuhanWinPayment, WUHAN_RULESET } from './rules'
+import { evaluateWuhanWin, withWuhanWinScenes, wuhanMeetsMinimum, wuhanPatternPoints, wuhanWinPayment, WUHAN_RULESET } from './rules'
 import type { WuhanEndGameOptions, WuhanGameState } from './wuhanState'
 import type { RuleSet } from '../../core/rules/ruleset'
 
@@ -24,6 +24,10 @@ interface Options {
 export function createWuhanSettlement(options: Options) {
   const { state } = options
   const ruleset = options.ruleset ?? WUHAN_RULESET
+  const settlementKongs = (winnerIndex: number, joker: TileType | undefined) => [
+    ...wuhanKongKinds(state.players[winnerIndex].melds, joker).filter(kind => kind !== 'red'),
+    ...state.players.flatMap(player => wuhanKongKinds(player.melds, joker).filter(kind => kind === 'red')),
+  ]
   const timeline = createSettlementTimeline<WuhanEndGameOptions>({
     ...options,
     takeRobbedKongTile: (playerIndex, tile, winnerIndex) => {
@@ -67,7 +71,8 @@ export function createWuhanSettlement(options: Options) {
       const hard = !joker || !winHand.includes(joker)
       const selfDrawStyle = Boolean(endOptions.selfDraw || endOptions.robbedKong)
       const discardWin = !endOptions.selfDraw && !endOptions.robbedKong
-      const payment = wuhanWinPayment(kinds, selfDrawStyle, hard, wuhanKongKinds(winner.melds, joker), discardWin)
+      const kongs = settlementKongs(winnerIndex, joker)
+      const payment = wuhanWinPayment(kinds, selfDrawStyle, hard, kongs, discardWin)
       const payer = discardWin ? endOptions.sourceFrom : null
       const totalWon = ruleset.score.applyWinScore(state.players, winnerIndex, payment, payer)
       const hasOtherBigKind = kinds.some(kind => kind !== '屁胡' && kind !== '门前清')
@@ -84,13 +89,13 @@ export function createWuhanSettlement(options: Options) {
             label,
             ...(label === '门前清' && hasOtherBigKind
               ? { multiplier: 6 }
-              : { points: label === '门前清' ? 6 : label === '屁胡' ? (selfDrawStyle ? 3 : 1) : 10 }),
+              : { points: label === '屁胡' ? (selfDrawStyle ? 3 : 1) : wuhanPatternPoints(label) }),
           })),
           ...(selfDrawStyle && kinds.some(kind => kind !== '屁胡') ? [{ label: '大胡自摸', multiplier: 1.5 }] : []),
           { label: hard ? '硬胡' : '软胡', multiplier: hard ? 2 : 1 },
           ...(discardWin && kinds.some(kind => kind !== '屁胡') ? [{ label: '大胡点炮', multiplier: 1.2 }] : []),
           ...(discardWin ? [{ label: '放炮者额外支付', points: 2 }] : []),
-          ...wuhanKongKinds(winner.melds, joker).map((kind) => ({ label: `杠番·${kind}`, multiplier: kind === 'concealed' || kind === 'joker' ? 4 : 2 })),
+          ...kongs.map((kind) => ({ label: `杠番·${kind}`, multiplier: kind === 'concealed' || kind === 'joker' ? 4 : 2 })),
         ],
         winType: endOptions.robbedKong ? 'robbed-kong' : endOptions.selfDraw ? 'self-draw' : 'discard',
         ...endOptions,
@@ -137,7 +142,7 @@ export function createWuhanSettlement(options: Options) {
       kinds,
       selfDrawStyle,
       !joker || !hand.includes(joker),
-      wuhanKongKinds(winner.melds, joker),
+      settlementKongs(winnerIndex, joker),
       !endOptions.selfDraw && !endOptions.robbedKong,
     )
   }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { evaluateWuhanWin, isWuhanStandardWin, withWuhanWinScenes, wuhanMeetsMinimum, wuhanRawWinPoints, wuhanWinPayment, WUHAN_RULESET } from './rules'
+import { evaluateWuhanWin, isWuhanStandardWin, withWuhanWinScenes, wuhanMeetsMinimum, wuhanPatternPoints, wuhanRawWinPoints, wuhanWinPayment, WUHAN_RULESET } from './rules'
 
 describe('武汉晃晃胡牌', () => {
   const standard = ['m1','m2','m3','m4','m5','m6','p2','p3','p4','s7','s8','s9','green','green'] as const
@@ -28,6 +28,8 @@ describe('武汉晃晃胡牌', () => {
     expect(wuhanMeetsMinimum(['屁胡', '门前清'], true, false, [])).toBe(true)
     expect(wuhanRawWinPoints(['清一色'], false, false, [], true)).toBe(12)
     expect(wuhanRawWinPoints(['七对'], true, false, ['red'])).toBe(30)
+    expect(wuhanRawWinPoints(['龙七对'], true, false, ['red'])).toBe(60)
+    expect(wuhanPatternPoints('双龙七对')).toBe(40)
     expect(wuhanRawWinPoints(['清一色', '门前清'], true, false, [])).toBe(90)
   })
   it('移除将一色、风一色和见字胡，门清牌加入门前清', () => {
