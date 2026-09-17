@@ -70,6 +70,7 @@ export function createWuhanSettlement(options: Options) {
       const payment = wuhanWinPayment(kinds, selfDrawStyle, hard, wuhanKongKinds(winner.melds, joker), discardWin)
       const payer = discardWin ? endOptions.sourceFrom : null
       const totalWon = ruleset.score.applyWinScore(state.players, winnerIndex, payment, payer)
+      const hasOtherBigKind = kinds.some(kind => kind !== '屁胡' && kind !== '门前清')
       return {
         winnerIndex,
         winner: winner.name,
@@ -81,7 +82,9 @@ export function createWuhanSettlement(options: Options) {
         details: [
           ...kinds.map((label) => ({
             label,
-            points: label === '门前清' ? 6 : label === '屁胡' ? (selfDrawStyle ? 3 : 1) : 10,
+            ...(label === '门前清' && hasOtherBigKind
+              ? { multiplier: 6 }
+              : { points: label === '门前清' ? 6 : label === '屁胡' ? (selfDrawStyle ? 3 : 1) : 10 }),
           })),
           ...(selfDrawStyle && kinds.some(kind => kind !== '屁胡') ? [{ label: '大胡自摸', multiplier: 1.5 }] : []),
           { label: hard ? '硬胡' : '软胡', multiplier: hard ? 2 : 1 },

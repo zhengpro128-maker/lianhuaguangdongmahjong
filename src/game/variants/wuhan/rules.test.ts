@@ -27,6 +27,8 @@ describe('武汉晃晃胡牌', () => {
     expect(wuhanRawWinPoints(['屁胡', '门前清'], true, false, [])).toBe(9)
     expect(wuhanMeetsMinimum(['屁胡', '门前清'], true, false, [])).toBe(true)
     expect(wuhanRawWinPoints(['清一色'], false, false, [], true)).toBe(12)
+    expect(wuhanRawWinPoints(['七对'], true, false, ['red'])).toBe(30)
+    expect(wuhanRawWinPoints(['清一色', '门前清'], true, false, [])).toBe(90)
   })
   it('移除将一色、风一色和见字胡，门清牌加入门前清', () => {
     expect(evaluateWuhanWin(standard, { joker: 'white' })).toContain('门前清')
@@ -38,6 +40,11 @@ describe('武汉晃晃胡牌', () => {
     const hand = ['m1','m1','m1','m2','m2','m2','m3','m3','m3','m4','m4'] as const
     expect(evaluateWuhanWin(hand, { exposed: 1, exposedTiles: ['m5', 'm6', 'm7'], joker: 'white' })).toContain('清一色')
     expect(evaluateWuhanWin(hand, { exposed: 1, exposedTiles: ['p5', 'p6', 'p7'], joker: 'white' })).not.toContain('清一色')
+  })
+  it('七对不与门前清叠加，其它大牌可以', () => {
+    const sevenPairs = ['m1','m1','m2','m2','m3','m3','p1','p1','p2','p2','s1','s1','green','green'] as const
+    expect(evaluateWuhanWin(sevenPairs, { joker: 'white', menQianQing: true })).toContain('七对')
+    expect(evaluateWuhanWin(sevenPairs, { joker: 'white', menQianQing: true })).not.toContain('门前清')
   })
   it('点炮时三家付款且放炮者多付 2 分', () => {
     const players = Array.from({ length: 4 }, (_, seat) => ({
