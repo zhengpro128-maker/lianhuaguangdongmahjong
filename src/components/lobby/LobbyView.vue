@@ -167,21 +167,7 @@ function toggleWakuDemoAuth() {
       />
 
       <section class="lobby-actions" aria-label="对局操作">
-        <div class="lobby-account-slot">
-          <div class="waku-account" :class="{ authenticated: wakuAuthenticated }">
-            <div>
-              <b>{{ wakuAuthenticated ? (wakuAccountName || 'WakuDemo 玩家') : 'WakuDemo 账号' }}</b>
-              <small>{{ wakuAuthenticated ? '已安全登录' : '登录后关联平台身份' }}</small>
-            </div>
-            <button
-              type="button"
-              data-action-role="secondary"
-              :disabled="wakuAuthLoading"
-              @click="toggleWakuDemoAuth"
-            >{{ wakuAuthLoading ? '处理中…' : (wakuAuthenticated ? '退出' : '登录') }}</button>
-          </div>
-          <p v-if="wakuAuthError" class="waku-auth-error" role="alert">{{ wakuAuthError }}</p>
-        </div>
+        <p v-if="wakuAuthError" class="waku-auth-error" role="alert">{{ wakuAuthError }}</p>
         <button v-if="storedSession && !roomId" class="continue-session" @click="$emit('resumeSession')">
           ⏵ 继续对局<template v-if="storedSession.roomId">（房间 {{ storedSession.roomId }}）</template>
         </button>
@@ -217,10 +203,10 @@ function toggleWakuDemoAuth() {
             <template v-if="roomMeta.llmAvailable"> · <span class="room-meta-llm">服务器已启用大模型</span></template>
           </p>
           <div v-if="!roomId" class="remote-entry-actions">
-            <button class="remote-create" data-action-role="primary" :disabled="!nicknameInput.trim() || sessionStatus === 'creating'" @click="openCreateDialog">
+            <button class="remote-create" data-action-role="primary" :disabled="wakuAuthLoading || !wakuAuthenticated || !nicknameInput.trim() || sessionStatus === 'creating'" @click="openCreateDialog">
               {{ sessionStatus === 'creating' ? '创建中…' : '创建房间' }}
             </button>
-            <button class="remote-join-btn" data-action-role="primary" :disabled="!nicknameInput.trim() || sessionStatus === 'joining'" @click="dialog = 'join'">
+            <button class="remote-join-btn" data-action-role="primary" :disabled="wakuAuthLoading || !wakuAuthenticated || !nicknameInput.trim() || sessionStatus === 'joining'" @click="dialog = 'join'">
               {{ sessionStatus === 'joining' ? '加入中…' : '加入房间' }}
             </button>
           </div>

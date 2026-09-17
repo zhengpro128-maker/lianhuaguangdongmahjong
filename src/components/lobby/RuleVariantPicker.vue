@@ -6,8 +6,7 @@ const props = defineProps<{ modelValue: RuleVariant; allowBloodFlow?: boolean; a
 const emit = defineEmits<{ close: []; confirm: [value: RuleVariant]; viewRules: [] }>()
 const pending = ref(props.modelValue)
 const options = computed(() => [
-  ...RULE_VARIANTS.filter((option) => props.allowWuhan || option.id !== 'wuhan-huanghuang'),
-  ...(props.allowBloodFlow ? [BLOOD_FLOW_RULE] : []),
+  ...RULE_VARIANTS.filter((option) => option.id === 'wuhan-huanghuang'),
 ])
 </script>
 

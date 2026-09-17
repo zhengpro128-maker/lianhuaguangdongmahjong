@@ -1,8 +1,6 @@
 import { onMounted, ref } from 'vue'
 import {
-  beginWakuDemoLogin,
-  getWakuDemoLoginSession,
-  logoutWakuDemo,
+  ensureGuestSession,
   type WakuDemoAccount,
 } from '../api/authApi'
 
@@ -39,7 +37,7 @@ export function useWakuDemoAuth() {
   async function refresh() {
     loading.value = true
     try {
-      const session = await getWakuDemoLoginSession()
+      const session = await ensureGuestSession()
       authenticated.value = session.authenticated
       account.value = session.authenticated ? session.account : null
     } catch {
@@ -51,20 +49,17 @@ export function useWakuDemoAuth() {
     }
   }
 
-  function login() {
-    error.value = ''
-    beginWakuDemoLogin()
-  }
+  function login() { void refresh() }
 
   async function logout() {
     loading.value = true
     try {
-      await logoutWakuDemo()
-      authenticated.value = false
-      account.value = null
+      const session = await ensureGuestSession()
+      authenticated.value = session.authenticated
+      account.value = session.authenticated ? session.account : null
       error.value = ''
     } catch {
-      error.value = '退出登录失败，请稍后重试'
+      error.value = '游客身份初始化失败，请稍后重试'
     } finally {
       loading.value = false
     }
@@ -77,4 +72,3 @@ export function useWakuDemoAuth() {
 
   return { authenticated, account, loading, error, login, logout, refresh }
 }
-
