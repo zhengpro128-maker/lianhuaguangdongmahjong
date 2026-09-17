@@ -88,12 +88,15 @@ export function createWuhanSettlement(options: Options) {
         ...(discardWin ? { discarderPayment: Math.min(50, payment * 2) } : {}),
         totalWon,
         details: [
-          ...detailKinds.map((label) => ({
-            label,
-            ...(label === '门前清' && hasOtherBigKind
-              ? { multiplier: 6 }
-              : { points: label === '屁胡' ? (selfDrawStyle ? 3 : 1) : wuhanPatternPoints(label) }),
-          })),
+          ...detailKinds.map((label) => {
+            const menQianQingMultiplier = label === '门前清' && hasOtherBigKind
+            return {
+              label: menQianQingMultiplier ? '门前清' : `底分·${label}`,
+              ...(menQianQingMultiplier
+                ? { multiplier: 6 }
+                : { points: label === '屁胡' ? (selfDrawStyle ? 3 : 1) : wuhanPatternPoints(label) }),
+            }
+          }),
           ...(selfDrawStyle && kinds.some(kind => kind !== '屁胡') ? [{ label: '大胡自摸', multiplier: 1.5 }] : []),
           { label: hard ? '硬胡' : '软胡', multiplier: hard ? 2 : 1 },
           ...(discardWin ? [{ label: '放炮者翻倍', multiplier: 2 }] : []),
