@@ -52,6 +52,8 @@ export function isWuhanStandardWin(
 export type WuhanWinKind = '屁胡' | '碰碰胡' | '清一色' | '门前清' | '全求人' | '七对' | '龙七对' | '双龙七对' | '杠上开花' | '抢杠胡'
 export interface WuhanWinContext {
   exposed?: number
+  /** 已吃、碰、杠的结构副露牌；清一色等花色牌型必须把它们一并计算。 */
+  exposedTiles?: readonly TileType[]
   /** 暗杠和红中单杠不破门前清；未传入时退化为无结构副露。 */
   menQianQing?: boolean
   joker?: TileType
@@ -83,7 +85,8 @@ export function evaluateWuhanWin(tiles: readonly TileType[], context: WuhanWinCo
   const standard = isWuhanStandardWin(tiles, exposed, joker, context.ordinaryJokers)
   if (standard && wild <= 1) kinds.push('屁胡')
   if (standard) {
-    const suits = new Set(natural.filter(t => /^[mps]/.test(t)).map(t => t[0])); const honors = natural.some(t => t === 'green' || t === 'white')
+    const allNatural = [...natural, ...(context.exposedTiles ?? []).filter(tile => tile !== joker && tile !== 'red')]
+    const suits = new Set(allNatural.filter(t => /^[mps]/.test(t)).map(t => t[0])); const honors = allNatural.some(t => t === 'green' || t === 'white')
     if (suits.size === 1 && !honors) kinds.push('清一色')
     const canPengPeng = usable.some(tile => {
       const amount = countsFor(natural).get(tile) ?? 0
