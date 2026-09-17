@@ -17,6 +17,7 @@ import type { RoundResult } from '../core/contracts/gamePort'
 import { tileName } from '../core/rules/tiles'
 import type { MatchType, TableActionEvent, TileType, WinPresentation } from '../core/contracts/types'
 import { LOTUS_RULESET } from '../variants/lotus/lotusRules'
+import { WUHAN_RULESET } from '../variants/wuhan/rules'
 import { createPlayerSelectors } from '../core/selectors/playerSelectors'
 import type { ServerPlayerDto, ServerSnapshot } from './protocol/dto'
 import { createRemoteSessionStore } from './session/remoteSessionStore'
@@ -205,14 +206,14 @@ export function useRemoteGame({
     isUserTurn,
     userDrewThisTurn,
     selectedIndex,
-    getRuleset: () => (rulesetId.value === 'lotus-legacy' ? LOTUS_RULESET : undefined),
+    getRuleset: () => rulesetId.value === 'wuhan-huanghuang' ? WUHAN_RULESET : (rulesetId.value === 'lotus-legacy' ? LOTUS_RULESET : undefined),
     getJokers: () => jokerTiles.value,
     getWildcards: () => wildcardTiles.value,
   })
   const remoteUserKongs = computed<TileType[]>(() => {
     if (!user.value || !isUserTurn.value || !userDrewThisTurn.value) return []
-    const concealed = rulesetId.value === 'lotus-legacy'
-      ? LOTUS_RULESET.win.concealedKongs(user.value.hand, { jokers: jokerTiles.value })
+    const concealed = rulesetId.value === 'lotus-legacy' || rulesetId.value === 'wuhan-huanghuang'
+      ? (rulesetId.value === 'wuhan-huanghuang' ? WUHAN_RULESET : LOTUS_RULESET).win.concealedKongs(user.value.hand, { jokers: jokerTiles.value })
       : userKongs.value
     const added = user.value.melds
       .filter((meld) => meld.type === 'peng' && user.value!.hand.includes(meld.tile))
@@ -220,7 +221,7 @@ export function useRemoteGame({
     return [...new Set([...concealed, ...added])]
   })
   const remoteUserCanHu = computed(() => (
-    rulesetId.value === 'lotus-legacy' ? turnCanHu.value : (turnCanHu.value || userCanHu.value)
+    rulesetId.value === 'lotus-legacy' || rulesetId.value === 'wuhan-huanghuang' ? turnCanHu.value : (turnCanHu.value || userCanHu.value)
   ))
   const windName = computed(() => (round.value > 4 ? '南' : '东'))
   const handNumber = computed(() => ((round.value - 1) % 4) + 1)

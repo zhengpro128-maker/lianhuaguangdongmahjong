@@ -141,7 +141,7 @@ function isDice(value: unknown): value is [number, number] {
 function isSnapshot(message: JsonObject): boolean {
   return isString(message.roomId)
     && isString(message.mode) && MATCH_TYPES.has(message.mode)
-    && isOptional(message.rulesetId, (value) => value === 'lotus-classic' || value === 'lotus-legacy')
+    && isOptional(message.rulesetId, (value) => value === 'lotus-classic' || value === 'lotus-legacy' || value === 'wuhan-huanghuang')
     && isString(message.phase) && GAME_PHASES.has(message.phase as GamePhase)
     && isNumber(message.round) && isNumber(message.dealer) && isNumber(message.honba)
     && isOptional(message.dice, isDice)
@@ -182,7 +182,7 @@ export function decodeServerMessage(raw: unknown): ServerMessage | null {
       case 'rejoin_ok':
         return isNumber(raw.seat) && isBoolean(raw.rejoin) && isString(raw.roomId)
           && isString(raw.mode) && MATCH_TYPES.has(raw.mode)
-          && isOptional(raw.rulesetId, (value) => value === 'lotus-classic' || value === 'lotus-legacy')
+          && isOptional(raw.rulesetId, (value) => value === 'lotus-classic' || value === 'lotus-legacy' || value === 'wuhan-huanghuang')
           && isString(raw.nickname) && isString(raw.rejoinCode)
           && isOptional(raw.theme, (value): value is string => isString(value) && TABLE_THEMES.has(value))
       case 'rejoin_err':

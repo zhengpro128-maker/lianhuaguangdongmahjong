@@ -10,7 +10,7 @@ export interface RuleVariantOption {
   rulesetId?: string
 }
 
-export const DEFAULT_RULE_VARIANT: RuleVariant = 'lotus-classic'
+export const DEFAULT_RULE_VARIANT: RuleVariant = 'wuhan-huanghuang'
 
 export const RULE_VARIANTS: readonly RuleVariantOption[] = [
   {

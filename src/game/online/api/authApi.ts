@@ -22,3 +22,6 @@ export function logoutWakuDemo(): Promise<{ authenticated: false }> {
   return request('/api/login/logout', { method: 'POST' })
 }
 
+export function ensureGuestSession(): Promise<WakuDemoLoginSession> {
+  return request<WakuDemoLoginSession>('/api/guest/session', { method: 'POST' })
+}
