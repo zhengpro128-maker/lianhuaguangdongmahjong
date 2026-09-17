@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   WUHAN_DRAW_STOP_COUNT, WUHAN_TILE_TYPES, WUHAN_WALL_SIZE, capWuhanPayment,
-  createWuhanWall, wuhanJokerForIndicator, wuhanKongMultiplier,
+  createWuhanWall, wuhanJokerForIndicator, wuhanKongMultiplier, wuhanPlayersKongKinds,
 } from './ruleProfile'
 
 describe('武汉晃晃规则档案', () => {
@@ -24,5 +24,16 @@ describe('武汉晃晃规则档案', () => {
     expect(capWuhanPayment(51)).toBe(50)
     expect(capWuhanPayment(8)).toBe(8)
     expect(WUHAN_DRAW_STOP_COUNT).toBe(8)
+  })
+
+  it('counts kongs from all four players when settling a win', () => {
+    const players = [
+      { melds: [{ type: 'flower', tile: 'red', tiles: ['red'] }] },
+      { melds: [{ type: 'gang', tile: 'm1', tiles: ['m1', 'm1', 'm1', 'm1'], added: false }] },
+      { melds: [{ type: 'angang', tile: 'p2', tiles: ['p2', 'p2', 'p2', 'p2'] }] },
+      { melds: [{ type: 'flower', tile: 'white', tiles: ['white'] }] },
+    ]
+
+    expect(wuhanPlayersKongKinds(players, 'white')).toEqual(['red', 'discard', 'concealed', 'joker'])
   })
 })
