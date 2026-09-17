@@ -91,6 +91,8 @@ export interface RoundResult {
   horsePoints?: number
   points?: number
   totalWon?: number
+  /** 武汉晃晃的 points 是单个付款者应付的分数，不是“倍数”。 */
+  paymentPerPayer?: number
   details?: RoundScoreDetail[]
   scoreChanges?: RoundScoreChange[]
   tenpai?: number[]
