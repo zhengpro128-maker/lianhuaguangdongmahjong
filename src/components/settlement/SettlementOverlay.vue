@@ -163,7 +163,7 @@ const relativeSeat = computed<0 | 1 | 2 | 3>(() => {
         </div>
         <div v-if="resultPresentation.kind !== 'draw' && result.details?.length" class="score-details">
           <span v-for="detail in result.details" :key="detail.label">
-            {{ detail.label }} <b>{{ detail.points != null ? `+${detail.points} 分` : `×${detail.multiplier}` }}</b>
+            {{ detail.label }} <b>{{ detail.points != null ? (detail.label.startsWith('底分') ? `${detail.points} 分` : `+${detail.points} 分`) : `×${detail.multiplier}` }}</b>
           </span>
         </div>
         <div v-if="resultPresentation.kind !== 'draw' && result.horses?.length" class="horse-area">
