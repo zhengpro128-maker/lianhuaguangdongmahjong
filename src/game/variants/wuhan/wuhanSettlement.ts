@@ -75,6 +75,9 @@ export function createWuhanSettlement(options: Options) {
       const payer = discardWin ? endOptions.sourceFrom : null
       const totalWon = ruleset.score.applyWinScore(state.players, winnerIndex, payment, payer)
       const hasOtherBigKind = kinds.some(kind => kind !== '屁胡' && kind !== '门前清')
+      const detailKinds = kinds.some(kind => kind !== '屁胡')
+        ? kinds.filter(kind => kind !== '屁胡')
+        : kinds
       return {
         winnerIndex,
         winner: winner.name,
@@ -85,7 +88,7 @@ export function createWuhanSettlement(options: Options) {
         ...(discardWin ? { discarderPayment: Math.min(50, payment * 2) } : {}),
         totalWon,
         details: [
-          ...kinds.map((label) => ({
+          ...detailKinds.map((label) => ({
             label,
             ...(label === '门前清' && hasOtherBigKind
               ? { multiplier: 6 }
