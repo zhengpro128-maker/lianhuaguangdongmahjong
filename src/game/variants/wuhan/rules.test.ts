@@ -19,7 +19,10 @@ describe('武汉晃晃胡牌', () => {
   })
   it('按新规则计算起胡、门前清、自摸和点炮', () => {
     expect(wuhanRawWinPoints(['屁胡'], true, false, [])).toBe(3)
-    expect(wuhanMeetsMinimum(['屁胡'], true, false, [])).toBe(false)
+    // 自摸由三家各付 3 分，总收 9 分；硬胡则每家 6 分、总收 18 分。
+    expect(wuhanMeetsMinimum(['屁胡'], true, false, [])).toBe(true)
+    expect(wuhanMeetsMinimum(['屁胡'], true, true, [])).toBe(true)
+    expect(wuhanMeetsMinimum(['屁胡'], false, true, [])).toBe(false)
     expect(wuhanMeetsMinimum(['屁胡'], true, false, ['concealed'])).toBe(true)
     expect(wuhanRawWinPoints(['屁胡', '门前清'], true, false, [])).toBe(9)
     expect(wuhanMeetsMinimum(['屁胡', '门前清'], true, false, [])).toBe(true)

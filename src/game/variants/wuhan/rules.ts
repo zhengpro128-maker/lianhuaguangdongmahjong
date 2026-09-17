@@ -149,7 +149,11 @@ export function wuhanMeetsMinimum(
   kinds: readonly WuhanWinKind[], selfDraw: boolean, hard: boolean,
   kongs: readonly WuhanKongKind[], discardWin = false,
 ) {
-  return wuhanRawWinPoints(kinds, selfDraw, hard, kongs, discardWin) >= WUHAN_MIN_WIN_POINTS
+  // 起胡门槛按本次胡牌的总收分算，而不是按单家付款额算：
+  // 自摸三家各付一份（屁胡 3 分 × 三家，硬胡再翻倍即共 18 分）。
+  const perPayer = wuhanRawWinPoints(kinds, selfDraw, hard, kongs, discardWin)
+  const total = perPayer * 3 + (discardWin ? 2 : 0)
+  return total >= WUHAN_MIN_WIN_POINTS
 }
 
 export function wuhanWinPayment(
