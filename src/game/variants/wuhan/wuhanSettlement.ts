@@ -125,7 +125,6 @@ export function createWuhanSettlement(options: Options) {
       ? winner.hand
       : endOptions.winTile ? [...winner.hand, endOptions.winTile] : null
     if (!hand) return false
-    if (!endOptions.selfDraw && !endOptions.robbedKong && (hand.includes('green') || hand.includes('white'))) return false
     const exposed = options.structuralMeldCount(winnerIndex)
     const exposedMelds = winner.melds.filter(meld => meld.type !== 'flower')
     const exposedTiles = exposedMelds.flatMap(meld => meld.tiles)

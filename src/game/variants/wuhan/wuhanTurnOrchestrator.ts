@@ -75,8 +75,6 @@ export function createWuhanTurnOrchestrator(options: WuhanTurnOrchestratorOption
     const player = state.players[playerIndex]
     if (!player) return false
     const winHand = [...player.hand, tile]
-    // 发财、白板在武汉晃晃中见字只能自摸（抢杠另行判定）。
-    if (winHand.includes('green') || winHand.includes('white')) return false
     return options.isLegalWin(playerIndex, { winTile: tile, winHand, sourceFrom: from })
   }
 

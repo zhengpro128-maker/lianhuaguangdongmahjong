@@ -66,7 +66,6 @@ export interface WuhanWinContext {
   discardWin?: boolean
   kongBloom?: boolean
   robbedKong?: boolean
-  /** 见发财/白板的牌只能自摸或抢杠胡。 */
   selfDraw?: boolean
   /** 点炮/抢杠带入的癞子按自身牌面计算，不作为万能牌。 */
   ordinaryJokers?: readonly TileType[]
