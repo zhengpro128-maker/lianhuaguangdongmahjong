@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { Meld } from '../../core/contracts/types'
 import {
   WUHAN_DRAW_STOP_COUNT, WUHAN_TILE_TYPES, WUHAN_WALL_SIZE, capWuhanPayment,
-  createWuhanWall, wuhanJokerForIndicator, wuhanKongMultiplier, wuhanPlayersKongKinds,
+  createWuhanWall, wuhanJokerForIndicator, wuhanKongMultiplier, wuhanPlayersKongKinds, wuhanSettlementKongKinds,
 } from './ruleProfile'
 
 describe('武汉晃晃规则档案', () => {
@@ -45,5 +45,17 @@ describe('武汉晃晃规则档案', () => {
     ]
 
     expect(wuhanPlayersKongKinds(players, 'white')).toEqual([])
+  })
+
+  it('excludes the winner\'s triggering kong from kong-bloom fan', () => {
+    const players: ReadonlyArray<{ melds: readonly Meld[] }> = [
+      { melds: [
+        { type: 'flower', tile: 'red', tiles: ['red'], specialKong: 'red' },
+        { type: 'flower', tile: 'red', tiles: ['red'], specialKong: 'red' },
+      ] },
+      { melds: [{ type: 'gang', tile: 'm1', tiles: ['m1', 'm1', 'm1', 'm1'], added: false }] },
+    ]
+
+    expect(wuhanSettlementKongKinds(players, 0, 'white', true)).toEqual(['red', 'discard'])
   })
 })

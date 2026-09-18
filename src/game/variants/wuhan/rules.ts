@@ -161,7 +161,8 @@ export function wuhanRawWinPoints(
       points * (kind === '门前清' && hasOtherBigKind ? 2 : wuhanPatternPoints(kind))
     ), 1)
     : kinds.includes('屁胡') ? (selfDraw ? 3 : 1) : 0
-  const winTypeMultiplier = selfDraw && bigKinds.length ? 1.5 : 1
+  // 杠上开花固定以 10 分底分计算，不能再叠加大胡自摸 ×1.5。
+  const winTypeMultiplier = selfDraw && bigKinds.length && !kinds.includes('杠上开花') ? 1.5 : 1
   return base * (hard ? 2 : 1) * winTypeMultiplier * wuhanKongMultiplier(kongs)
 }
 
