@@ -100,7 +100,11 @@ export function createWuhanSettlement(options: Options) {
         totalMultiplier: payment,
         points: payment,
         paymentPerPayer: payerPayments.find((amount, playerIndex) => playerIndex !== winnerIndex && amount > 0) ?? payment,
-        ...(discardWin ? { discarderPayment: payerPayments[payer ?? -1] } : {}),
+        ...(discardWin ? {
+          discarderPayment: payerPayments[payer ?? -1],
+          discarderIndex: payer ?? undefined,
+          discarderMultiplier,
+        } : {}),
         payerPayments,
         payerKongDetails,
         totalWon,

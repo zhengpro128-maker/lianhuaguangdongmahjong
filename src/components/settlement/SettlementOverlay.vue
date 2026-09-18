@@ -131,6 +131,16 @@ const relativeSeat = computed<0 | 1 | 2 | 3>(() => {
 function payerKongDetails(playerIndex: number) {
   return props.result?.payerKongDetails?.[playerIndex] ?? []
 }
+
+function payerSettlementDetails(playerIndex: number) {
+  const result = props.result
+  if (!result || playerIndex === result.winnerIndex) return []
+  const details = [...payerKongDetails(playerIndex)]
+  if (playerIndex === result.discarderIndex && result.discarderMultiplier != null) {
+    details.push({ label: '点炮加付', multiplier: result.discarderMultiplier })
+  }
+  return details
+}
 </script>
 
 <template>
@@ -180,7 +190,7 @@ function payerKongDetails(playerIndex: number) {
             <strong class="rank-number">{{ entry.rank }}<small>位</small></strong>
             <div class="settlement-avatar">
               <img :src="displayedAvatar(entry)" :alt="`${entry.name}头像`" @error="onAvatarError(entry)" />
-              <small v-for="detail in entry.playerIndex === result.winnerIndex ? [] : payerKongDetails(entry.playerIndex)" :key="detail.label">
+              <small v-for="detail in payerSettlementDetails(entry.playerIndex)" :key="detail.label">
                 {{ detail.label }} ×{{ detail.multiplier }}
               </small>
             </div>

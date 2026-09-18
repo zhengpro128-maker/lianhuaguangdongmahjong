@@ -95,6 +95,10 @@ export interface RoundResult {
   paymentPerPayer?: number
   /** 点炮局中，按该牌型规则加付后的放炮者实际应付分。 */
   discarderPayment?: number
+  /** 点炮者座位；供结算页逐家标注点炮加付。 */
+  discarderIndex?: number
+  /** 点炮者在其自身杠倍数之外额外适用的付款倍率。 */
+  discarderMultiplier?: number
   /** 按座位顺序记录的实际付款额；赢家位置为 0。 */
   payerPayments?: number[]
   /** 按座位顺序记录各付款者自己生效的杠倍数，供结算头像旁逐家说明。 */

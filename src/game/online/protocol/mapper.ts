@@ -45,6 +45,9 @@ export function mapRoundResultToLocal(
     winnerIndex: result.winnerIndex != null && result.winnerIndex >= 0
       ? toLocalSeat(result.winnerIndex, localServerSeat)
       : -1,
+    discarderIndex: result.discarderIndex != null && result.discarderIndex >= 0
+      ? toLocalSeat(result.discarderIndex, localServerSeat)
+      : undefined,
     robbedKongPlayerIndex: result.robbedKongPlayerIndex != null && result.robbedKongPlayerIndex >= 0
       ? toLocalSeat(result.robbedKongPlayerIndex, localServerSeat)
       : -1,
