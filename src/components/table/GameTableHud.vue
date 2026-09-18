@@ -87,6 +87,11 @@ interface Props {
 }
 
 const props = defineProps<Props>()
+// 武汉晃晃的翻癞子只在右上角 HUD 展示；翻牌所在墩仍属于正常牌墙，
+// 不在桌面额外放置一个永不移动的翻牌占位。
+const tableFlipStack = computed(() => (
+  props.rulesetId === 'wuhan-huanghuang' ? undefined : props.flipStack
+))
 const userAnimeStyle = computed(() => props.themeName === 'llmAnime'
   ? { '--anime-accent': animeCharacterAccent(props.user.characterId) }
   : undefined)
@@ -487,7 +492,7 @@ function onAvatarError(entry: GamePlayer) {
       :table-action-event="tableActionEvent"
       :wall-break-index="wallBreakIndex"
       :flip-tile="flipTile"
-      :flip-stack="flipStack"
+      :flip-stack="tableFlipStack"
       :flip-stack-removed="rulesetId !== 'wuhan-huanghuang'"
       :blood-flow-batches="bloodFlow?.batches"
       :blood-flow-compact="compactPiles"
