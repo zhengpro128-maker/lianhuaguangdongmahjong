@@ -52,6 +52,22 @@ export function wuhanPlayersKongKinds(
   return players.flatMap((player) => wuhanKongKinds(player.melds, joker))
 }
 
+/**
+ * 杠上开花的底分已经包含开杠本身，因此只计其余杠番。
+ * 补摸一定来自胡家刚开的杠，故从胡家记录的最后一杠中扣除一杠；其他三家的杠番保持不变。
+ */
+export function wuhanSettlementKongKinds(
+  players: ReadonlyArray<{ melds: readonly Meld[] }>,
+  winnerIndex: number,
+  joker: TileType | undefined,
+  kongBloom: boolean,
+): WuhanKongKind[] {
+  return players.flatMap((player, playerIndex) => {
+    const kinds = wuhanKongKinds(player.melds, joker)
+    return kongBloom && playerIndex === winnerIndex ? kinds.slice(0, -1) : kinds
+  })
+}
+
 /** 以“番”为指数：1 番=×2，2 番=×4；多次杠相乘。 */
 export function wuhanKongMultiplier(kongs: readonly WuhanKongKind[]): number {
   return kongs.reduce((factor, kind) => factor * (kind === 'concealed' || kind === 'joker' ? 4 : 2), 1)

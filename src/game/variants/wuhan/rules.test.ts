@@ -34,6 +34,11 @@ describe('武汉晃晃胡牌', () => {
     expect(wuhanRawWinPoints(['清一色', '门前清'], false, false, [])).toBe(20)
     expect(wuhanRawWinPoints(['清一色', '门前清'], true, false, [])).toBe(30)
   })
+  it('杠上开花以 10 分起算，不另计大胡自摸', () => {
+    // 两个红中杠中，触发补摸的一个在结算前已剔除，只剩一个 ×2 杠番。
+    expect(wuhanRawWinPoints(['杠上开花'], true, true, ['red'])).toBe(40)
+    expect(wuhanRawWinPoints(['杠上开花'], true, false, [])).toBe(10)
+  })
   it('移除将一色、风一色和见字胡，门清牌加入门前清', () => {
     expect(evaluateWuhanWin(standard, { joker: 'white', selfDraw: true })).toContain('门前清')
     expect(evaluateWuhanWin(standard, { joker: 'white' }).join(',')).not.toMatch(/将一色|风一色|见字胡/)
