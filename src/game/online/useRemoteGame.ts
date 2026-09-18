@@ -218,8 +218,8 @@ export function useRemoteGame({
     const added = user.value.melds
       .filter((meld) => meld.type === 'peng' && user.value!.hand.includes(meld.tile))
       .map((meld) => meld.tile)
-    const red = rulesetId.value === 'wuhan-huanghuang' && user.value.hand.includes('red') ? ['red' as TileType] : []
-    return [...new Set([...concealed, ...added, ...red])]
+    // 红中和癞子在武汉晃晃中是“直接打出即单张杠”，不能再出现在右侧常规杠按钮。
+    return [...new Set([...concealed, ...added])]
   })
   const remoteUserCanHu = computed(() => (
     rulesetId.value === 'lotus-legacy' || rulesetId.value === 'wuhan-huanghuang' ? turnCanHu.value : (turnCanHu.value || userCanHu.value)
