@@ -129,6 +129,7 @@ export interface RuleSet {
       payerIndex?: number | null,
       dealerIndex?: number | null,
       payerMultiplier?: number,
+      payerKongMultipliers?: readonly number[],
     ): number
     applyWinSettlement?(
       players: GamePlayer[],

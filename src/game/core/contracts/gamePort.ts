@@ -95,6 +95,8 @@ export interface RoundResult {
   paymentPerPayer?: number
   /** 点炮局中，按该牌型规则加付后的放炮者实际应付分。 */
   discarderPayment?: number
+  /** 按座位顺序记录的实际付款额；赢家位置为 0。 */
+  payerPayments?: number[]
   details?: RoundScoreDetail[]
   scoreChanges?: RoundScoreChange[]
   tenpai?: number[]
