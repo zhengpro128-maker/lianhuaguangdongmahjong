@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { Meld } from '../../core/contracts/types'
 import {
   WUHAN_DRAW_STOP_COUNT, WUHAN_TILE_TYPES, WUHAN_WALL_SIZE, capWuhanPayment,
-  createWuhanWall, wuhanJokerForIndicator, wuhanKongKinds, wuhanKongMultiplier, wuhanSettlementKongKinds,
+  createWuhanWall, wuhanJokerForIndicator, wuhanKongKinds, wuhanKongLabel, wuhanKongMultiplier, wuhanSettlementKongKinds,
 } from './ruleProfile'
 
 describe('武汉晃晃规则档案', () => {
@@ -25,6 +25,11 @@ describe('武汉晃晃规则档案', () => {
     expect(capWuhanPayment(51)).toBe(50)
     expect(capWuhanPayment(8)).toBe(8)
     expect(WUHAN_DRAW_STOP_COUNT).toBe(8)
+  })
+
+  it('uses Chinese labels for every kong kind in settlement', () => {
+    expect(['red', 'discard', 'added', 'concealed', 'joker'].map(wuhanKongLabel))
+      .toEqual(['红中杠', '明杠', '补杠', '暗杠', '癞子杠'])
   })
 
   it('only counts the winner\'s own kongs when settling a win', () => {

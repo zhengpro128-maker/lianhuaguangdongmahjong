@@ -2,7 +2,7 @@ import type { RoundResult } from '../../core/contracts/gamePort'
 import type { TableActionType, TileType } from '../../core/contracts/types'
 import { removeLastDiscard } from '../../core/rules/actions'
 import { createSettlementTimeline } from '../../shared/settlement/settlementTimeline'
-import { capWuhanPayment, wuhanKongKinds, wuhanKongMultiplier, wuhanSettlementKongKinds } from './ruleProfile'
+import { capWuhanPayment, wuhanKongKinds, wuhanKongLabel, wuhanKongMultiplier, wuhanSettlementKongKinds } from './ruleProfile'
 import { evaluateWuhanWin, isWuhanStandardWin, withWuhanWinScenes, wuhanDiscarderMultiplier, wuhanGetsSelfDrawBonus, wuhanMeetsMinimum, wuhanPatternPoints, wuhanWinPayment, WUHAN_RULESET } from './rules'
 import type { WuhanEndGameOptions, WuhanGameState } from './wuhanState'
 import type { RuleSet } from '../../core/rules/ruleset'
@@ -75,7 +75,12 @@ export function createWuhanSettlement(options: Options) {
       const payment = wuhanWinPayment(kinds, selfDrawStyle, hard, kongs, discardWin)
       const payer = discardWin ? endOptions.sourceFrom : null
       const discarderMultiplier = wuhanDiscarderMultiplier(kinds, discardWin)
-      const payerKongMultipliers = state.players.map((player) => wuhanKongMultiplier(wuhanKongKinds(player.melds, joker)))
+      const payerKongKinds = state.players.map((player) => wuhanKongKinds(player.melds, joker))
+      const payerKongMultipliers = payerKongKinds.map((playerKongs) => wuhanKongMultiplier(playerKongs))
+      const payerKongDetails = payerKongKinds.map((playerKongs) => playerKongs.map((kind) => ({
+        label: wuhanKongLabel(kind),
+        multiplier: kind === 'concealed' || kind === 'joker' ? 4 : 2,
+      })))
       const payerPayments = state.players.map((_, playerIndex) => (
         playerIndex === winnerIndex ? 0 : capWuhanPayment(
           payment * payerKongMultipliers[playerIndex] * (playerIndex === payer ? discarderMultiplier : 1),
@@ -97,6 +102,7 @@ export function createWuhanSettlement(options: Options) {
         paymentPerPayer: payerPayments.find((amount, playerIndex) => playerIndex !== winnerIndex && amount > 0) ?? payment,
         ...(discardWin ? { discarderPayment: payerPayments[payer ?? -1] } : {}),
         payerPayments,
+        payerKongDetails,
         totalWon,
         details: [
           ...detailKinds.map((label) => {
@@ -111,7 +117,7 @@ export function createWuhanSettlement(options: Options) {
           ...(selfDrawStyle && wuhanGetsSelfDrawBonus(kinds) ? [{ label: '大胡自摸', multiplier: 1.5 }] : []),
           { label: hard ? '硬胡' : '软胡', multiplier: hard ? 2 : 1 },
           ...(discardWin ? [{ label: '放炮者加付', multiplier: discarderMultiplier }] : []),
-          ...kongs.map((kind) => ({ label: `杠番·${kind}`, multiplier: kind === 'concealed' || kind === 'joker' ? 4 : 2 })),
+          ...kongs.map((kind) => ({ label: `杠番·${wuhanKongLabel(kind)}`, multiplier: kind === 'concealed' || kind === 'joker' ? 4 : 2 })),
         ],
         winType: endOptions.robbedKong ? 'robbed-kong' : endOptions.selfDraw ? 'self-draw' : 'discard',
         ...endOptions,
