@@ -41,10 +41,10 @@ describe('武汉晃晃胡牌', () => {
     expect(wuhanRawWinPoints(['清一色', '门前清'], true, false, [])).toBe(30)
     expect(wuhanGetsSelfDrawBonus(['门前清'])).toBe(false)
   })
-  it('杠上开花以 10 分起算，不另计大胡自摸', () => {
-    // 两个红中杠中，触发补摸的一个在结算前已剔除，只剩一个 ×2 杠番。
-    expect(wuhanRawWinPoints(['杠上开花'], true, true, ['red'])).toBe(40)
-    expect(wuhanRawWinPoints(['杠上开花'], true, false, [])).toBe(10)
+  it('杠上开花以 10 分起算，只减一番而不移除触发杠', () => {
+    expect(wuhanRawWinPoints(['杠上开花'], true, false, ['red'], false, true)).toBe(10)
+    expect(wuhanRawWinPoints(['杠上开花'], true, false, ['joker'], false, true)).toBe(20)
+    expect(wuhanRawWinPoints(['杠上开花'], true, true, ['joker'], false, true)).toBe(40)
   })
   it('red and the current joker are single-kongs rather than regular kong choices', () => {
     const tiles: TileType[] = ['red', 'red', 'red', 'red', 's8', 's8', 's8', 's8', 'm1', 'm1', 'm1', 'm1']

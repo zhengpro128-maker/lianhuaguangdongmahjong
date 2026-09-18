@@ -72,7 +72,8 @@ export function createWuhanSettlement(options: Options) {
       const hard = isWuhanHardWin(winHand, exposed, joker)
       const discardWin = !endOptions.selfDraw && !endOptions.robbedKong
       const kongs = settlementKongs(winnerIndex, joker, Boolean(endOptions.kongBloom))
-      const payment = wuhanWinPayment(kinds, selfDrawStyle, hard, kongs, discardWin)
+      const kongBloom = Boolean(endOptions.kongBloom)
+      const payment = wuhanWinPayment(kinds, selfDrawStyle, hard, kongs, discardWin, kongBloom)
       const payer = discardWin ? endOptions.sourceFrom : null
       const discarderMultiplier = wuhanDiscarderMultiplier(kinds, discardWin)
       const payerKongKinds = state.players.map((player) => wuhanKongKinds(player.melds, joker))
@@ -122,6 +123,7 @@ export function createWuhanSettlement(options: Options) {
           { label: hard ? '硬胡' : '软胡', multiplier: hard ? 2 : 1 },
           ...(discardWin ? [{ label: '放炮者加付', multiplier: discarderMultiplier }] : []),
           ...kongs.map((kind) => ({ label: `杠番·${wuhanKongLabel(kind)}`, multiplier: kind === 'concealed' || kind === 'joker' ? 4 : 2 })),
+          ...(kongBloom ? [{ label: '杠上开花减一番', multiplier: 0.5 }] : []),
         ],
         winType: endOptions.robbedKong ? 'robbed-kong' : endOptions.selfDraw ? 'self-draw' : 'discard',
         ...endOptions,
@@ -172,6 +174,7 @@ export function createWuhanSettlement(options: Options) {
       isWuhanHardWin(hand, exposed, joker),
       settlementKongs(winnerIndex, joker, Boolean(endOptions.kongBloom)),
       !endOptions.selfDraw && !endOptions.robbedKong,
+      Boolean(endOptions.kongBloom),
     )
   }
 

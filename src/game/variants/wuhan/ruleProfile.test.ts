@@ -47,7 +47,7 @@ describe('武汉晃晃规则档案', () => {
     expect(wuhanKongKinds([{ type: 'flower', tile: 'red', tiles: ['red'] }], 'white')).toEqual([])
   })
 
-  it('excludes the winner\'s triggering kong from kong-bloom fan', () => {
+  it('keeps every winner kong for kong-bloom, then removes exactly one fan', () => {
     const players: ReadonlyArray<{ melds: readonly Meld[] }> = [
       { melds: [
         { type: 'flower', tile: 'red', tiles: ['red'], specialKong: 'red' },
@@ -56,6 +56,8 @@ describe('武汉晃晃规则档案', () => {
       { melds: [{ type: 'gang', tile: 'm1', tiles: ['m1', 'm1', 'm1', 'm1'], added: false }] },
     ]
 
-    expect(wuhanSettlementKongKinds(players, 0, 'white', true)).toEqual(['red'])
+    const kongs = wuhanSettlementKongKinds(players, 0, 'white', true)
+    expect(kongs).toEqual(['red', 'red'])
+    expect(wuhanKongMultiplier(kongs, true)).toBe(2)
   })
 })

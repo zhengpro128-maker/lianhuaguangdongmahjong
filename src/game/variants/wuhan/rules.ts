@@ -167,7 +167,7 @@ export function wuhanPatternPoints(kind: WuhanWinKind): number {
 
 export function wuhanRawWinPoints(
   kinds: readonly WuhanWinKind[], selfDraw: boolean, hard: boolean,
-  kongs: readonly WuhanKongKind[], discardWin = false,
+  kongs: readonly WuhanKongKind[], discardWin = false, kongBloom = false,
 ) {
   const bigKinds = kinds.filter(k => k !== '屁胡')
   const hasOtherBigKind = bigKinds.some(kind => kind !== '门前清')
@@ -178,7 +178,7 @@ export function wuhanRawWinPoints(
     : kinds.includes('屁胡') ? (selfDraw ? 3 : 1) : 0
   // 门前清和杠上开花都以自摸为成立前提，不能再叠加一次大胡自摸 ×1.5。
   const winTypeMultiplier = selfDraw && wuhanGetsSelfDrawBonus(kinds) ? 1.5 : 1
-  return base * (hard ? 2 : 1) * winTypeMultiplier * wuhanKongMultiplier(kongs)
+  return base * (hard ? 2 : 1) * winTypeMultiplier * wuhanKongMultiplier(kongs, kongBloom)
 }
 
 export function wuhanGetsSelfDrawBonus(kinds: readonly WuhanWinKind[]) {
@@ -187,11 +187,11 @@ export function wuhanGetsSelfDrawBonus(kinds: readonly WuhanWinKind[]) {
 
 export function wuhanMeetsMinimum(
   kinds: readonly WuhanWinKind[], selfDraw: boolean, hard: boolean,
-  kongs: readonly WuhanKongKind[], discardWin = false,
+  kongs: readonly WuhanKongKind[], discardWin = false, kongBloom = false,
 ) {
   // 起胡门槛按本次胡牌的总收分算，而不是按单家付款额算：
   // 自摸三家各付一份（屁胡 3 分 × 三家，硬胡再翻倍即共 18 分）。
-  const perPayer = wuhanRawWinPoints(kinds, selfDraw, hard, kongs, discardWin)
+  const perPayer = wuhanRawWinPoints(kinds, selfDraw, hard, kongs, discardWin, kongBloom)
   // 点炮三家都付款：七对、清一色、碰碰胡的放炮者付 1.2 倍，其它点炮付 2 倍。
   const total = selfDraw ? perPayer * 3 : perPayer * (2 + wuhanDiscarderMultiplier(kinds, discardWin))
   return total >= WUHAN_MIN_WIN_POINTS
@@ -199,9 +199,9 @@ export function wuhanMeetsMinimum(
 
 export function wuhanWinPayment(
   kinds: readonly WuhanWinKind[], selfDraw: boolean, hard: boolean,
-  kongs: readonly WuhanKongKind[], discardWin = false,
+  kongs: readonly WuhanKongKind[], discardWin = false, kongBloom = false,
 ) {
-  return capWuhanPayment(wuhanRawWinPoints(kinds, selfDraw, hard, kongs, discardWin))
+  return capWuhanPayment(wuhanRawWinPoints(kinds, selfDraw, hard, kongs, discardWin, kongBloom))
 }
 
 function contextJoker(context?: RuleEvaluationContext) {
