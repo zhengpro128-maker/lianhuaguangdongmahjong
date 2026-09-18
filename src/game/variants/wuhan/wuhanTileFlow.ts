@@ -38,7 +38,12 @@ export function createWuhanTileFlow(options: Options) {
       player.hand = sortTilesWithJokers(player.hand, options.state.jokerTiles.value)
       player.drawnTileIndex = -1
       player.redCount += tile === 'red' ? 1 : 0
-      player.melds.push({ type: 'flower', tile, tiles: [tile] })
+      player.melds.push({
+        type: 'flower',
+        tile,
+        tiles: [tile],
+        specialKong: tile === 'red' ? 'red' : 'joker',
+      })
       options.getTurnOrchestrator().showRedKong(playerIndex, player.melds.length - 1, tile)
       options.playSound('gang.mp3')
       options.later(() => { options.getTurnOrchestrator().beginTurn(playerIndex, { fromTail: true }) }, 350)

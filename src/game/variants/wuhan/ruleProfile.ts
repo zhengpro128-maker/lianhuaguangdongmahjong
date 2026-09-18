@@ -34,8 +34,10 @@ export type WuhanKongKind = 'red' | 'discard' | 'added' | 'concealed' | 'joker'
 
 export function wuhanKongKinds(melds: readonly Meld[], joker: TileType | undefined): WuhanKongKind[] {
   return melds.flatMap((meld): WuhanKongKind[] => {
-    if (meld.type === 'flower' && meld.tile === 'red') return ['red']
-    if (meld.type === 'flower' && meld.tile === joker) return ['joker']
+    // `flower` 是跨玩法共用的展示类型；结算必须依据开杠时写入的凭据，
+    // 不能把牌面恰好为红中/本局癞子的花牌误算为杠。
+    if (meld.type === 'flower' && meld.specialKong === 'red' && meld.tile === 'red') return ['red']
+    if (meld.type === 'flower' && meld.specialKong === 'joker' && meld.tile === joker) return ['joker']
     if (meld.type === 'angang') return [meld.tile === joker ? 'joker' : 'concealed']
     if (meld.type === 'gang') return [meld.added ? 'added' : 'discard']
     return []
