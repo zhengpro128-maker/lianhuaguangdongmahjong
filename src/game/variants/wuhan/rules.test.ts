@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { TileType } from '../../core/contracts/types'
-import { evaluateWuhanWin, isWuhanStandardWin, withWuhanWinScenes, wuhanDiscarderMultiplier, wuhanGetsSelfDrawBonus, wuhanMeetsMinimum, wuhanPatternPoints, wuhanRawWinPoints, wuhanWinPayment, WUHAN_RULESET } from './rules'
+import { evaluateWuhanWin, isWuhanHardWin, isWuhanStandardWin, withWuhanWinScenes, wuhanDiscarderMultiplier, wuhanGetsSelfDrawBonus, wuhanMeetsMinimum, wuhanPatternPoints, wuhanRawWinPoints, wuhanWinPayment, WUHAN_RULESET } from './rules'
 
 describe('武汉晃晃胡牌', () => {
   const standard = ['m1','m2','m3','m4','m5','m6','p2','p3','p4','s7','s8','s9','green','green'] as const
@@ -9,6 +9,12 @@ describe('武汉晃晃胡牌', () => {
     expect(evaluateWuhanWin([...standard.slice(0, 12), 'white', 'white'], { joker: 'white' })).not.toContain('屁胡')
     const peng = ['m1','m1','m1','p2','p2','p2','s3','s3','s3','green','green','green','white','white'] as const
     expect(evaluateWuhanWin(peng, { joker: 'white' })).toContain('碰碰胡')
+  })
+  it('treats one joker as hard when its own face completes the hand', () => {
+    const jokerAsP3 = ['m1', 'm2', 'm3', 'p1', 'p2', 'p3', 's4', 's5', 's6', 's7', 's8', 's9', 'green', 'green'] as const
+    expect(isWuhanHardWin(jokerAsP3, 0, 'p3')).toBe(true)
+    expect(wuhanRawWinPoints(['屁胡'], true, isWuhanHardWin(jokerAsP3, 0, 'p3'), [])).toBe(6)
+    expect(isWuhanHardWin([...jokerAsP3.slice(0, 12), 'p3', 'p3'], 0, 'p3')).toBe(false)
   })
   it('adds only legal scene patterns and caps a payer', () => {
     expect(withWuhanWinScenes(['清一色'], ['m1'], { exposed: 4, discardWin: true, kongBloom: true })).toEqual(['清一色', '全求人', '杠上开花'])

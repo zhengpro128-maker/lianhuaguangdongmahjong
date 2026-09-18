@@ -3,7 +3,7 @@ import type { TableActionType, TileType } from '../../core/contracts/types'
 import { removeLastDiscard } from '../../core/rules/actions'
 import { createSettlementTimeline } from '../../shared/settlement/settlementTimeline'
 import { capWuhanPayment, wuhanKongKinds, wuhanKongLabel, wuhanKongMultiplier, wuhanSettlementKongKinds } from './ruleProfile'
-import { evaluateWuhanWin, isWuhanStandardWin, withWuhanWinScenes, wuhanDiscarderMultiplier, wuhanGetsSelfDrawBonus, wuhanMeetsMinimum, wuhanPatternPoints, wuhanWinPayment, WUHAN_RULESET } from './rules'
+import { evaluateWuhanWin, isWuhanHardWin, isWuhanStandardWin, withWuhanWinScenes, wuhanDiscarderMultiplier, wuhanGetsSelfDrawBonus, wuhanMeetsMinimum, wuhanPatternPoints, wuhanWinPayment, WUHAN_RULESET } from './rules'
 import type { WuhanEndGameOptions, WuhanGameState } from './wuhanState'
 import type { RuleSet } from '../../core/rules/ruleset'
 
@@ -69,7 +69,7 @@ export function createWuhanSettlement(options: Options) {
         kongBloom: Boolean(endOptions.kongBloom),
         robbedKong: Boolean(endOptions.robbedKong),
       })
-      const hard = !joker || !winHand.includes(joker)
+      const hard = isWuhanHardWin(winHand, exposed, joker)
       const discardWin = !endOptions.selfDraw && !endOptions.robbedKong
       const kongs = settlementKongs(winnerIndex, joker, Boolean(endOptions.kongBloom))
       const payment = wuhanWinPayment(kinds, selfDrawStyle, hard, kongs, discardWin)
@@ -169,7 +169,7 @@ export function createWuhanSettlement(options: Options) {
     return wuhanMeetsMinimum(
       kinds,
       selfDrawStyle,
-      !joker || !hand.includes(joker),
+      isWuhanHardWin(hand, exposed, joker),
       settlementKongs(winnerIndex, joker, Boolean(endOptions.kongBloom)),
       !endOptions.selfDraw && !endOptions.robbedKong,
     )
