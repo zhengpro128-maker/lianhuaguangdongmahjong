@@ -23,7 +23,9 @@ export function createWuhanSelectors(
     selectedIndex: state.selectedIndex,
     availableWaitTiles: () => [...WUHAN_TILE_TYPES].filter((tile) => tile !== 'red'),
     isWinningHand: (hand, meldCount) => ruleset.win.isWinningHand(hand, meldCount, { jokers: state.jokerTiles.value }),
-    concealedKongs: (hand) => [...ruleset.win.concealedKongs(hand, { jokers: state.jokerTiles.value }), ...(hand.includes('red') ? ['red' as const] : [])],
+    // 红中和本局癞子没有“杠”按钮：直接打出便按单张杠处理并补摸。
+    // 这里只保留暗杠/补杠等需要玩家主动选择的常规杠。
+    concealedKongs: (hand) => ruleset.win.concealedKongs(hand, { jokers: state.jokerTiles.value }),
     waitingTiles: (hand, meldCount) => ruleset.win.waitingTiles(hand, meldCount, { jokers: state.jokerTiles.value }),
     matchingCount,
   })
