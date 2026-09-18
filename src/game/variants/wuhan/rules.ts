@@ -49,6 +49,15 @@ export function isWuhanStandardWin(
     || usable.some(tile => (counts.get(tile) ?? 0) >= 1 && jokers > 0 && melds(take(counts, tile, 1), jokers - 1, 4 - exposed))
 }
 
+/**
+ * 只有一张癞子时，若把它按自身牌面而非万能牌仍能组成完整牌型，即为硬胡。
+ * 两张及以上癞子不适用此例外，始终按软胡处理。
+ */
+export function isWuhanHardWin(tiles: readonly TileType[], exposed = 0, joker?: TileType): boolean {
+  const jokerCount = joker ? tiles.filter((tile) => tile === joker).length : 0
+  return jokerCount <= 1 && isWuhanStandardWin(tiles, exposed)
+}
+
 export type WuhanWinKind = '屁胡' | '碰碰胡' | '清一色' | '门前清' | '全求人' | '七对' | '龙七对' | '双龙七对' | '杠上开花' | '抢杠胡'
 export interface WuhanWinContext {
   exposed?: number
