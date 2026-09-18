@@ -14,6 +14,11 @@ export interface Meld {
   pending?: boolean
   /** 风杠（乱风杠）：东南西北各 1 张组成的亮明暗杠 */
   windKong?: boolean
+  /**
+   * 单张特殊杠的动作凭据。`flower` 也用于其它玩法的展示占位，
+   * 不能仅凭牌面把一张红中/癞子花牌反推成杠番。
+   */
+  specialKong?: 'red' | 'joker'
 }
 
 export interface GamePlayer {

@@ -29,12 +29,21 @@ describe('武汉晃晃规则档案', () => {
 
   it('counts kongs from all four players when settling a win', () => {
     const players: ReadonlyArray<{ melds: readonly Meld[] }> = [
-      { melds: [{ type: 'flower', tile: 'red', tiles: ['red'] }] },
+      { melds: [{ type: 'flower', tile: 'red', tiles: ['red'], specialKong: 'red' }] },
       { melds: [{ type: 'gang', tile: 'm1', tiles: ['m1', 'm1', 'm1', 'm1'], added: false }] },
       { melds: [{ type: 'angang', tile: 'p2', tiles: ['p2', 'p2', 'p2', 'p2'] }] },
-      { melds: [{ type: 'flower', tile: 'white', tiles: ['white'] }] },
+      { melds: [{ type: 'flower', tile: 'white', tiles: ['white'], specialKong: 'joker' }] },
     ]
 
     expect(wuhanPlayersKongKinds(players, 'white')).toEqual(['red', 'discard', 'concealed', 'joker'])
+  })
+
+  it('does not infer a kong fan from an unmarked flower meld', () => {
+    const players: ReadonlyArray<{ melds: readonly Meld[] }> = [
+      { melds: [{ type: 'flower', tile: 'red', tiles: ['red'] }] },
+      { melds: [{ type: 'flower', tile: 'white', tiles: ['white'] }] },
+    ]
+
+    expect(wuhanPlayersKongKinds(players, 'white')).toEqual([])
   })
 })
