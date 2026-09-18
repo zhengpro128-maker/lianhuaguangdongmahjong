@@ -128,6 +128,7 @@ export interface RuleSet {
       points: number,
       payerIndex?: number | null,
       dealerIndex?: number | null,
+      payerMultiplier?: number,
     ): number
     applyWinSettlement?(
       players: GamePlayer[],
