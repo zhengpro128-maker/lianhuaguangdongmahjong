@@ -57,7 +57,8 @@ export function wuhanKongKinds(melds: readonly Meld[], joker: TileType | undefin
 
 /**
  * 胡牌分只统计胡家自己的杠番；其他玩家的杠按其自身动作独立结算，不能并入胡家。
- * 杠上开花的底分已经包含开杠本身，因此再从胡家记录的最后一杠中扣除一杠。
+ * 杠上开花的 10 分底分只默认抵销一番（÷2），而不是移除触发杠。
+ * 因此红中杠开为 10 分；暗杠或癞子杠开为 20 分，再叠加其它杠番。
  */
 export function wuhanSettlementKongKinds(
   players: ReadonlyArray<{ melds: readonly Meld[] }>,
@@ -65,13 +66,13 @@ export function wuhanSettlementKongKinds(
   joker: TileType | undefined,
   kongBloom: boolean,
 ): WuhanKongKind[] {
-  const kinds = wuhanKongKinds(players[winnerIndex]?.melds ?? [], joker)
-  return kongBloom ? kinds.slice(0, -1) : kinds
+  return wuhanKongKinds(players[winnerIndex]?.melds ?? [], joker)
 }
 
 /** 以“番”为指数：1 番=×2，2 番=×4；多次杠相乘。 */
-export function wuhanKongMultiplier(kongs: readonly WuhanKongKind[]): number {
-  return kongs.reduce((factor, kind) => factor * (kind === 'concealed' || kind === 'joker' ? 4 : 2), 1)
+export function wuhanKongMultiplier(kongs: readonly WuhanKongKind[], kongBloom = false): number {
+  const factor = kongs.reduce((value, kind) => value * (kind === 'concealed' || kind === 'joker' ? 4 : 2), 1)
+  return kongBloom ? factor / 2 : factor
 }
 
 export function capWuhanPayment(points: number): number {
