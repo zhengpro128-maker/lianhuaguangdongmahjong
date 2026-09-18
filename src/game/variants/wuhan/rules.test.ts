@@ -77,4 +77,12 @@ describe('武汉晃晃胡牌', () => {
     expect(WUHAN_RULESET.score.applyWinScore(bigHandPlayers, 0, 20, 2, undefined, 1.2)).toBe(64)
     expect(bigHandPlayers.map(player => player.score)).toEqual([1064, 980, 976, 980])
   })
+  it('付款者各自的杠番独立翻倍，不合并进胡家底分', () => {
+    const players = Array.from({ length: 4 }, (_, seat) => ({
+      name: String(seat), avatar: '', score: 1000, seat, hand: [], discards: [], melds: [], redCount: 0, drawnTileIndex: -1,
+    }))
+    // 胡家红中杠使硬屁胡底分为 4；放炮者的点炮 ×2，以及另两家的红中杠，分别把三家都翻到 8。
+    expect(WUHAN_RULESET.score.applyWinScore(players, 0, 4, 1, undefined, 2, [2, 1, 2, 2])).toBe(24)
+    expect(players.map(player => player.score)).toEqual([1024, 992, 992, 992])
+  })
 })

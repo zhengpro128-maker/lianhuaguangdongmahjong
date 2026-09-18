@@ -216,12 +216,13 @@ function applyNoImmediateKongScore(): ScoreDelta[] {
 
 function applyWinnerPayment(
   players: GamePlayer[], winnerIndex: number, points: number, payerIndex?: number | null,
-  _dealerIndex?: number | null, payerMultiplier = 2,
+  _dealerIndex?: number | null, payerMultiplier = 2, payerKongMultipliers: readonly number[] = [],
 ) {
   let total = 0
   players.forEach((player, index) => {
     if (index === winnerIndex) return
-    const payment = capWuhanPayment(points * (index === payerIndex ? payerMultiplier : 1))
+    const kongMultiplier = payerKongMultipliers[index] ?? 1
+    const payment = capWuhanPayment(points * kongMultiplier * (index === payerIndex ? payerMultiplier : 1))
     player.score -= payment
     total += payment
   })

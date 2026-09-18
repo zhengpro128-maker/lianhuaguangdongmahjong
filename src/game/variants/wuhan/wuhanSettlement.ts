@@ -2,7 +2,7 @@ import type { RoundResult } from '../../core/contracts/gamePort'
 import type { TableActionType, TileType } from '../../core/contracts/types'
 import { removeLastDiscard } from '../../core/rules/actions'
 import { createSettlementTimeline } from '../../shared/settlement/settlementTimeline'
-import { wuhanSettlementKongKinds } from './ruleProfile'
+import { capWuhanPayment, wuhanKongKinds, wuhanKongMultiplier, wuhanSettlementKongKinds } from './ruleProfile'
 import { evaluateWuhanWin, withWuhanWinScenes, wuhanDiscarderMultiplier, wuhanGetsSelfDrawBonus, wuhanMeetsMinimum, wuhanPatternPoints, wuhanWinPayment, WUHAN_RULESET } from './rules'
 import type { WuhanEndGameOptions, WuhanGameState } from './wuhanState'
 import type { RuleSet } from '../../core/rules/ruleset'
@@ -75,7 +75,15 @@ export function createWuhanSettlement(options: Options) {
       const payment = wuhanWinPayment(kinds, selfDrawStyle, hard, kongs, discardWin)
       const payer = discardWin ? endOptions.sourceFrom : null
       const discarderMultiplier = wuhanDiscarderMultiplier(kinds, discardWin)
-      const totalWon = ruleset.score.applyWinScore(state.players, winnerIndex, payment, payer, undefined, discarderMultiplier)
+      const payerKongMultipliers = state.players.map((player) => wuhanKongMultiplier(wuhanKongKinds(player.melds, joker)))
+      const payerPayments = state.players.map((_, playerIndex) => (
+        playerIndex === winnerIndex ? 0 : capWuhanPayment(
+          payment * payerKongMultipliers[playerIndex] * (playerIndex === payer ? discarderMultiplier : 1),
+        )
+      ))
+      const totalWon = ruleset.score.applyWinScore(
+        state.players, winnerIndex, payment, payer, undefined, discarderMultiplier, payerKongMultipliers,
+      )
       const hasOtherBigKind = kinds.some(kind => kind !== '屁胡' && kind !== '门前清')
       const detailKinds = kinds.some(kind => kind !== '屁胡')
         ? kinds.filter(kind => kind !== '屁胡')
@@ -86,8 +94,9 @@ export function createWuhanSettlement(options: Options) {
         multiplier: payment,
         totalMultiplier: payment,
         points: payment,
-        paymentPerPayer: payment,
-        ...(discardWin ? { discarderPayment: Math.min(50, payment * discarderMultiplier) } : {}),
+        paymentPerPayer: payerPayments.find((amount, playerIndex) => playerIndex !== winnerIndex && amount > 0) ?? payment,
+        ...(discardWin ? { discarderPayment: payerPayments[payer ?? -1] } : {}),
+        payerPayments,
         totalWon,
         details: [
           ...detailKinds.map((label) => {
