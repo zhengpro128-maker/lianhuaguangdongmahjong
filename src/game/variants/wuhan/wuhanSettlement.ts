@@ -54,12 +54,13 @@ export function createWuhanSettlement(options: Options) {
         ? [...winner.hand, endOptions.winTile]
         : [...winner.hand])
       const exposed = options.structuralMeldCount(winnerIndex)
-      const exposedTiles = winner.melds.filter(meld => meld.type !== 'flower').flatMap(meld => meld.tiles)
+      const exposedMelds = winner.melds.filter(meld => meld.type !== 'flower')
+      const exposedTiles = exposedMelds.flatMap(meld => meld.tiles)
       const joker = state.jokerTiles.value[0]
       const ordinaryJokers = !endOptions.selfDraw && endOptions.winTile === joker ? [endOptions.winTile] : []
       const menQianQing = winner.melds.every(meld => meld.type === 'angang' || meld.type === 'flower')
       const selfDrawStyle = Boolean(endOptions.selfDraw || endOptions.robbedKong)
-      const baseKinds = evaluateWuhanWin(winHand, { exposed, exposedTiles, joker, ordinaryJokers, menQianQing, selfDraw: selfDrawStyle })
+      const baseKinds = evaluateWuhanWin(winHand, { exposed, exposedTiles, exposedMelds, joker, ordinaryJokers, menQianQing, selfDraw: selfDrawStyle })
       const kinds = withWuhanWinScenes(baseKinds, winHand, {
         exposed,
         joker,
@@ -125,7 +126,8 @@ export function createWuhanSettlement(options: Options) {
     if (!hand) return false
     if (!endOptions.selfDraw && !endOptions.robbedKong && (hand.includes('green') || hand.includes('white'))) return false
     const exposed = options.structuralMeldCount(winnerIndex)
-    const exposedTiles = winner.melds.filter(meld => meld.type !== 'flower').flatMap(meld => meld.tiles)
+    const exposedMelds = winner.melds.filter(meld => meld.type !== 'flower')
+    const exposedTiles = exposedMelds.flatMap(meld => meld.tiles)
     const ordinaryJokers = endOptions.winTile === state.jokerTiles.value[0] && !endOptions.selfDraw ? [endOptions.winTile] : []
     if (!ruleset.win.isWinningHand(hand, exposed, {
       jokers: state.jokerTiles.value,
@@ -134,7 +136,7 @@ export function createWuhanSettlement(options: Options) {
     const joker = state.jokerTiles.value[0]
     const menQianQing = winner.melds.every(meld => meld.type === 'angang' || meld.type === 'flower')
     const selfDrawStyle = Boolean(endOptions.selfDraw || endOptions.robbedKong)
-    const baseKinds = evaluateWuhanWin(hand, { exposed, exposedTiles, joker, ordinaryJokers, menQianQing, selfDraw: selfDrawStyle })
+    const baseKinds = evaluateWuhanWin(hand, { exposed, exposedTiles, exposedMelds, joker, ordinaryJokers, menQianQing, selfDraw: selfDrawStyle })
     const kinds = withWuhanWinScenes(baseKinds, hand, {
       exposed,
       joker,

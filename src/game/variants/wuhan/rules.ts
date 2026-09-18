@@ -1,4 +1,4 @@
-import type { TileType } from '../../core/contracts/types'
+import type { Meld, TileType } from '../../core/contracts/types'
 import type { ChiOption } from '../../core/contracts/gamePort'
 import type { GamePlayer, ScoreDelta } from '../../core/contracts/types'
 import type { RuleEvaluationContext, RuleSet } from '../../core/rules/ruleset'
@@ -54,6 +54,11 @@ export interface WuhanWinContext {
   exposed?: number
   /** 已吃、碰、杠的结构副露牌；清一色等花色牌型必须把它们一并计算。 */
   exposedTiles?: readonly TileType[]
+  /**
+   * 已亮出的结构副露。碰碰胡除了暗手必须全部由刻子组成，也不能有任何吃牌顺子。
+   * 单靠 `exposed` 数量或扁平化的 `exposedTiles` 都无法分辨碰与吃。
+   */
+  exposedMelds?: readonly Pick<Meld, 'type'>[]
   /** 暗杠和红中单杠不破门前清；未传入时退化为无结构副露。 */
   menQianQing?: boolean
   joker?: TileType
@@ -88,7 +93,8 @@ export function evaluateWuhanWin(tiles: readonly TileType[], context: WuhanWinCo
     const allNatural = [...natural, ...(context.exposedTiles ?? []).filter(tile => tile !== joker && tile !== 'red')]
     const suits = new Set(allNatural.filter(t => /^[mps]/.test(t)).map(t => t[0])); const honors = allNatural.some(t => t === 'green' || t === 'white')
     if (suits.size === 1 && !honors) kinds.push('清一色')
-    const canPengPeng = usable.some(tile => {
+    const hasExposedSequence = context.exposedMelds?.some((meld) => meld.type === 'chi') ?? false
+    const canPengPeng = !hasExposedSequence && usable.some(tile => {
       const amount = countsFor(natural).get(tile) ?? 0
       const remaining = take(countsFor(natural), tile, Math.min(2, amount))
       return 2 - Math.min(2, amount) <= wild && tripletsOnly(remaining, wild - (2 - Math.min(2, amount)), 4 - exposed)

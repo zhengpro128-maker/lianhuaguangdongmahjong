@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { TileType } from '../../core/contracts/types'
 import { evaluateWuhanWin, isWuhanStandardWin, withWuhanWinScenes, wuhanMeetsMinimum, wuhanPatternPoints, wuhanRawWinPoints, wuhanWinPayment, WUHAN_RULESET } from './rules'
 
 describe('武汉晃晃胡牌', () => {
@@ -43,6 +44,14 @@ describe('武汉晃晃胡牌', () => {
     const hand = ['m1','m1','m1','m2','m2','m2','m3','m3','m3','m4','m4'] as const
     expect(evaluateWuhanWin(hand, { exposed: 1, exposedTiles: ['m5', 'm6', 'm7'], joker: 'white' })).toContain('清一色')
     expect(evaluateWuhanWin(hand, { exposed: 1, exposedTiles: ['p5', 'p6', 'p7'], joker: 'white' })).not.toContain('清一色')
+  })
+  it('碰碰胡会把吃、碰、杠的副露结构一并检查', () => {
+    const hand = ['m1','m1','m1','m2','m2','m2','p3','p3','p3','green','green'] as const
+    const chi = { type: 'chi' as const, tile: 's5' as const, tiles: ['s5', 's6', 's7'] as TileType[] }
+    const peng = { type: 'peng' as const, tile: 's5' as const, tiles: ['s5', 's5', 's5'] as TileType[] }
+
+    expect(evaluateWuhanWin(hand, { exposed: 1, exposedMelds: [chi], joker: 'white' })).not.toContain('碰碰胡')
+    expect(evaluateWuhanWin(hand, { exposed: 1, exposedMelds: [peng], joker: 'white' })).toContain('碰碰胡')
   })
   it('七对不与门前清叠加，其它大牌可以', () => {
     const sevenPairs = ['m1','m1','m2','m2','m3','m3','p1','p1','p2','p2','s1','s1','green','green'] as const
