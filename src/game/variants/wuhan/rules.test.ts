@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { TileType } from '../../core/contracts/types'
-import { evaluateWuhanWin, isWuhanStandardWin, withWuhanWinScenes, wuhanMeetsMinimum, wuhanPatternPoints, wuhanRawWinPoints, wuhanWinPayment, WUHAN_RULESET } from './rules'
+import { evaluateWuhanWin, isWuhanStandardWin, withWuhanWinScenes, wuhanGetsSelfDrawBonus, wuhanMeetsMinimum, wuhanPatternPoints, wuhanRawWinPoints, wuhanWinPayment, WUHAN_RULESET } from './rules'
 
 describe('武汉晃晃胡牌', () => {
   const standard = ['m1','m2','m3','m4','m5','m6','p2','p3','p4','s7','s8','s9','green','green'] as const
@@ -25,7 +25,7 @@ describe('武汉晃晃胡牌', () => {
     expect(wuhanMeetsMinimum(['屁胡'], true, true, [])).toBe(true)
     expect(wuhanMeetsMinimum(['屁胡'], false, true, [])).toBe(false)
     expect(wuhanMeetsMinimum(['屁胡'], true, false, ['concealed'])).toBe(true)
-    expect(wuhanRawWinPoints(['屁胡', '门前清'], true, false, [])).toBe(9)
+    expect(wuhanRawWinPoints(['屁胡', '门前清'], true, false, [])).toBe(6)
     expect(wuhanMeetsMinimum(['屁胡', '门前清'], true, false, [])).toBe(true)
     expect(wuhanRawWinPoints(['清一色'], false, false, [], true)).toBe(10)
     expect(wuhanRawWinPoints(['七对'], true, false, ['red'])).toBe(30)
@@ -33,6 +33,7 @@ describe('武汉晃晃胡牌', () => {
     expect(wuhanPatternPoints('双龙七对')).toBe(40)
     expect(wuhanRawWinPoints(['清一色', '门前清'], false, false, [])).toBe(20)
     expect(wuhanRawWinPoints(['清一色', '门前清'], true, false, [])).toBe(30)
+    expect(wuhanGetsSelfDrawBonus(['门前清'])).toBe(false)
   })
   it('杠上开花以 10 分起算，不另计大胡自摸', () => {
     // 两个红中杠中，触发补摸的一个在结算前已剔除，只剩一个 ×2 杠番。

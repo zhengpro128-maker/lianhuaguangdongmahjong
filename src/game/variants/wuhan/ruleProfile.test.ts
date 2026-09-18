@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { Meld } from '../../core/contracts/types'
 import {
   WUHAN_DRAW_STOP_COUNT, WUHAN_TILE_TYPES, WUHAN_WALL_SIZE, capWuhanPayment,
-  createWuhanWall, wuhanJokerForIndicator, wuhanKongMultiplier, wuhanPlayersKongKinds, wuhanSettlementKongKinds,
+  createWuhanWall, wuhanJokerForIndicator, wuhanKongKinds, wuhanKongMultiplier, wuhanSettlementKongKinds,
 } from './ruleProfile'
 
 describe('武汉晃晃规则档案', () => {
@@ -27,7 +27,7 @@ describe('武汉晃晃规则档案', () => {
     expect(WUHAN_DRAW_STOP_COUNT).toBe(8)
   })
 
-  it('counts kongs from all four players when settling a win', () => {
+  it('only counts the winner\'s own kongs when settling a win', () => {
     const players: ReadonlyArray<{ melds: readonly Meld[] }> = [
       { melds: [{ type: 'flower', tile: 'red', tiles: ['red'], specialKong: 'red' }] },
       { melds: [{ type: 'gang', tile: 'm1', tiles: ['m1', 'm1', 'm1', 'm1'], added: false }] },
@@ -35,16 +35,11 @@ describe('武汉晃晃规则档案', () => {
       { melds: [{ type: 'flower', tile: 'white', tiles: ['white'], specialKong: 'joker' }] },
     ]
 
-    expect(wuhanPlayersKongKinds(players, 'white')).toEqual(['red', 'discard', 'concealed', 'joker'])
+    expect(wuhanSettlementKongKinds(players, 0, 'white', false)).toEqual(['red'])
   })
 
   it('does not infer a kong fan from an unmarked flower meld', () => {
-    const players: ReadonlyArray<{ melds: readonly Meld[] }> = [
-      { melds: [{ type: 'flower', tile: 'red', tiles: ['red'] }] },
-      { melds: [{ type: 'flower', tile: 'white', tiles: ['white'] }] },
-    ]
-
-    expect(wuhanPlayersKongKinds(players, 'white')).toEqual([])
+    expect(wuhanKongKinds([{ type: 'flower', tile: 'red', tiles: ['red'] }], 'white')).toEqual([])
   })
 
   it('excludes the winner\'s triggering kong from kong-bloom fan', () => {
@@ -56,6 +51,6 @@ describe('武汉晃晃规则档案', () => {
       { melds: [{ type: 'gang', tile: 'm1', tiles: ['m1', 'm1', 'm1', 'm1'], added: false }] },
     ]
 
-    expect(wuhanSettlementKongKinds(players, 0, 'white', true)).toEqual(['red', 'discard'])
+    expect(wuhanSettlementKongKinds(players, 0, 'white', true)).toEqual(['red'])
   })
 })
