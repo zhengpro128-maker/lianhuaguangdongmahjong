@@ -240,7 +240,10 @@ export const WUHAN_RULESET: RuleSet = {
     canRobKong: (tiles, kongTile, exposed = 0, context) => (
       winningKinds([...tiles, kongTile], exposed, context).length > 0
     ),
-    concealedKongs: (tiles) => [...new Set(tiles.filter((tile) => tile !== 'red' && matchingCount(tiles, tile) === 4))],
+    // 红中与本局癞子是单张杠：打出即亮杠补摸，不进入常规暗杠选择。
+    concealedKongs: (tiles, context) => [...new Set(tiles.filter((tile) => (
+      tile !== 'red' && !context?.jokers?.includes(tile) && matchingCount(tiles, tile) === 4
+    )))],
     evaluatePattern: (tiles, exposed, context) => {
       const kinds = winningKinds(tiles, exposed, context)
       return kinds.length ? { pattern: kinds.join('、'), fan: kinds.filter((kind) => kind !== '屁胡').length || 1 } : null

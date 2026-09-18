@@ -40,6 +40,10 @@ describe('武汉晃晃胡牌', () => {
     expect(wuhanRawWinPoints(['杠上开花'], true, true, ['red'])).toBe(40)
     expect(wuhanRawWinPoints(['杠上开花'], true, false, [])).toBe(10)
   })
+  it('red and the current joker are single-kongs rather than regular kong choices', () => {
+    const tiles: TileType[] = ['red', 'red', 'red', 'red', 's8', 's8', 's8', 's8', 'm1', 'm1', 'm1', 'm1']
+    expect(WUHAN_RULESET.win.concealedKongs(tiles, { jokers: ['s8'] })).toEqual(['m1'])
+  })
   it('移除将一色、风一色和见字胡，门清牌加入门前清', () => {
     expect(evaluateWuhanWin(standard, { joker: 'white', selfDraw: true })).toContain('门前清')
     expect(evaluateWuhanWin(standard, { joker: 'white' }).join(',')).not.toMatch(/将一色|风一色|见字胡/)
