@@ -97,6 +97,8 @@ export interface RoundResult {
   discarderPayment?: number
   /** 按座位顺序记录的实际付款额；赢家位置为 0。 */
   payerPayments?: number[]
+  /** 按座位顺序记录各付款者自己生效的杠倍数，供结算头像旁逐家说明。 */
+  payerKongDetails?: RoundScoreDetail[][]
   details?: RoundScoreDetail[]
   scoreChanges?: RoundScoreChange[]
   tenpai?: number[]

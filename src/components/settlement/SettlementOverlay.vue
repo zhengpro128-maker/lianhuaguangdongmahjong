@@ -127,6 +127,10 @@ const relativeSeat = computed<0 | 1 | 2 | 3>(() => {
   if (winner == null) return 0
   return ((winner - props.dealer + 4) % 4) as 0 | 1 | 2 | 3
 })
+
+function payerKongDetails(playerIndex: number) {
+  return props.result?.payerKongDetails?.[playerIndex] ?? []
+}
 </script>
 
 <template>
@@ -174,7 +178,12 @@ const relativeSeat = computed<0 | 1 | 2 | 3>(() => {
         <div class="round-rankings">
           <article v-for="entry in result.scoreChanges" :key="entry.playerIndex" :class="{ winner: entry.playerIndex === result.winnerIndex }" :style="animeEntryStyle(entry)">
             <strong class="rank-number">{{ entry.rank }}<small>位</small></strong>
-            <img :src="displayedAvatar(entry)" :alt="`${entry.name}头像`" @error="onAvatarError(entry)" />
+            <div class="settlement-avatar">
+              <img :src="displayedAvatar(entry)" :alt="`${entry.name}头像`" @error="onAvatarError(entry)" />
+              <small v-for="detail in entry.playerIndex === result.winnerIndex ? [] : payerKongDetails(entry.playerIndex)" :key="detail.label">
+                {{ detail.label }} ×{{ detail.multiplier }}
+              </small>
+            </div>
             <span class="player-line">
               {{ entry.name }}
               <i v-if="entry.playerIndex === dealer" class="mark dealer">庄</i>

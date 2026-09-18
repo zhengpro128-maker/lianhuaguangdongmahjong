@@ -32,6 +32,17 @@ export function createWuhanWall(random: () => number = Math.random): TileType[] 
 
 export type WuhanKongKind = 'red' | 'discard' | 'added' | 'concealed' | 'joker'
 
+/** 结算展示使用中文杠种，避免把内部枚举值暴露给玩家。 */
+export function wuhanKongLabel(kind: WuhanKongKind): string {
+  switch (kind) {
+    case 'red': return '红中杠'
+    case 'discard': return '明杠'
+    case 'added': return '补杠'
+    case 'concealed': return '暗杠'
+    case 'joker': return '癞子杠'
+  }
+}
+
 export function wuhanKongKinds(melds: readonly Meld[], joker: TileType | undefined): WuhanKongKind[] {
   return melds.flatMap((meld): WuhanKongKind[] => {
     // `flower` 是跨玩法共用的展示类型；结算必须依据开杠时写入的凭据，

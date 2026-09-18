@@ -36,6 +36,10 @@ export function mapRoundResultToLocal(
   localServerSeat: number,
 ): RoundResult | null {
   if (!result) return null
+  const mapSeatValues = <T>(values: T[] | undefined) => values?.reduce<T[]>((mapped, value, serverSeat) => {
+    mapped[toLocalSeat(serverSeat, localServerSeat)] = value
+    return mapped
+  }, [])
   return {
     ...result,
     winnerIndex: result.winnerIndex != null && result.winnerIndex >= 0
@@ -45,6 +49,8 @@ export function mapRoundResultToLocal(
       ? toLocalSeat(result.robbedKongPlayerIndex, localServerSeat)
       : -1,
     tenpai: (result.tenpai ?? []).map((seat: number) => toLocalSeat(seat, localServerSeat)),
+    payerPayments: mapSeatValues(result.payerPayments),
+    payerKongDetails: mapSeatValues(result.payerKongDetails),
     scoreChanges: (result.scoreChanges ?? []).map((change) => ({
       ...change,
       avatar: change.avatar || defaultAvatarForSeat(change.playerIndex),
