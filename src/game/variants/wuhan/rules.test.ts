@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { TileType } from '../../core/contracts/types'
-import { evaluateWuhanWin, isWuhanStandardWin, withWuhanWinScenes, wuhanGetsSelfDrawBonus, wuhanMeetsMinimum, wuhanPatternPoints, wuhanRawWinPoints, wuhanWinPayment, WUHAN_RULESET } from './rules'
+import { evaluateWuhanWin, isWuhanStandardWin, withWuhanWinScenes, wuhanDiscarderMultiplier, wuhanGetsSelfDrawBonus, wuhanMeetsMinimum, wuhanPatternPoints, wuhanRawWinPoints, wuhanWinPayment, WUHAN_RULESET } from './rules'
 
 describe('武汉晃晃胡牌', () => {
   const standard = ['m1','m2','m3','m4','m5','m6','p2','p3','p4','s7','s8','s9','green','green'] as const
@@ -64,11 +64,17 @@ describe('武汉晃晃胡牌', () => {
     expect(evaluateWuhanWin(sevenPairs, { joker: 'white', menQianQing: true })).toContain('七对')
     expect(evaluateWuhanWin(sevenPairs, { joker: 'white', menQianQing: true })).not.toContain('门前清')
   })
-  it('点炮时三家付款且放炮者多付 2 分', () => {
+  it('大胡点炮时放炮者按 1.2 倍支付，其它点炮仍按 2 倍', () => {
     const players = Array.from({ length: 4 }, (_, seat) => ({
       name: String(seat), avatar: '', score: 1000, seat, hand: [], discards: [], melds: [], redCount: 0, drawnTileIndex: -1,
     }))
     expect(WUHAN_RULESET.score.applyWinScore(players, 0, 12, 2)).toBe(48)
     expect(players.map(player => player.score)).toEqual([1048, 988, 976, 988])
+    const bigHandPlayers = Array.from({ length: 4 }, (_, seat) => ({
+      name: String(seat), avatar: '', score: 1000, seat, hand: [], discards: [], melds: [], redCount: 0, drawnTileIndex: -1,
+    }))
+    expect(wuhanDiscarderMultiplier(['龙七对'], true)).toBe(1.2)
+    expect(WUHAN_RULESET.score.applyWinScore(bigHandPlayers, 0, 20, 2, undefined, 1.2)).toBe(64)
+    expect(bigHandPlayers.map(player => player.score)).toEqual([1064, 980, 976, 980])
   })
 })
