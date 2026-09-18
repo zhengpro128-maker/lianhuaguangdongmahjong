@@ -44,17 +44,9 @@ export function wuhanKongKinds(melds: readonly Meld[], joker: TileType | undefin
   })
 }
 
-/** 胡牌结算使用的杠番：红中杠、癞子杠、明杠、暗杠均统计全桌四家。 */
-export function wuhanPlayersKongKinds(
-  players: ReadonlyArray<{ melds: readonly Meld[] }>,
-  joker: TileType | undefined,
-): WuhanKongKind[] {
-  return players.flatMap((player) => wuhanKongKinds(player.melds, joker))
-}
-
 /**
- * 杠上开花的底分已经包含开杠本身，因此只计其余杠番。
- * 补摸一定来自胡家刚开的杠，故从胡家记录的最后一杠中扣除一杠；其他三家的杠番保持不变。
+ * 胡牌分只统计胡家自己的杠番；其他玩家的杠按其自身动作独立结算，不能并入胡家。
+ * 杠上开花的底分已经包含开杠本身，因此再从胡家记录的最后一杠中扣除一杠。
  */
 export function wuhanSettlementKongKinds(
   players: ReadonlyArray<{ melds: readonly Meld[] }>,
@@ -62,10 +54,8 @@ export function wuhanSettlementKongKinds(
   joker: TileType | undefined,
   kongBloom: boolean,
 ): WuhanKongKind[] {
-  return players.flatMap((player, playerIndex) => {
-    const kinds = wuhanKongKinds(player.melds, joker)
-    return kongBloom && playerIndex === winnerIndex ? kinds.slice(0, -1) : kinds
-  })
+  const kinds = wuhanKongKinds(players[winnerIndex]?.melds ?? [], joker)
+  return kongBloom ? kinds.slice(0, -1) : kinds
 }
 
 /** 以“番”为指数：1 番=×2，2 番=×4；多次杠相乘。 */

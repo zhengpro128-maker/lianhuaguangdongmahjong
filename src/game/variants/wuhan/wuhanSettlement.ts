@@ -3,7 +3,7 @@ import type { TableActionType, TileType } from '../../core/contracts/types'
 import { removeLastDiscard } from '../../core/rules/actions'
 import { createSettlementTimeline } from '../../shared/settlement/settlementTimeline'
 import { wuhanSettlementKongKinds } from './ruleProfile'
-import { evaluateWuhanWin, withWuhanWinScenes, wuhanMeetsMinimum, wuhanPatternPoints, wuhanWinPayment, WUHAN_RULESET } from './rules'
+import { evaluateWuhanWin, withWuhanWinScenes, wuhanGetsSelfDrawBonus, wuhanMeetsMinimum, wuhanPatternPoints, wuhanWinPayment, WUHAN_RULESET } from './rules'
 import type { WuhanEndGameOptions, WuhanGameState } from './wuhanState'
 import type { RuleSet } from '../../core/rules/ruleset'
 
@@ -98,7 +98,7 @@ export function createWuhanSettlement(options: Options) {
                 : { points: label === '屁胡' ? (selfDrawStyle ? 3 : 1) : wuhanPatternPoints(label) }),
             }
           }),
-          ...(selfDrawStyle && !endOptions.kongBloom && kinds.some(kind => kind !== '屁胡') ? [{ label: '大胡自摸', multiplier: 1.5 }] : []),
+          ...(selfDrawStyle && wuhanGetsSelfDrawBonus(kinds) ? [{ label: '大胡自摸', multiplier: 1.5 }] : []),
           { label: hard ? '硬胡' : '软胡', multiplier: hard ? 2 : 1 },
           ...(discardWin ? [{ label: '放炮者翻倍', multiplier: 2 }] : []),
           ...kongs.map((kind) => ({ label: `杠番·${kind}`, multiplier: kind === 'concealed' || kind === 'joker' ? 4 : 2 })),

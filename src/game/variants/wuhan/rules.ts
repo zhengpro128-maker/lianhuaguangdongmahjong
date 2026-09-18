@@ -161,9 +161,13 @@ export function wuhanRawWinPoints(
       points * (kind === '门前清' && hasOtherBigKind ? 2 : wuhanPatternPoints(kind))
     ), 1)
     : kinds.includes('屁胡') ? (selfDraw ? 3 : 1) : 0
-  // 杠上开花固定以 10 分底分计算，不能再叠加大胡自摸 ×1.5。
-  const winTypeMultiplier = selfDraw && bigKinds.length && !kinds.includes('杠上开花') ? 1.5 : 1
+  // 门前清和杠上开花都以自摸为成立前提，不能再叠加一次大胡自摸 ×1.5。
+  const winTypeMultiplier = selfDraw && wuhanGetsSelfDrawBonus(kinds) ? 1.5 : 1
   return base * (hard ? 2 : 1) * winTypeMultiplier * wuhanKongMultiplier(kongs)
+}
+
+export function wuhanGetsSelfDrawBonus(kinds: readonly WuhanWinKind[]) {
+  return !kinds.includes('杠上开花') && kinds.some((kind) => kind !== '屁胡' && kind !== '门前清')
 }
 
 export function wuhanMeetsMinimum(
