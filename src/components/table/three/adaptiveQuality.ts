@@ -6,6 +6,7 @@ export const QUALITY_LEVELS = [
 
 interface AdaptiveQualityOptions {
   override?: number | null
+  initialLevel?: number
   warmupFrames?: number
   downgradeFrameMs?: number
   upgradeFrameMs?: number
@@ -23,6 +24,7 @@ export function parseQualityOverride(search: string) {
 
 export function createAdaptiveQualityController({
   override = null,
+  initialLevel = 0,
   warmupFrames = 10,
   downgradeFrameMs = 26,
   upgradeFrameMs = 20,
@@ -30,7 +32,7 @@ export function createAdaptiveQualityController({
   upgradeFrames = 180,
   onChange,
 }: AdaptiveQualityOptions) {
-  let level = override ?? 0
+  let level = override ?? initialLevel
   let emaFrameMs = 0
   let badFrames = 0
   let goodFrames = 0

@@ -347,8 +347,11 @@ function presetName(id: string | null): string {
 
 <style scoped>
 .llm-panel {
-  position: fixed; z-index: 100; top: 0; right: 0; bottom: 0; width: min(410px, 94vw);
-  padding: 26px 24px; overflow: auto; border-left: 1px solid #997439;
+  position: fixed; z-index: 100;
+  top: env(safe-area-inset-top, 0px); right: env(safe-area-inset-right, 0px); bottom: env(safe-area-inset-bottom, 0px);
+  width: min(410px, calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
+  padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) 24px;
+  overflow: auto; overscroll-behavior: contain; border-left: 1px solid #997439;
   background: linear-gradient(160deg, #102b23, #071510 65%);
   box-shadow: -22px 0 60px rgba(0, 0, 0, .65);
   color: #d0c39e; font-size: 13px;

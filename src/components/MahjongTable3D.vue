@@ -82,12 +82,13 @@ const WALL_DEAL_ORIGIN_Y = 1.1  // 发牌从牌山 head 槽位上方起飞的初
 // 触屏设备（真机）判定：主指针 coarse 且无 hover。
 const isMobileLike = typeof window.matchMedia === 'function'
   && window.matchMedia('(hover: none) and (pointer: coarse)').matches
-// 渲染分辨率上限（清晰度 vs 帧率）：桌面 3、真机 2.5（在 2 的清晰与 3 的帧率间取平衡）。
+// 渲染分辨率上限（清晰度 vs 帧率）：桌面 3、真机 2，优先避免高 DPR 横屏的发热与首局掉帧。
 // URL 带 ?pr=<数字> 可覆盖。
-let pixelRatioCap = parseFloat(new URLSearchParams(window.location.search).get('pr') ?? '') || (isMobileLike ? 2.5 : 3)
+let pixelRatioCap = parseFloat(new URLSearchParams(window.location.search).get('pr') ?? '') || (isMobileLike ? 2 : 3)
 
-// 抗锯齿：默认开（二次元渲染已足够轻，真机也能扛）；?aa=off 可关。
-const aaEnabled = new URLSearchParams(window.location.search).get('aa') !== 'off'
+// 真机先关闭 MSAA，把预算让给稳定帧率；仍可用 ?aa=on 明确开启，桌面默认开启。
+const aaPreference = new URLSearchParams(window.location.search).get('aa')
+const aaEnabled = aaPreference === 'on' || (aaPreference !== 'off' && !isMobileLike)
 const cameraLabEnabled = import.meta.env.DEV && new URLSearchParams(window.location.search).has('cameraLab')
 // 低成本真 3D 实验开关（dev）：?cheapTable=1 关闭实时阴影/描边/环境反射/面光。
 const cheapTable = import.meta.env.DEV && new URLSearchParams(window.location.search).has('cheapTable')
@@ -107,6 +108,8 @@ if (import.meta.env.DEV) {
 }
 const adaptiveQuality = createAdaptiveQualityController({
   override: parseQualityOverride(window.location.search),
+  // 手机从 512 阴影档起步，仍可在连续流畅后自动回升到高档。
+  initialLevel: isMobileLike ? 1 : 0,
   onChange: applyQuality,
 })
 let lastFrameAt = 0
