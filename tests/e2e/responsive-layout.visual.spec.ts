@@ -124,8 +124,13 @@ async function assertTableLayout(page: Page, viewport: typeof viewports[number])
   expect(overlap(metrics.topbar, metrics.topSeat)).toBe(0)
   expect(overlap(metrics.hand, metrics.cue)).toBe(0)
 
-  if (viewport.width <= 844 && viewport.height <= 390) {
+  if (viewport.width >= 640 && viewport.width <= 844 && viewport.height <= 390) {
     expect(metrics.minTarget?.width).toBeGreaterThanOrEqual(43.5)
+    expect(metrics.minTarget?.height).toBeGreaterThanOrEqual(43.5)
+  }
+  // 568px 级别旧机横屏需要在 14 张牌的物理宽度内收紧；不能牺牲可玩性改成横向滚动。
+  if (viewport.width < 640 && viewport.height <= 390) {
+    expect(metrics.minTarget?.width).toBeGreaterThanOrEqual(39.5)
     expect(metrics.minTarget?.height).toBeGreaterThanOrEqual(43.5)
   }
   if (metrics.artRatio) {

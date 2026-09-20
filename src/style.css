@@ -41,6 +41,13 @@ button { font: inherit; }
   touch-action: manipulation;
 }
 
+/* 大厅与设置面板包含昵称、房间码与 API Key 等可编辑内容；不能继承牌桌的禁选中策略。 */
+.game-app :is(input, textarea, [contenteditable="true"]) {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+
 .game-app button:focus-visible,
 .game-app [role="button"]:focus-visible,
 .orientation-gate button:focus-visible {
@@ -571,6 +578,7 @@ button { font: inherit; }
 .hand-rack.dealing .mahjong-tile { animation: deal-to-user .23s cubic-bezier(.2,.85,.3,1) both; }
 .hand-rack::after { content: ""; position: absolute; right: 4%; bottom: -13px; left: 4%; height: 5px; border-radius: 50%; background: rgba(0,0,0,.38); filter: blur(3px); }
 .hand-rack.playable { content: ""; }
+.hand-action-hint { display: none; }
 @keyframes deal-to-user {
   from { opacity: .2; transform: translate(38vw, -34vh) scale(.7) rotate(8deg); }
   to { opacity: 1; transform: translate(0, 0) scale(1) rotate(0); }
@@ -992,6 +1000,23 @@ button { font: inherit; }
   .hand-rack { min-height: 72px; padding: 5px 8px 4px; }
   .hand-rack .mahjong-tile { --tile-width: clamp(32px, 4.25vw, 38px); }
   .hand-rack .hand-tile-slot.drawn { margin-left: clamp(8px, 1.5cqh, 14px); }
+  .hand-action-hint {
+    position: absolute;
+    z-index: 44;
+    bottom: calc(var(--safe-bottom) + var(--hand-zone-height) + 3px);
+    left: 50%;
+    max-width: min(48cqw, 360px);
+    padding: 3px 8px;
+    border: 1px solid color-mix(in srgb, var(--theme-border) 48%, transparent);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--theme-panel) 88%, transparent);
+    color: var(--theme-text-muted);
+    font-size: 11px;
+    line-height: 1.3;
+    pointer-events: none;
+    text-align: center;
+    transform: translateX(-50%);
+  }
   .user-melds { bottom: 75px; }
   /* 本家卡的 width/padding/scale 由新版共享块覆盖；此处 72px 遗留规则会把本家卡
      压得比三家座位卡窄，造成四家尺寸不一致（R6.19 移除）。 */
@@ -2465,8 +2490,9 @@ button { font: inherit; }
     padding: 4px 2px max(4px, var(--safe-bottom));
   }
   .hand-rack .hand-tile-slot {
-    width: clamp(40px, 8cqh, 68px);
-    min-width: clamp(40px, 8cqh, 68px);
+    /* 常见横屏至少给每张牌 44px 的独立热区；568px 级别的旧小屏才退到 40px。 */
+    width: clamp(40px, calc((100cqw - 16px) / 14), 44px);
+    min-width: clamp(40px, calc((100cqw - 16px) / 14), 44px);
     margin-inline: 0;
   }
   .hand-rack .hand-hit-area {
@@ -2479,11 +2505,11 @@ button { font: inherit; }
     transform: translateX(-50%);
     pointer-events: auto;
   }
-  /* slot 与牌面同为 40px，普通牌视觉 gap 为 0；44px 命中区由 hand-hit-area 独立承担。 */
+  /* 常见横屏 slot 与牌面均为 44px；极小屏可收至 40px，额外热区只补足边缘。 */
   .hand-rack .mahjong-tile {
     position: relative;
     z-index: 1;
-    --tile-width: clamp(40px, 8cqh, 68px);
+    --tile-width: clamp(40px, calc((100cqw - 16px) / 14), 44px);
     width: var(--tile-width);
     height: auto;
     aspect-ratio: 4 / 5;
@@ -3222,13 +3248,15 @@ button { font: inherit; }
   .lobby-actions .mode-selector button { padding: 6px 7px 5px; }
   .lobby-actions .game-settings { margin-bottom: 5px; }
   .lobby-actions .game-settings-title { padding: 3px 9px 2px; }
-  .lobby-actions .game-settings > button { min-height: 34px; padding: 3px 8px; }
+  .lobby-actions .game-settings > button { padding: 3px 8px; }
   .current-config { margin-bottom: 5px; }
-  .game-app .lobby-actions > .start-button { flex: 0 0 auto; min-height: 42px; padding: 3px 12px; }
+  .lobby-actions .game-settings > button { min-height: var(--control-hit-target); }
+  .game-app .lobby-actions > .start-button { flex: 0 0 auto; min-height: var(--control-hit-target); padding: 3px 12px; }
   .lobby-actions .start-button b { font-size: 17px; line-height: 1.1; }
   .lobby-actions .start-button span { margin-top: 1px; font-size: 10px; line-height: 1.2; }
   .game-app.is-lobby .llm-fab { top: max(4px, var(--safe-top)); left: max(8px, var(--safe-left)); right: auto; bottom: auto; }
-  .lobby-actions .lobby-links { margin-top: 5px; }
+  .lobby-actions .lobby-links { min-height: var(--control-hit-target); margin-top: 5px; }
+  .lobby-actions .lobby-links :is(button, a) { display: inline-flex; align-items: center; justify-content: center; min-height: var(--control-hit-target); }
   .lobby-account-slot { margin-top: 5px; }
   .lobby-actions .waku-account { padding: 5px 8px; }
   .lobby.room-focused .lobby-layout { grid-template-columns: minmax(0, 1fr); }
@@ -3511,6 +3539,10 @@ button { font: inherit; }
 }
 
 @container (max-height: 340px) {
+  .lobby { overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+  .lobby-layout { height: auto; min-height: 100%; overflow: visible; }
+  .lobby:not(.room-focused) .lobby-layout { grid-template-columns: minmax(0, 1fr); }
+  .lobby:not(.room-focused) .lobby-visual { display: none; }
   .lobby.room-focused .room-seats { flex: 1; overflow-y: auto; overscroll-behavior: contain; }
   .lobby:not(.room-focused) .lobby-actions { padding: 6px; }
   .lobby-actions .mode-selector { margin-bottom: 4px; }

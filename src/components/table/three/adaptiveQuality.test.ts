@@ -32,4 +32,17 @@ describe('adaptiveQuality', () => {
     expect(quality.level).toBe(2)
     expect(onChange).toHaveBeenCalledOnce()
   })
+
+  it('can start from the mobile medium tier and still adapt upward', () => {
+    const quality = createAdaptiveQualityController({
+      initialLevel: 1,
+      warmupFrames: 0,
+      upgradeFrames: 2,
+      onChange: vi.fn(),
+    })
+    expect(quality.level).toBe(1)
+    quality.frame(1)
+    quality.frame(1)
+    expect(quality.level).toBe(0)
+  })
 })

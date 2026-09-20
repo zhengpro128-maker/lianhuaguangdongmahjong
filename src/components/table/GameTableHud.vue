@@ -26,9 +26,11 @@ import {
 } from '../../theme/themeEventPresentation'
 
 const MahjongTable3D = defineAsyncComponent(() => import('../MahjongTable3D.vue'))
-// 预热 3D 牌桌组件 chunk：首次开局时若等挂载才加载，WebGL 场景初始化会
-// 与骰子动画竞争首帧，导致骰子动画被压缩/跳过。应用启动即预取。
-void import('../MahjongTable3D.vue')
+// 手机首屏优先保证大厅可交互，不在尚未开局时抢占网络/解压 Three.js chunk；桌面仍可预热缩短首局等待。
+const connection = navigator as Navigator & { connection?: { saveData?: boolean } }
+const shouldPreloadTable = !window.matchMedia('(hover: none) and (pointer: coarse)').matches
+  && !connection.connection?.saveData
+if (shouldPreloadTable) void import('../MahjongTable3D.vue')
 
 interface Props {
   themeName: TableThemeName
@@ -396,12 +398,19 @@ function finishTileGesture(index: number, event: PointerEvent) {
     lastTouchTap = { index: -1, time: 0 }
     hoveredDiscard.value = null
     waitsOpen.value = false
-    if (!props.bloodFlow?.seats[props.user.seat].locked || index === props.user.drawnTileIndex) emit('discard', index)
+    if (!props.bloodFlow?.seats[props.user.seat].locked || index === props.user.drawnTileIndex) {
+      emit('discard', index)
+      mobileHaptic(16)
+    }
   }
 }
 
 function cancelTileGesture(event: PointerEvent) {
   touchStarts.delete(event.pointerId)
+}
+
+function mobileHaptic(duration: number) {
+  if (!usesFinePointer()) navigator.vibrate?.(duration)
 }
 
 function handleTileActivation(index: number, event?: PointerEvent) {
@@ -420,10 +429,12 @@ function handleTileActivation(index: number, event?: PointerEvent) {
     lastTouchTap = { index: -1, time: 0 }
     waitsOpen.value = false
     emit('discard', index)
+    mobileHaptic(16)
     return
   }
   lastTouchTap = { index, time: now }
   emit('selectTile', index)
+  mobileHaptic(8)
 }
 
 function clearMobileSelection(event: PointerEvent) {
@@ -641,6 +652,10 @@ function onAvatarError(entry: GamePlayer) {
         </div>
       </div>
     </section>
+
+    <div v-if="isUserTurn && !userKongs.length && !userHasWindKong && !userCanHu && !userCurrentWaits && !userTingOptions.length" class="hand-action-hint" role="status">
+      {{ selectedIndex < 0 ? '点牌选择 · 再点一次或上滑出牌' : '已选中 · 再点一次或上滑出牌' }}
+    </div>
 
     <div v-if="showTurnRow" class="turn-action-row" :class="{ 'kong-picker-open': kongPickerOpen || chiPickerOpen }">
       <div v-if="bloodFlow?.preview && userCanHu && !presentationBusy" class="blood-flow-preview" role="status">
