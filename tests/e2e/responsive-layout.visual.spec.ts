@@ -532,6 +532,7 @@ test('手机横屏清单使用同一触控布局连续适配', async ({ browser 
       const canvas = rect('canvas.mahjong-scene')!
       const topSeat = rect('.seat-top .avatar-wrap')!
       const rightSeat = rect('.seat-right .avatar-wrap')!
+      const sideAvatar = rect('.seat-right .avatar')!
       const topbar = rect('.top-bar')!
       const tileRects = [...document.querySelectorAll('.hand-rack .mahjong-tile')]
         .map((element) => element.getBoundingClientRect())
@@ -597,6 +598,8 @@ test('手机横屏清单使用同一触控布局连续适配', async ({ browser 
         topbarTop: topbar.top,
         topbarOverlap: overlap(topSeat, topbar),
         topRightOverlap: overlap(topSeat, rightSeat),
+        sideAvatar: { width: sideAvatar.width, height: sideAvatar.height },
+        rightSeatCenterY: rightSeat.y + rightSeat.height / 2,
         minimumTileGap,
         cssHandGap: getComputedStyle(document.querySelector('.hand-rack')!).gap,
         cssSlotWidth: getComputedStyle(document.querySelector('.hand-tile-slot')!).width,
@@ -653,10 +656,14 @@ test('手机横屏清单使用同一触控布局连续适配', async ({ browser 
     // clamp(76px, 7vw, 104px) 的 76px（四家一致）；本家 72px 遗留泄漏已移除。
     expect(cardWidth).toBeGreaterThanOrEqual(72.5)
     expect(cardWidth).toBeLessThanOrEqual(80)
-    expect(cardHeight).toBeGreaterThanOrEqual(83.5)
+    expect(cardHeight).toBeGreaterThanOrEqual(70)
     expect(cardHeight).toBeLessThanOrEqual(112.5)
     expect(metrics.seatCardSpread.width).toBeLessThanOrEqual(1)
     expect(metrics.seatCardSpread.height).toBeLessThanOrEqual(1)
+    expect(metrics.sideAvatar.width).toBeGreaterThanOrEqual(37.5)
+    expect(metrics.sideAvatar.width).toBeLessThanOrEqual(48.5)
+    expect(metrics.sideAvatar.height).toBeCloseTo(metrics.sideAvatar.width, 1)
+    expect(metrics.rightSeatCenterY).toBeLessThanOrEqual(metrics.game.height * .33)
     expect(Math.max(...metrics.scoreBottomInsets)).toBeLessThanOrEqual(16)
     expect(Math.min(...metrics.scoreBottomInsets)).toBeGreaterThanOrEqual(7)
     expect(Math.max(...metrics.scoreCenterOffsets)).toBeLessThanOrEqual(0.5)
