@@ -1,7 +1,7 @@
 {
-  "name": "莲花广麻",
-  "short_name": "莲花广麻",
-  "description": "在线单机四人广东麻将游戏",
+  "name": "武汉晃晃",
+  "short_name": "武汉晃晃",
+  "description": "可直接在浏览器游玩的四人麻将游戏",
   "lang": "zh-CN",
   "start_url": "/",
   "scope": "/",
