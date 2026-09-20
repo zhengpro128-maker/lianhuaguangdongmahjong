@@ -2328,7 +2328,9 @@ button { font: inherit; }
     --topbar-height: 44px;
     --seat-card-width: clamp(88px, 10cqw, 96px);
     --seat-card-height: clamp(94px, 21cqh, 110px);
-    --seat-avatar-size: clamp(44px, 6cqh, 56px);
+    /* 手机横屏把头像收至 38–48px，并将左右家贴近上沿，给中央牌桌留出完整视野。 */
+    --seat-avatar-size: clamp(38px, 5cqh, 48px);
+    --side-seat-anchor: clamp(calc(var(--topbar-height) + 48px), 30cqh, 132px);
     --top-seat-inline-anchor: 66%;
     --hand-zone-height: calc(clamp(72px, 13cqh, 112px) + var(--safe-bottom));
     --hud-gap: 6px;
@@ -2454,7 +2456,7 @@ button { font: inherit; }
     transform: none;
   }
   .avatar-wrap .avatar,
-  .user-identity .avatar { width: clamp(52px, 5.1vw, 76px); height: clamp(52px, 5.1vw, 76px); }
+  .user-identity .avatar { width: var(--seat-avatar-size); height: var(--seat-avatar-size); }
   .game-app .avatar-wrap > .player-info,
   .game-app .user-identity > .player-info {
     display: flex;
@@ -2575,7 +2577,6 @@ button { font: inherit; }
 @media (hover: none) and (pointer: coarse) and (orientation: landscape) and (max-aspect-ratio: 8 / 5) {
   .game-app {
     --top-seat-inline-anchor: 86%;
-    --side-seat-anchor: 39%;
     --top-seat-resolved-left: var(--top-seat-inline-anchor);
   }
   /* 偏方档（4:3 平板）对家与右家纵向错开，无需用右家卡宽钳制横向前进；
@@ -2590,7 +2591,6 @@ button { font: inherit; }
 @media (hover: none) and (pointer: coarse) and (orientation: landscape) and (min-aspect-ratio: 2 / 1) {
   .game-app {
     --top-seat-inline-anchor: 66%;
-    --side-seat-anchor: 40%;
     --top-seat-resolved-left: clamp(
       46px,
       var(--top-seat-inline-anchor),
