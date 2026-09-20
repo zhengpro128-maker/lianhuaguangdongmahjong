@@ -36,9 +36,9 @@ function markImageFailed() {
 <template>
   <section class="lobby-visual" :data-visual-theme="themeName" aria-label="当前主题预览">
     <div class="lobby-brand">
-      <p class="eyebrow">LIANHUA MAHJONG COLLECTIONS</p>
-      <h1>莲花<span>广麻</span></h1>
-      <p class="subtitle">一款莲花县特有的地方麻将游戏玩法</p>
+      <p class="eyebrow">WUHAN HUANGHUANG</p>
+      <h1>武汉<span>晃晃</span></h1>
+      <p class="subtitle">体验武汉晃晃，一款可直接在浏览器游玩的四人麻将游戏</p>
     </div>
 
     <div
