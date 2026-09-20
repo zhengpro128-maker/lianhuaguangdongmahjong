@@ -318,11 +318,17 @@ test('llmAnime 移动端菜单沿用共享版式且顶栏按钮视觉缩小', as
     const rect = menu.getBoundingClientRect()
     const buttons = [...menu.querySelectorAll('button')]
     const firstStyle = getComputedStyle(buttons[0]!)
+    const firstButtonRect = buttons[0]!.getBoundingClientRect()
+    const hitTarget = document.elementFromPoint(
+      firstButtonRect.left + firstButtonRect.width / 2,
+      firstButtonRect.top + firstButtonRect.height / 2,
+    )
     return {
       rect: { top: rect.top, right: rect.right, bottom: rect.bottom, left: rect.left },
       maximumRowHeight: Math.max(...buttons.map((button) => button.getBoundingClientRect().height)),
       backgroundImage: firstStyle.backgroundImage,
       backgroundColor: firstStyle.backgroundColor,
+      firstButtonReceivesPointer: hitTarget instanceof Element && menu.contains(hitTarget),
     }
   })
   expect(audioMetrics.rect.left).toBeGreaterThanOrEqual(0)
@@ -331,6 +337,7 @@ test('llmAnime 移动端菜单沿用共享版式且顶栏按钮视觉缩小', as
   expect(audioMetrics.maximumRowHeight).toBeLessThanOrEqual(56)
   expect(audioMetrics.backgroundImage).toBe('none')
   expect(audioMetrics.backgroundColor).toBe('rgba(0, 0, 0, 0)')
+  expect(audioMetrics.firstButtonReceivesPointer).toBe(true)
   await page.screenshot({ path: `${evidenceRoot}/extreme/llmAnime-896x414-audio-menu.png` })
 
   await page.goto('/?theme=jade', { waitUntil: 'domcontentloaded' })
