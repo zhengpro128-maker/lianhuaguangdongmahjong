@@ -55,7 +55,10 @@ export function isWuhanStandardWin(
  */
 export function isWuhanHardWin(tiles: readonly TileType[], exposed = 0, joker?: TileType): boolean {
   const jokerCount = joker ? tiles.filter((tile) => tile === joker).length : 0
-  return jokerCount <= 1 && isWuhanStandardWin(tiles, exposed)
+  if (jokerCount > 1) return false
+  // 单张癞子不能继续作为万能牌参与硬胡判定；把它放回真实牌面后仍可胡，
+  // 才说明本手牌不依赖替牌。ordinaryJokers 会让标准胡牌求解器保留该牌面。
+  return isWuhanStandardWin(tiles, exposed, joker, jokerCount === 1 && joker ? [joker] : [])
 }
 
 export type WuhanWinKind = '屁胡' | '碰碰胡' | '清一色' | '门前清' | '全求人' | '七对' | '龙七对' | '双龙七对' | '杠上开花' | '抢杠胡'

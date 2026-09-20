@@ -14,6 +14,9 @@ describe('武汉晃晃胡牌', () => {
     const jokerAsP3 = ['m1', 'm2', 'm3', 'p1', 'p2', 'p3', 's4', 's5', 's6', 's7', 's8', 's9', 'green', 'green'] as const
     expect(isWuhanHardWin(jokerAsP3, 0, 'p3')).toBe(true)
     expect(wuhanRawWinPoints(['屁胡'], true, isWuhanHardWin(jokerAsP3, 0, 'p3'), [])).toBe(6)
+    const jokerMustSubstitute = ['m1', 'm2', 'm3', 'm4', 'm5', 'm6', 'p2', 'p3', 'p3', 's7', 's8', 's9', 'green', 'green'] as const
+    expect(isWuhanStandardWin(jokerMustSubstitute, 0, 'p3')).toBe(true)
+    expect(isWuhanHardWin(jokerMustSubstitute, 0, 'p3')).toBe(false)
     expect(isWuhanHardWin([...jokerAsP3.slice(0, 12), 'p3', 'p3'], 0, 'p3')).toBe(false)
   })
   it('adds only legal scene patterns and caps a payer', () => {
