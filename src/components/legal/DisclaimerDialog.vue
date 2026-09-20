@@ -23,8 +23,8 @@ const emit = defineEmits<{
           </template>
         </div>
         <div class="result-actions">
-          <button class="secondary" @click="emit('decline')">不同意，返回</button>
-          <button @click="emit('accept')">同意并继续</button>
+          <button class="secondary" type="button" @click.stop="emit('decline')">不同意，返回</button>
+          <button type="button" @click.stop="emit('accept')">同意并继续</button>
         </div>
       </section>
     </div>

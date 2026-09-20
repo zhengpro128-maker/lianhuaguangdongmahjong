@@ -723,15 +723,15 @@ button { font: inherit; }
 .rules-panel .disclaimer-block ol { margin: 0 0 8px; padding-left: 20px; }
 .rules-panel .disclaimer-block li { margin-bottom: 4px; color: #9db0a6; font-size: 12px; line-height: 1.65; }
 .disclaimer-backdrop { z-index: 110; }
-.disclaimer-card { width: min(660px, 92vw); max-height: 88%; padding: 30px 34px 26px; overflow: hidden; }
+.disclaimer-card { box-sizing: border-box; display: flex; flex-direction: column; width: min(660px, 92vw); max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 16px); padding: 30px 34px 26px; overflow: hidden; }
 .disclaimer-card h2 { margin-bottom: 14px; font-size: clamp(24px, 2.6vw, 34px); }
-.disclaimer-scroll { max-height: 56vh; padding-right: 6px; overflow-y: auto; text-align: left; }
+.disclaimer-scroll { flex: 1 1 auto; min-height: 0; padding-right: 6px; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; text-align: left; }
 .disclaimer-scroll h3 { margin: 15px 0 6px; color: #eccb7d; font: 800 15px "Noto Serif SC", serif; letter-spacing: .08em; }
 .disclaimer-scroll h3:first-child { margin-top: 0; }
 .disclaimer-scroll p { margin: 0 0 8px; color: #c4d0c9; font-size: 13px; line-height: 1.75; }
 .disclaimer-scroll ol { margin: 0 0 8px; padding-left: 22px; }
 .disclaimer-scroll li { margin-bottom: 5px; color: #a6b5ad; font-size: 13px; line-height: 1.65; }
-.disclaimer-card .result-actions { margin-top: 16px; }
+.disclaimer-card .result-actions { flex: 0 0 auto; margin-top: 16px; padding-bottom: max(0px, var(--safe-bottom)); }
 
 .result-backdrop { position: absolute; z-index: 90; inset: 0; display: grid; place-items: center; background: rgba(2,8,6,.78); backdrop-filter: blur(4px); }
 .result-card { position: relative; width: min(590px, 91vw); padding: 43px 42px 34px; border: 1px solid #b58a3c; border-radius: 8px; background: radial-gradient(circle at 50% 0, rgba(155,106,44,.2), transparent 42%), linear-gradient(145deg, #17352b, #081711 78%); box-shadow: 0 25px 70px #000; text-align: center; }
@@ -2708,6 +2708,15 @@ button { font: inherit; }
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
   }
+  /* 用户声明在横屏手机上必须给底部确认按钮保留空间；正文单独滚动，不能把
+     「同意并继续」裁到卡片外或落入安全区。 */
+  .disclaimer-card {
+    width: min(660px, calc(100cqw - var(--safe-left) - var(--safe-right) - 8px));
+    max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 8px);
+    padding: 14px 16px 10px;
+  }
+  .disclaimer-card h2 { margin-bottom: 8px; font-size: clamp(20px, 6cqh, 28px); }
+  .disclaimer-card .result-actions { margin-top: 8px; padding-bottom: max(4px, var(--safe-bottom)); }
   .settlement-card,
   .final-board {
     box-sizing: border-box;
