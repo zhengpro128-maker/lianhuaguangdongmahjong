@@ -264,6 +264,21 @@ const touchStarts = new Map<number, { index: number; x: number; y: number; start
 let lastTouchTap = { index: -1, time: 0 }
 let suppressTileClickUntil = 0
 
+function resetHandInteraction() {
+  touchStarts.clear()
+  lastTouchTap = { index: -1, time: 0 }
+  suppressTileClickUntil = 0
+}
+
+// 移动端以「同一张牌短时间内连点两次」作为出牌手势。摸牌、吃碰杠或服务器快照
+// 都可能替换手牌数组；若沿用上一手牌的选中索引/连点记录，就会让新数组中同索引的
+// 旧牌被误渲染为选中态（视觉上像是自动弹起）。手牌变动一律结束这次交互。
+watch(() => props.user.hand, (hand, previousHand) => {
+  if (hand === previousHand) return
+  resetHandInteraction()
+  if (props.selectedIndex >= 0) emit('clearSelection')
+})
+
 const roundResultPresentation = computed(() => props.result ? resolveRoundResultPresentation(props.result) : null)
 const userAvatar = computed(() => props.themeName === 'llmAnime'
   ? animeAvatarForPlayer(props.user)
