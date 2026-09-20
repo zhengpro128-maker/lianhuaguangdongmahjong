@@ -143,15 +143,28 @@ try {
   $unresolved = @(git diff --name-only --diff-filter=U)
   foreach ($file in $unresolved) {
     $isMasterOnly = $false
+    $isVibehubKeep = $false
     foreach ($path in $masterOnly) {
       if ($file -eq $path -or $file.StartsWith("$path/")) {
         $isMasterOnly = $true
         break
       }
     }
+    foreach ($path in $vibehubKeep) {
+      if ($file -eq $path -or $file.StartsWith("$path/")) {
+        $isVibehubKeep = $true
+        break
+      }
+    }
     if ($isMasterOnly) {
       git rm --quiet -f -- $file
       Write-Host "==> 按删除解决 modify/delete 冲突: $file"
+    } elseif ($isVibehubKeep) {
+      # master 删除而 vibehub 仍使用的联机层文件应保留 vibehub 版本；
+      # 这类 modify/delete 冲突必须在后续统一 restore 之前先标记为已解决。
+      git checkout --ours -- $file
+      git add -- $file
+      Write-Host "==> 保留 vibehub 联机文件解决冲突: $file"
     }
   }
   $unresolved = @(git diff --name-only --diff-filter=U)
