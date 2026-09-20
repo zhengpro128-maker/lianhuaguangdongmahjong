@@ -23,7 +23,6 @@ import { createRemoteLobbyController } from './game/online/orchestration/remoteL
 import { useDisclaimerGate } from './game/online/session/useDisclaimerGate'
 import { useWakuDemoAuth } from './game/online/session/useWakuDemoAuth'
 import { useRoomAvailability } from './game/online/session/useRoomAvailability'
-import { useRemoteContinueCountdown } from './game/online/presentation/useRemoteContinueCountdown'
 import { useAudio } from './game/core/presentation/useAudio'
 import type { MatchType, TileType } from './game/core/contracts/types'
 import { DEFAULT_RULE_VARIANT, type RuleVariant } from './game/core/rules/ruleVariants'
@@ -412,15 +411,6 @@ watch(result, (value) => {
   resultVisible.value = Boolean(value)
 })
 
-const continueCountdown = useRemoteContinueCountdown({
-  gameMode,
-  phase,
-  result,
-  matchFinished,
-  waitingNextRound,
-  continueRound: nextRound,
-})
-
 // 联机房间内主题切换锁定：非房主始终锁定；房主开局后也锁定（大厅阶段可改）。
 const themeLocked = computed(() => (
   gameMode.value === 'remote' && Boolean(roomId.value)
@@ -603,7 +593,6 @@ function changeTableTheme(theme: TableThemeName) {
         :dealer="dealer"
         :waiting-next-round="waitingNextRound"
         :game-mode="gameMode"
-        :continue-countdown="continueCountdown"
         :match-name="matchName"
         :standings="standings"
         :player-id="playerId"

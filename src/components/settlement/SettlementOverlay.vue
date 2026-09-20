@@ -23,7 +23,6 @@ interface Props {
   dealer: number
   waitingNextRound: boolean
   gameMode: GameMode
-  continueCountdown: number
   matchName: string
   standings: Standing[]
   playerId: string
@@ -208,7 +207,7 @@ function payerSettlementDetails(playerIndex: number) {
             <button class="secondary" @click="$emit('update:resultVisible', false)">查看牌桌</button>
             <button :disabled="waitingNextRound" @click="$emit('nextRound')">
               <template v-if="waitingNextRound">等待其他玩家确定...</template>
-              <template v-else>继续<template v-if="gameMode === 'remote' && continueCountdown > 0"> ({{ continueCountdown }})</template></template>
+              <template v-else><template v-if="gameMode === 'remote'">确认下一局</template><template v-else>继续</template></template>
             </button>
           </div>
           <p class="result-disclaimer-note">游戏结果禁止用于赌博行为</p>
@@ -251,5 +250,5 @@ function payerSettlementDetails(playerIndex: number) {
     class="result-reopen continue"
     :disabled="waitingNextRound"
     @click="$emit('nextRound')"
-  ><template v-if="waitingNextRound">等待其他玩家确定...</template><template v-else>继续<template v-if="continueCountdown > 0"> ({{ continueCountdown }})</template></template></button>
+  ><template v-if="waitingNextRound">已确认，等待其他玩家确认...</template><template v-else>确认下一局</template></button>
 </template>
