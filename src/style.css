@@ -245,6 +245,9 @@ button { font: inherit; }
   color: #b9c4b5;
 }
 
+/* Dropdowns must sit above table HUD cards, such as the flip-wildcard indicator. */
+.top-bar.menu-open { z-index: 50; }
+
 .brand-mini { display: flex; align-items: center; gap: 8px; color: #d9c491; letter-spacing: .12em; }
 .brand-mini i { display: grid; place-items: center; width: 25px; height: 25px; border: 1px solid #a9823c; border-radius: 50%; font: 700 14px "Noto Serif SC", serif; font-style: normal; }
 .base-score-badge { margin-right: auto; display: flex; align-items: center; gap: 9px; padding: 5px; color: #f1cc70; font-size: clamp(12px,1cqw,15px); font-weight: 800; letter-spacing: .08em; pointer-events: none; }

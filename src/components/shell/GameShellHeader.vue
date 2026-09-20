@@ -102,6 +102,7 @@ onBeforeUnmount(() => {
 <template>
   <header
     class="top-bar"
+    :class="{ 'menu-open': themeMenuOpen || audioMenuOpen }"
     :data-sound-enabled="soundOn ? 'true' : 'false'"
     :data-bgm-enabled="bgmOn ? 'true' : 'false'"
     :data-effects-enabled="effectsOn ? 'true' : 'false'"
