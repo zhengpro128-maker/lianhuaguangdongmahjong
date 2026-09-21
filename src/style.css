@@ -2689,7 +2689,7 @@ button { font: inherit; }
 }
 
 /* 小程序壳用 URL 明确声明此模式，不依赖 WebView 对 hover、pointer 或 container query 的
-   支持。只固定四个小头像卡的位置，不改变根容器或手牌的尺寸/排列，避免影响页面宽度。 */
+   支持。头像与手牌各有独立的边缘安全车道，避免用信息卡压住任何一家牌面。 */
 .game-app.mini-program-layout .user-area {
   right: 0;
   bottom: 0;
@@ -2736,9 +2736,9 @@ button { font: inherit; }
   text-align: center;
 }
 .game-app.mini-program-layout .has-three-scene .seat-top {
-  /* 对家固定在顶部控制栏与右侧牌墙之间的空白位。 */
-  top: calc(var(--safe-top) + 3px);
-  left: calc(70% - var(--safe-right));
+  /* 对家靠右上边缘：避开上方吃碰杠牌及原先居中的局数标签。 */
+  top: calc(var(--safe-top) + 47px);
+  left: calc(100% - var(--safe-right) - 25px);
   transform: translateX(-50%);
 }
 .game-app.mini-program-layout .has-three-scene .seat-left {
@@ -2756,6 +2756,19 @@ button { font: inherit; }
   left: calc(var(--safe-left) + 2px);
   transform: none;
 }
+/* 本家卡固定在左下角，手牌从卡片右侧的安全车道开始。 */
+.game-app.mini-program-layout .hand-rack {
+  justify-content: flex-start;
+  padding-right: calc(var(--safe-right) + 3px);
+  padding-left: calc(var(--safe-left) + 52px);
+}
+.game-app.mini-program-layout .hand-rack .hand-tile-slot {
+  width: min(44px, calc((100cqw - var(--safe-left) - var(--safe-right) - 58px) / 14));
+  min-width: min(44px, calc((100cqw - var(--safe-left) - var(--safe-right) - 58px) / 14));
+}
+.game-app.mini-program-layout .hand-rack .mahjong-tile {
+  --tile-width: min(44px, calc((100cqw - var(--safe-left) - var(--safe-right) - 58px) / 14));
+}
 .game-app.mini-program-layout :is(.seat-top, .seat-left, .seat-right) .dealer-badge,
 .game-app.mini-program-layout .user-identity .dealer-badge {
   top: -5px;
@@ -2764,6 +2777,66 @@ button { font: inherit; }
   height: 15px;
   font-size: 9px;
 }
+
+/* 小程序顶部只留一个设置入口；原来主题、声音、规则三个按钮移入其弹层。 */
+.game-app.mini-program-layout .top-bar nav { margin-left: auto; }
+.mini-settings-picker { position: relative; }
+.mini-settings-toggle svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.6;
+}
+.mini-settings-menu {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 4px);
+  right: 0;
+  display: grid;
+  width: 132px;
+  padding: 6px;
+  border: 1px solid rgba(231,207,147,.55);
+  border-radius: 8px;
+  background: rgba(7,22,17,.96);
+  box-shadow: 0 5px 15px rgba(0,0,0,.42);
+}
+.mini-settings-menu p {
+  margin: 1px 3px 5px;
+  overflow: hidden;
+  color: #e9dca7;
+  font-size: 9px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mini-settings-menu button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 30px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #fff6da;
+  font-size: 11px;
+  text-align: left;
+}
+.mini-settings-menu button:active,
+.mini-settings-menu button.active { background: rgba(222,181,74,.2); }
+.mini-settings-menu button:disabled { opacity: .45; }
+.mini-settings-menu .settings-back { color: #d7bd66; }
+.mini-settings-menu button i {
+  width: 20px;
+  height: 11px;
+  border-radius: 8px;
+  background: #68726a;
+}
+.mini-settings-menu button i.active { background: #59ae59; }
 
 /* 平板（触控且 ≥1024×768）：切回 PC/桌面样式（卡片、座位、手牌、顶栏）。 */
 @container (min-width: 1024px) and (min-height: 768px) {
