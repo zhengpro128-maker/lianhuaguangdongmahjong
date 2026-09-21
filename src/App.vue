@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onMounted, ref, shallowRef, watch } from 'vue'
+import { computed, defineAsyncComponent, ref, shallowRef, watch } from 'vue'
 import StatsOverlay from './components/account/StatsOverlay.vue'
 import WinEffectLab from './components/dev/WinEffectLab.vue'
 import DisclaimerDialog from './components/legal/DisclaimerDialog.vue'
@@ -51,25 +51,11 @@ const robotIconUrl = `${import.meta.env.BASE_URL}img/robot.svg`
 
 const rulesOpen = ref(false)
 const resultVisible = ref(true)
-const isMiniProgramWebView = ref(false)
 const selectedMatch = ref<MatchType>('east')
 const selectedRule = ref<RuleVariant>(DEFAULT_RULE_VARIANT)
 const gameTableReady = ref(false)
 let tableReadyPromise: Promise<void> | null = null
 let tableReadyResolve: (() => void) | null = null
-
-/** 微信 web-view 在真机上可能把触控能力报告为 desktop；以宿主环境而非媒体查询判定。 */
-function refreshMiniProgramWebView() {
-  const miniProgramWindow = window as Window & { __wxjs_environment?: string }
-  isMiniProgramWebView.value = miniProgramWindow.__wxjs_environment === 'miniprogram'
-    || /miniprogram/i.test(navigator.userAgent)
-}
-
-refreshMiniProgramWebView()
-onMounted(() => {
-  refreshMiniProgramWebView()
-  document.addEventListener('WeixinJSBridgeReady', refreshMiniProgramWebView, { once: true })
-})
 
 function waitForTableReady() {
   if (gameTableReady.value) return Promise.resolve()
@@ -457,7 +443,7 @@ function changeTableTheme(theme: TableThemeName) {
   <OrientationGate :theme-name="tableThemeName" />
   <main
     class="game-app"
-    :class="[{ 'is-lobby': showLobby, 'mini-program-webview': isMiniProgramWebView }, themePresentation.typography.headingClass]"
+    :class="[{ 'is-lobby': showLobby }, themePresentation.typography.headingClass]"
     :data-table-theme="tableThemeName"
     :data-theme-player-frame="themePresentation.hud.playerFrame"
     :data-theme-particle="themePresentation.shell.particle"
