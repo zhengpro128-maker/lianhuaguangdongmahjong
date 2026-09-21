@@ -4000,3 +4000,37 @@ button { font: inherit; }
     transition: none !important;
   }
 }
+
+/* 小程序 WebView 的容器宽度可能命中平板断点，导致最终结算重新套用桌面端的宽卡片。
+   这里必须放在文件末尾，以小程序标记覆盖该断点：分数列始终留在卡片可视范围内。 */
+.game-app.mini-program-layout .final-backdrop {
+  padding: max(5px, var(--safe-top)) max(6px, var(--safe-right)) max(5px, var(--safe-bottom)) max(6px, var(--safe-left));
+}
+.game-app.mini-program-layout .final-board {
+  box-sizing: border-box;
+  width: min(540px, calc(100cqw - var(--safe-left) - var(--safe-right) - 12px));
+  max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 10px);
+  padding: 10px 12px 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.game-app.mini-program-layout .final-board > p { font-size: 9px; letter-spacing: .14em; }
+.game-app.mini-program-layout .final-board > h2 { margin: 1px 0 7px; font-size: clamp(22px, 4.2cqh, 30px); line-height: 1.1; }
+.game-app.mini-program-layout .final-rankings { gap: 4px; }
+.game-app.mini-program-layout .final-rankings article {
+  grid-template-columns: 30px 34px minmax(0, 1fr) 62px;
+  gap: 5px;
+  min-height: 40px;
+  padding: 3px 6px;
+}
+.game-app.mini-program-layout .final-rankings img { width: 32px; height: 32px; border-width: 1px; }
+.game-app.mini-program-layout .final-rank b { font-size: 24px; }
+.game-app.mini-program-layout .final-rank span { font-size: 9px; }
+.game-app.mini-program-layout .final-name { min-width: 0; overflow: hidden; white-space: nowrap; }
+.game-app.mini-program-layout .final-name strong { max-width: 100%; overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.game-app.mini-program-layout .final-name small { margin-left: 4px; padding: 1px 4px; font-size: 9px; }
+.game-app.mini-program-layout .final-rankings em { min-width: 0; overflow: hidden; font-size: 18px; text-overflow: ellipsis; white-space: nowrap; }
+.game-app.mini-program-layout .final-footer { margin: 6px -12px 0; padding: 6px 12px max(6px, var(--safe-bottom)); }
+.game-app.mini-program-layout .final-footer > button { min-width: 118px; min-height: 36px; padding: 6px 12px; font-size: 12px; }
+.game-app.mini-program-layout .final-footer .result-disclaimer-note { margin: 4px 0 0; font-size: 9px; }
