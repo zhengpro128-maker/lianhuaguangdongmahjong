@@ -2718,8 +2718,16 @@ button { font: inherit; }
   text-align: center;
 }
 .game-app.mini-program-layout :is(.avatar-wrap .player-info strong, .user-identity .player-info strong) {
-  /* 小程序座位牌只保留头像和分数；昵称移除，避免拉宽/拉高遮挡牌桌。 */
-  display: none;
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1.15;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .game-app.mini-program-layout :is(.avatar-wrap .player-info span, .user-identity .player-info span) {
   width: 100%;
