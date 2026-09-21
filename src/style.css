@@ -2607,6 +2607,87 @@ button { font: inherit; }
   }
 }
 
+/* 微信 web-view 在部分机型/真机调试中会错误上报 hover:pointer 能力，导致上面的
+   coarse-pointer 规则未命中而回退为桌面 HUD。横屏且高度不超过 600px 时统一采用紧凑
+   布局，保证头像、翻牌提示与本家手牌各自拥有独立区域。 */
+@container game (max-height: 600px) and (min-aspect-ratio: 1 / 1) {
+  .game-app {
+    --safe-top: 0px;
+    --topbar-height: 44px;
+    --seat-card-width: clamp(72px, 9cqw, 84px);
+    --seat-avatar-size: clamp(32px, 4.5cqh, 42px);
+    --side-seat-anchor: clamp(calc(var(--topbar-height) + 42px), 27cqh, 116px);
+    --hand-zone-height: calc(clamp(68px, 12.5cqh, 96px) + var(--safe-bottom));
+    --hud-gap: 5px;
+    --top-seat-resolved-left: clamp(
+      62%,
+      68%,
+      calc(100% - var(--safe-right) - var(--seat-card-width) - 42px)
+    );
+  }
+
+  .has-three-scene .seat-top {
+    top: calc(var(--topbar-height) + 4px);
+    left: var(--top-seat-resolved-left);
+    transform: translateX(-50%);
+  }
+  .has-three-scene .seat-left {
+    top: var(--side-seat-anchor);
+    left: calc(var(--safe-left) + 5px);
+    transform: translateY(-50%);
+  }
+  .has-three-scene .seat-right {
+    top: var(--side-seat-anchor);
+    right: calc(var(--safe-right) + 5px);
+    transform: translateY(-50%);
+  }
+  .has-three-scene .seat-top .avatar-wrap,
+  .seat-left .avatar-wrap,
+  .seat-right .avatar-wrap,
+  .user-identity {
+    box-sizing: border-box;
+    width: var(--seat-card-width);
+    min-width: 0;
+    padding: 4px 5px 5px;
+  }
+  .avatar-wrap .avatar,
+  .user-identity .avatar {
+    width: var(--seat-avatar-size);
+    height: var(--seat-avatar-size);
+  }
+  .game-app .avatar-wrap .player-info strong,
+  .game-app .user-identity .player-info strong {
+    font-size: clamp(10px, 1.8cqh, 12px);
+  }
+  .game-app .avatar-wrap > .player-info > span,
+  .game-app .user-identity > .player-info > span {
+    font-size: clamp(10px, 1.6cqh, 11px);
+  }
+
+  /* 给本家信息卡预留左侧车道；手牌从车道右侧开始，不再被头像覆盖。 */
+  .user-area {
+    right: calc(var(--safe-right) + 2px);
+    bottom: var(--safe-bottom);
+    left: calc(var(--safe-left) + 2px);
+  }
+  .user-identity {
+    bottom: calc(var(--safe-bottom) + 5px);
+    left: calc(var(--safe-left) + 2px);
+  }
+  .hand-rack {
+    box-sizing: border-box;
+    min-height: clamp(68px, 12.5cqh, 96px);
+    padding: 3px calc(var(--seat-card-width) + 8px) max(3px, var(--safe-bottom));
+  }
+  .hand-rack .hand-tile-slot {
+    width: min(44px, calc((100cqw - (2 * var(--seat-card-width)) - 20px) / 14));
+    min-width: min(44px, calc((100cqw - (2 * var(--seat-card-width)) - 20px) / 14));
+  }
+  .hand-rack .mahjong-tile {
+    --tile-width: min(44px, calc((100cqw - (2 * var(--seat-card-width)) - 20px) / 14));
+  }
+}
+
 /* 平板（触控且 ≥1024×768）：切回 PC/桌面样式（卡片、座位、手牌、顶栏）。 */
 @container (min-width: 1024px) and (min-height: 768px) {
   .has-three-scene {
