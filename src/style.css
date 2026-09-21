@@ -1113,6 +1113,59 @@ button { font: inherit; }
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; transition-delay: 0s !important; }
 }
 
+/* 小程序 WebView 的逻辑宽度较大，通用横屏结算会被当成桌面卡片而横向撑满。
+   明确使用小程序布局标记收紧卡片，并保持两列排行，避免列表高度反过来挤压操作区。 */
+.game-app.mini-program-layout .round-settlement {
+  padding: max(6px, var(--safe-top)) max(6px, var(--safe-right)) max(6px, var(--safe-bottom)) max(6px, var(--safe-left));
+}
+.game-app.mini-program-layout .settlement-card {
+  box-sizing: border-box;
+  width: min(680px, calc(100cqw - var(--safe-left) - var(--safe-right) - 72px));
+  max-height: calc(100cqh - var(--safe-top) - var(--safe-bottom) - 12px);
+  padding: 12px 12px 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+.game-app.mini-program-layout .settlement-card h2 {
+  margin: 0 0 5px;
+  font-size: clamp(19px, 3.2cqh, 25px);
+  line-height: 1.15;
+}
+.game-app.mini-program-layout .round-rankings {
+  gap: 4px;
+  width: calc(100% - 8px);
+  margin: 3px 4px;
+}
+.game-app.mini-program-layout .round-rankings article {
+  grid-template-columns: 28px 28px minmax(0, 1fr) 32px 48px;
+  gap: 3px;
+  min-height: 39px;
+  padding: 3px 4px;
+}
+.game-app.mini-program-layout .round-rankings .settlement-avatar img { width: 27px; height: 27px; }
+.game-app.mini-program-layout .round-rankings .settlement-avatar small { max-width: 38px; font-size: 7px; line-height: 8px; }
+.game-app.mini-program-layout .rank-number { font-size: 19px; }
+.game-app.mini-program-layout .rank-number small { font-size: 8px; }
+.game-app.mini-program-layout .round-rankings span,
+.game-app.mini-program-layout .round-rankings em { font-size: 11px; }
+.game-app.mini-program-layout .round-rankings article > b { font-size: 15px; }
+.game-app.mini-program-layout .round-rankings .mark { margin-left: 2px; padding: 0 3px; font-size: 8px; line-height: 12px; }
+.game-app.mini-program-layout .settlement-footer {
+  margin: 5px -12px 0;
+  padding: 6px 12px max(6px, var(--safe-bottom));
+}
+.game-app.mini-program-layout .settlement-footer .result-actions { gap: 7px; }
+.game-app.mini-program-layout .settlement-footer .result-actions button {
+  min-width: 110px;
+  min-height: 36px;
+  padding: 6px 12px;
+  font-size: 12px;
+}
+.game-app.mini-program-layout .settlement-footer .result-disclaimer-note {
+  margin: 5px 0 0;
+  font-size: 9px;
+}
+
 /* ── Phase 7 联机对战：模式切换 / 远程房间 Lobby ── */
 .continue-session { margin: 0 auto 16px; padding: 11px 26px; border: 1px solid #d2aa58; border-radius: 24px; background: linear-gradient(135deg, rgba(185,135,55,.9), rgba(217,182,93,.85)); color: #182218; font: 800 15px "Noto Serif SC", serif; letter-spacing: .08em; cursor: pointer; box-shadow: 0 6px 18px rgba(0,0,0,.35); }
 .continue-session:hover { filter: brightness(1.08); transform: translateY(-1px); }
