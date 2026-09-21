@@ -323,7 +323,7 @@ watch(animeCharacterId, (value) => {
 // 联机房间的大模型能力可能在恢复会话或房间元数据返回后才生效。
 watch(effectiveLlmEnabled, (enabled) => preferLlmTableTheme(enabled), { immediate: true })
 
-const { roomMeta } = useRoomAvailability(gameMode, roomId)
+const { roomMeta, joinableRooms } = useRoomAvailability(gameMode, roomId)
 
 const disclaimerGate = useDisclaimerGate(playerId)
 const wakuAuth = useWakuDemoAuth()
@@ -363,6 +363,11 @@ const {
   report: reportPlayer,
   toggleReady,
 } = lobbyController
+
+function joinAvailableRoom(roomCode: string) {
+  joinCode.value = roomCode
+  joinRemoteRoom()
+}
 
 watch(() => wakuAuth.account.value?.displayName, (displayName) => {
   if (displayName && !nicknameInput.value.trim()) nicknameInput.value = displayName.slice(0, 12)
@@ -551,6 +556,7 @@ function changeTableTheme(theme: TableThemeName) {
         :room-id="roomId"
         :match-name="matchName"
         :room-meta="roomMeta"
+        :joinable-rooms="joinableRooms"
         :session-status="sessionStatus"
         :session-error="sessionError"
         :room-time-limit="roomTimeLimit"
@@ -574,6 +580,7 @@ function changeTableTheme(theme: TableThemeName) {
         @start-local="startGameWithAudio"
         @create-room="(payload: { llmEnabled: boolean }) => createRemoteRoom(payload.llmEnabled)"
         @join-room="joinRemoteRoom"
+        @join-available-room="joinAvailableRoom"
         @resume-session="resumeRemoteSession"
         @copy-room="copyRoomCode"
         @toggle-ready="toggleReady"

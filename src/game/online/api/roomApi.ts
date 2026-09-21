@@ -91,6 +91,15 @@ export interface RoomMeta {
   llmProviders?: Array<LlmProviderInfo>
 }
 
+/** 大厅可直接加入的房间摘要；不含座位身份和任何重连凭据。 */
+export interface JoinableRoom {
+  roomId: string
+  mode: MatchType
+  rulesetId?: RuleVariant
+  capacity: number
+  occupied: number
+}
+
 export function createRoom(mode: MatchType, capacity: number, playerId?: string,
   rulesetId: RuleVariant = 'wuhan-huanghuang', llmEnabled?: boolean): Promise<RoomInfo> {
   if (rulesetId === 'lotus-blood-flow') return Promise.reject(new Error('血流玩法尚不支持 WebSocket 房间'))
@@ -109,6 +118,10 @@ export function getRoom(roomId: string): Promise<RoomInfo> {
 
 export function getRoomMeta(): Promise<RoomMeta> {
   return request<RoomMeta>('/api/rooms/meta')
+}
+
+export function getJoinableRooms(): Promise<{ rooms: JoinableRoom[] }> {
+  return request<{ rooms: JoinableRoom[] }>('/api/rooms')
 }
 
 export function joinRoom(roomId: string, nickname: string, playerId?: string, characterId?: string): Promise<JoinResult> {

@@ -9,7 +9,7 @@ import { bloodFlowEnabled } from '../../game/variants/lotus/bloodFlow/availabili
 import type { GameMode } from '../../game/core/contracts/activeGamePort'
 import type { MatchType } from '../../game/core/contracts/types'
 import { getRuleVariant, type RuleVariant } from '../../game/core/rules/ruleVariants'
-import type { LlmProviderInfo, LlmSeatRequest, RoomMeta, RoomSeatState } from '../../game/online/api/roomApi'
+import type { JoinableRoom, LlmProviderInfo, LlmSeatRequest, RoomMeta, RoomSeatState } from '../../game/online/api/roomApi'
 import type { StoredSession } from '../../game/online/session/remoteSessionStore'
 import AnimeCharacterPicker from '../llm/AnimeCharacterPicker.vue'
 import LobbyThemeVisual from './LobbyThemeVisual.vue'
@@ -28,6 +28,7 @@ interface Props {
   animeCharacterId: CharacterId
   tableThemeName: TableThemeName
   roomMeta: RoomMeta | null
+  joinableRooms: JoinableRoom[]
   sessionStatus: string
   sessionError: string
   roomTimeLimit: number | null
@@ -66,6 +67,7 @@ const emit = defineEmits<{
   startLocal: []
   createRoom: [payload: { llmEnabled: boolean }]
   joinRoom: []
+  joinAvailableRoom: [roomId: string]
   resumeSession: []
   copyRoom: []
   toggleReady: []
@@ -210,6 +212,21 @@ function toggleWakuDemoAuth() {
               {{ sessionStatus === 'joining' ? '加入中…' : '加入房间' }}
             </button>
           </div>
+          <section v-if="!roomId" class="joinable-room-list" aria-label="可加入房间">
+            <div class="joinable-room-list-heading">
+              <b>可加入房间</b><small>{{ joinableRooms.length ? `当前 ${joinableRooms.length} 个` : '暂无空位房间' }}</small>
+            </div>
+            <div v-if="joinableRooms.length" class="joinable-room-items">
+              <article v-for="room in joinableRooms" :key="room.roomId">
+                <span><strong>{{ room.mode === 'east' ? '东风场' : '半庄场' }}</strong><small>房间 {{ room.roomId }} · {{ room.occupied }}/{{ room.capacity }} 人</small></span>
+                <button
+                  data-action-role="secondary"
+                  :disabled="wakuAuthLoading || !wakuAuthenticated || !nicknameInput.trim() || sessionStatus === 'joining'"
+                  @click="$emit('joinAvailableRoom', room.roomId)"
+                >加入</button>
+              </article>
+            </div>
+          </section>
           <p v-if="sessionError" class="session-error" role="alert">{{ sessionError }}</p>
 
           <RoomPanel
@@ -324,4 +341,14 @@ function toggleWakuDemoAuth() {
 
 <style scoped>
 .lobby-actions { min-width: 0; }
+.joinable-room-list { display: grid; gap: 7px; margin-top: 10px; padding: 10px; border: 1px solid rgba(211,174,87,.26); border-radius: 7px; background: rgba(4,19,14,.42); }
+.joinable-room-list-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.joinable-room-list-heading b { color: #ead9a7; font-size: 13px; }
+.joinable-room-list-heading small { color: #8fa397; font-size: 10px; }
+.joinable-room-items { display: grid; gap: 5px; max-height: 150px; overflow-y: auto; }
+.joinable-room-items article { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; padding: 7px 8px; border: 1px solid rgba(211,174,87,.18); border-radius: 5px; background: rgba(255,255,255,.025); }
+.joinable-room-items span { display: grid; min-width: 0; gap: 2px; }
+.joinable-room-items strong { color: #ebdfbf; font-size: 12px; }
+.joinable-room-items small { overflow: hidden; color: #91a399; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.joinable-room-items button { flex: 0 0 auto; min-width: 48px; min-height: 30px; padding: 4px 9px; border-radius: 5px; font-size: 11px; }
 </style>
