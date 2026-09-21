@@ -861,10 +861,8 @@ function onAvatarError(entry: GamePlayer) {
   .joker-guide div { max-width: 150px; white-space: normal; }
 }
 
-/* 微信小程序的 web-view 在真机调试时不总会报告 coarse pointer；用矮横屏兜底，
-   让翻牌提示始终折叠成不遮挡左家座位的小徽章。 */
-@container game (max-height: 600px) and (min-aspect-ratio: 1 / 1) {
-  .flip-indicator {
+/* 微信小程序运行时直接折叠翻牌提示，避免受 WebView 媒体查询兼容性影响。 */
+:global(.game-app.mini-program-webview) .flip-indicator {
     top: calc(var(--safe-top) + var(--topbar-height) + var(--hud-gap));
     right: auto;
     left: calc(var(--safe-left) + 5px);
@@ -875,17 +873,16 @@ function onAvatarError(entry: GamePlayer) {
     gap: 2px;
     padding: 3px 5px;
     border-radius: 8px;
-  }
-  .flip-indicator-head { min-width: 0; gap: 3px; }
-  .flip-indicator-head > span { font-size: 11px; letter-spacing: 1px; }
-  .flip-indicator-head > .mahjong-tile.small { --tile-width: 18px; top: 0; }
-  .flip-indicator-head > em { font-size: 10px; white-space: nowrap; }
-  .flip-chevron { display: block; }
-  .flip-indicator-body { display: none; }
-  .flip-open .flip-indicator-body { display: grid; gap: 3px; }
-  .joker-guide { font-size: 10px; }
-  .joker-guide div { max-width: 130px; white-space: normal; }
 }
+:global(.game-app.mini-program-webview) .flip-indicator-head { min-width: 0; gap: 3px; }
+:global(.game-app.mini-program-webview) .flip-indicator-head > span { font-size: 11px; letter-spacing: 1px; }
+:global(.game-app.mini-program-webview) .flip-indicator-head > .mahjong-tile.small { --tile-width: 18px; top: 0; }
+:global(.game-app.mini-program-webview) .flip-indicator-head > em { font-size: 10px; white-space: nowrap; }
+:global(.game-app.mini-program-webview) .flip-chevron { display: block; }
+:global(.game-app.mini-program-webview) .flip-indicator-body { display: none; }
+:global(.game-app.mini-program-webview) .flip-open .flip-indicator-body { display: grid; gap: 3px; }
+:global(.game-app.mini-program-webview) .joker-guide { font-size: 10px; }
+:global(.game-app.mini-program-webview) .joker-guide div { max-width: 130px; white-space: normal; }
 
 /* 平板（≥1024×768）：翻精指示牌回到桌面「常显完整卡片、不折叠」 */
 @container (min-width: 1024px) and (min-height: 768px) {
