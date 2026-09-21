@@ -561,13 +561,13 @@ button { font: inherit; }
 .user-melds { position: absolute; bottom: clamp(88px, 11.3vh, 112px); left: 1%; display: flex; gap: 8px; }
 .user-meld { display: flex; gap: 1px; padding: 2px; border-radius: 3px; background: rgba(0,0,0,.2); }
 .hand-rack { position: absolute; right: 0; bottom: 9px; left: 0; display: flex; align-items: flex-end; justify-content: center; gap: clamp(1px, .2vw, 4px); min-height: 88px; padding: 10px 14px 5px; border: 0; border-radius: 5px 5px 20px 20px; transform-origin: 50% 100%; }
-/* 副露后手牌数减少：保留左侧头像/副露的安全区，并把手牌整体稍向右锚定。
-   这样不会挤进左下角身份区，也能消化右侧增加的留白。 */
+/* 副露在手牌右侧展示。副露后余牌变少时，为右侧吃、碰、杠牌保留空间，
+   让手牌略偏左锚定，避免两组牌互相遮挡。 */
 .hand-rack.has-melds {
   justify-content: center;
-  padding-right: 7%;
-  padding-left: 18%;
-  transform: translateX(2%);
+  padding-right: 18%;
+  padding-left: 12%;
+  transform: none;
 }
 .hand-tile-slot { position: relative; display: flex; flex: 0 0 auto; align-items: flex-end; touch-action: none; }
 .hand-hit-area { position: absolute; inset: 0; pointer-events: none; }
@@ -2835,10 +2835,11 @@ button { font: inherit; }
   padding-right: calc(var(--safe-right) + 3px);
   padding-left: calc(var(--safe-left) + 52px);
 }
-/* 副露后的余牌数量明显变少，继续左对齐会在左下角堆成一团、右侧大面积留白。
-   此时改用安全车道内的居中锚点：左边仍避开本家信息卡，余牌自然向右补位。 */
+/* 小程序横屏中，右侧固定展示吃、碰、杠牌。把余牌置于左侧安全车道，
+   并为副露预留约 18% 的右边距，避免遮挡。 */
 .game-app.mini-program-layout .hand-rack.has-melds {
   justify-content: center;
+  padding-right: calc(var(--safe-right) + 18%);
   transform: none;
 }
 .game-app.mini-program-layout .hand-rack .hand-tile-slot {
