@@ -2694,21 +2694,23 @@ button { font: inherit; }
   right: 0;
   bottom: 0;
   left: 0;
-  min-height: 96px;
+  min-height: 0;
 }
 .game-app.mini-program-layout :is(.has-three-scene .seat-top .avatar-wrap, .seat-left .avatar-wrap, .seat-right .avatar-wrap, .user-identity) {
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1px;
-  width: 72px;
+  gap: 0;
+  width: 44px;
   min-width: 0;
-  padding: 4px;
+  padding: 2px;
+  border-radius: 8px;
 }
 .game-app.mini-program-layout :is(.avatar-wrap .avatar, .user-identity .avatar) {
-  width: 34px;
-  height: 34px;
+  width: 28px;
+  height: 28px;
+  border-width: 1px;
 }
 .game-app.mini-program-layout :is(.avatar-wrap .player-info, .user-identity .player-info) {
   width: 100%;
@@ -2716,41 +2718,43 @@ button { font: inherit; }
   text-align: center;
 }
 .game-app.mini-program-layout :is(.avatar-wrap .player-info strong, .user-identity .player-info strong) {
-  width: 100%;
-  max-width: 100%;
-  overflow: hidden;
-  font-size: 11px;
-  line-height: 1.2;
-  text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* 小程序座位牌只保留头像和分数；昵称移除，避免拉宽/拉高遮挡牌桌。 */
+  display: none;
 }
 .game-app.mini-program-layout :is(.avatar-wrap .player-info span, .user-identity .player-info span) {
   width: 100%;
-  font-size: 10px;
-  line-height: 1.2;
+  font-size: 9px;
+  line-height: 1.1;
   text-align: center;
 }
 .game-app.mini-program-layout .has-three-scene .seat-top {
-  top: calc(var(--safe-top) + var(--topbar-height) + 4px);
-  /* 对家置于右上空白区，避开上方牌墙与中心牌桌。 */
-  left: calc(100% - var(--safe-right) - 132px);
+  /* 对家固定在顶部控制栏与右侧牌墙之间的空白位。 */
+  top: calc(var(--safe-top) + 3px);
+  left: calc(70% - var(--safe-right));
   transform: translateX(-50%);
 }
 .game-app.mini-program-layout .has-three-scene .seat-left {
   top: 48%;
-  left: calc(var(--safe-left) + 6px);
+  left: calc(var(--safe-left) + 2px);
   transform: translateY(-50%);
 }
 .game-app.mini-program-layout .has-three-scene .seat-right {
   top: 48%;
-  right: calc(var(--safe-right) + 6px);
+  right: calc(var(--safe-right) + 2px);
   transform: translateY(-50%);
 }
 .game-app.mini-program-layout .user-identity {
-  bottom: calc(var(--safe-bottom) + 6px);
-  left: calc(var(--safe-left) + 6px);
+  bottom: calc(var(--safe-bottom) + 2px);
+  left: calc(var(--safe-left) + 2px);
   transform: none;
+}
+.game-app.mini-program-layout :is(.seat-top, .seat-left, .seat-right) .dealer-badge,
+.game-app.mini-program-layout .user-identity .dealer-badge {
+  top: -5px;
+  left: -5px;
+  width: 15px;
+  height: 15px;
+  font-size: 9px;
 }
 
 /* 平板（触控且 ≥1024×768）：切回 PC/桌面样式（卡片、座位、手牌、顶栏）。 */
