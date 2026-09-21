@@ -561,13 +561,13 @@ button { font: inherit; }
 .user-melds { position: absolute; bottom: clamp(88px, 11.3vh, 112px); left: 1%; display: flex; gap: 8px; }
 .user-meld { display: flex; gap: 1px; padding: 2px; border-radius: 3px; background: rgba(0,0,0,.2); }
 .hand-rack { position: absolute; right: 0; bottom: 9px; left: 0; display: flex; align-items: flex-end; justify-content: center; gap: clamp(1px, .2vw, 4px); min-height: 88px; padding: 10px 14px 5px; border: 0; border-radius: 5px 5px 20px 20px; transform-origin: 50% 100%; }
-/* 副露后手牌数减少：不再把整行钉死在左侧，改为向左偏移的居中排布。
-   这样既给右侧副露视觉留出空间，也不会造成左侧拥挤、右侧大面积留白。 */
+/* 副露后手牌数减少：保留左侧头像/副露的安全区，并把手牌整体稍向右锚定。
+   这样不会挤进左下角身份区，也能消化右侧增加的留白。 */
 .hand-rack.has-melds {
   justify-content: center;
-  padding-right: 27%;
-  padding-left: 5%;
-  transform: translateX(-6%);
+  padding-right: 7%;
+  padding-left: 18%;
+  transform: translateX(2%);
 }
 .hand-tile-slot { position: relative; display: flex; flex: 0 0 auto; align-items: flex-end; touch-action: none; }
 .hand-hit-area { position: absolute; inset: 0; pointer-events: none; }
