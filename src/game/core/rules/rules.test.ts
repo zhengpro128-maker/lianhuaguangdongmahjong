@@ -136,38 +136,25 @@ describe('开杠与抢杠计分', () => {
     drawnTileIndex: -1,
   }))
 
-  it('暗杠由其余三家各支付底分两倍', () => {
+  it('暗杠不即时收付分数', () => {
     const gamePlayers = players()
     const deltas = applyKongScore(gamePlayers, 0, 'concealed')
-    expect(gamePlayers.map((player) => player.score)).toEqual([1600, 800, 800, 800])
-    expect(deltas).toEqual([
-      { playerIndex: 0, amount: 600 },
-      { playerIndex: 1, amount: -200 },
-      { playerIndex: 2, amount: -200 },
-      { playerIndex: 3, amount: -200 },
-    ])
+    expect(gamePlayers.map((player) => player.score)).toEqual([1000, 1000, 1000, 1000])
+    expect(deltas).toEqual([])
   })
 
-  it('明杠只由被杠者支付底分', () => {
+  it('明杠不即时收付分数', () => {
     const gamePlayers = players()
     const deltas = applyKongScore(gamePlayers, 0, 'discard', 2)
-    expect(gamePlayers.map((player) => player.score)).toEqual([1100, 1000, 900, 1000])
-    expect(deltas).toEqual([
-      { playerIndex: 0, amount: 100 },
-      { playerIndex: 2, amount: -100 },
-    ])
+    expect(gamePlayers.map((player) => player.score)).toEqual([1000, 1000, 1000, 1000])
+    expect(deltas).toEqual([])
   })
 
-  it('补杠由其余三家各支付底分', () => {
+  it('补杠不即时收付分数', () => {
     const gamePlayers = players()
     const deltas = applyKongScore(gamePlayers, 0, 'added')
-    expect(gamePlayers.map((player) => player.score)).toEqual([1300, 900, 900, 900])
-    expect(deltas).toEqual([
-      { playerIndex: 0, amount: 300 },
-      { playerIndex: 1, amount: -100 },
-      { playerIndex: 2, amount: -100 },
-      { playerIndex: 3, amount: -100 },
-    ])
+    expect(gamePlayers.map((player) => player.score)).toEqual([1000, 1000, 1000, 1000])
+    expect(deltas).toEqual([])
   })
 
   it('抢杠胡只由补杠者支付胡牌分', () => {

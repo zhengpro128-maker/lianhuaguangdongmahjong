@@ -3,7 +3,7 @@
 // LLM 只能在候选编号内选择；合法性复核在控制器/引擎执行层再次进行。
 import type { Meld, TileType } from '../core/contracts/types'
 import { DEFAULT_RULESET } from '../core/rules/ruleset'
-import { matchingCount, applyKongScore } from '../core/rules/rules'
+import { matchingCount } from '../core/rules/rules'
 import { decideTurn as coreDecideTurn, decideClaim as coreDecideClaim } from '../core/controllers/ai'
 import { decideTurn as lotusDecideTurn, decideClaim as lotusDecideClaim } from '../variants/lotus/lotusAi'
 import {
@@ -286,27 +286,9 @@ function pengWouldDiscardClaimedTile(input: DecisionInput): boolean {
   return best?.discardedTile === input.tile
 }
 
-/** 杠分（即时收益）档位：在克隆分数上应用规则集杠分，delta>0 按档位。 */
+/** 常规对局开杠不即时计分；仅允许独立玩法显式提供自己的候选分差。 */
 function scoreDeltaValue(input: DecisionInput, action: CanonicalAction): number | null {
-  if (input.scoreDeltaForAction) return input.scoreDeltaForAction(action)
-  const playerIndex = input.playerIndex
-  const scores = input.scores
-  if (!scores || scores[playerIndex] == null) return null
-  const before = scores[playerIndex]
-  const players = scores.map((score) => ({ score })) as unknown as Array<{ score: number }>
-  if (action.kind === 'added-kong') {
-    applyKongScore(players as never, playerIndex, 'added', input.from ?? null)
-  } else if (action.kind === 'concealed-kong') {
-    applyKongScore(players as never, playerIndex, 'concealed', null)
-  } else if (action.kind === 'wind-kong') {
-    applyKongScore(players as never, playerIndex, 'concealed', null)
-  } else if (action.kind === 'gang') {
-    applyKongScore(players as never, playerIndex, 'discard', input.from ?? null)
-  } else {
-    return null
-  }
-  const delta = (players[playerIndex] as { score: number }).score - before
-  return delta > 0 ? delta : null
+  return input.scoreDeltaForAction?.(action) ?? null
 }
 
 function applyScoreDelta(input: DecisionInput, action: CanonicalAction, features: Candidate['features']): void {
@@ -469,7 +451,7 @@ function claimCandidates(input: DecisionInput): Candidate[] {
     candidates.push({ id: 'G', label: `大明杠${input.tile ? tileName(input.tile) : ''}`, action: { kind: 'gang' }, features: buildCandidateFeatures(input, { kind: 'gang' }, '中'), legalityKey: 'gang' })
   }
   // 若碰后最佳动作是把手中第 3 张同牌原样打回，大明杠在本规则下严格占优：
-  // 最终结构不差，并额外获得杠分与尾牌补摸。不要把这个劣质碰候选交给 LLM。
+  // 最终结构不差，并额外获得杠后补摸。不要把这个劣质碰候选交给 LLM。
   if (canPeng && !(canGang && pengWouldDiscardClaimedTile(input))) {
     candidates.push({ id: 'P', label: `碰${input.tile ? tileName(input.tile) : ''}`, action: { kind: 'peng' }, features: buildCandidateFeatures(input, { kind: 'peng' }, '中'), legalityKey: 'peng' })
   }

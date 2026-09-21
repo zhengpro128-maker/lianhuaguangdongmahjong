@@ -17,30 +17,24 @@ function makePlayers(): GamePlayer[] {
   }))
 }
 
-describe('杠分（复用 applyKongScore）', () => {
-  it('加杠：其余三家各付 1B', () => {
+describe('杠分', () => {
+  it('加杠不即时收付分数', () => {
     const players = makePlayers()
-    applyKongScore(players, 0, 'added')
-    expect(players[0].score).toBe(2300)
-    expect(players[1].score).toBe(1900)
-    expect(players[2].score).toBe(1900)
-    expect(players[3].score).toBe(1900)
+    expect(applyKongScore(players, 0, 'added')).toEqual([])
+    expect(players.map(({ score }) => score)).toEqual([2000, 2000, 2000, 2000])
   })
-  it('明杠：放杠者付 1B', () => {
+  it('明杠不即时收付分数', () => {
     const players = makePlayers()
-    applyKongScore(players, 2, 'discard', 1)
-    expect(players[2].score).toBe(2100)
-    expect(players[1].score).toBe(1900)
-    expect(players[0].score).toBe(2000)
+    expect(applyKongScore(players, 2, 'discard', 1)).toEqual([])
+    expect(players.map(({ score }) => score)).toEqual([2000, 2000, 2000, 2000])
   })
-  it('暗杠与风杠：其余三家各付 2B', () => {
+  it('暗杠与风杠不即时收付分数', () => {
     const concealed = makePlayers()
-    applyKongScore(concealed, 1, 'concealed')
-    expect(concealed[1].score).toBe(2600)
-    expect(concealed[0].score).toBe(1800)
+    expect(applyKongScore(concealed, 1, 'concealed')).toEqual([])
+    expect(concealed.map(({ score }) => score)).toEqual([2000, 2000, 2000, 2000])
     const wind = makePlayers()
-    applyKongScore(wind, 3, 'concealed')
-    expect(wind[3].score).toBe(2600)
+    expect(applyKongScore(wind, 3, 'concealed')).toEqual([])
+    expect(wind.map(({ score }) => score)).toEqual([2000, 2000, 2000, 2000])
   })
 })
 

@@ -9,21 +9,9 @@ const STANDARD_TILES = TILE_TYPES.filter((tile) => tile !== 'white' && tile !== 
 const WINNING_DRAW_TILES: TileType[] = [...STANDARD_TILES, 'white']
 export const BASE_SCORE = 100
 
-export function applyKongScore(players: GamePlayer[], kongPlayerIndex: number, type: 'discard' | 'concealed' | 'added', fromIndex: number | null = null) {
-  const payers = type === 'discard'
-    ? [fromIndex]
-    : players.map((_, index) => index).filter((index) => index !== kongPlayerIndex)
-  const payment = type === 'concealed' ? BASE_SCORE * 2 : BASE_SCORE
-  const validPayers = payers.filter((payerIndex) => Number.isInteger(payerIndex) && payerIndex !== kongPlayerIndex) as number[]
-  validPayers.forEach((payerIndex) => {
-    players[payerIndex].score -= payment
-    players[kongPlayerIndex].score += payment
-  })
-  const deltas: ScoreDelta[] = [
-    { playerIndex: kongPlayerIndex, amount: payment * validPayers.length },
-    ...validPayers.map((playerIndex) => ({ playerIndex, amount: -payment })),
-  ]
-  return deltas.filter(({ amount }) => amount !== 0)
+export function applyKongScore(_players: GamePlayer[], _kongPlayerIndex: number, _type: 'discard' | 'concealed' | 'added', _fromIndex: number | null = null): ScoreDelta[] {
+  // 杠只改变牌面并触发补摸；明杠、暗杠、补杠均不再即时收付分数。
+  return []
 }
 
 export function applyWinScore(
