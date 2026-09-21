@@ -5,6 +5,6 @@
  * 仅供开发者本人真机预览时，可暂填 http://公网IP:端口/，但开发者工具和手机微信
  * 都必须显式开启「不校验合法域名」调试。
  */
-const GAME_WEB_URL = 'https://wuhanhh.mnix.cn/'
+const GAME_WEB_URL = 'https://wuhanhh.flytray.com/'
 
 module.exports = { GAME_WEB_URL }
