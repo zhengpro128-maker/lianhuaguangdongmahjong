@@ -1,0 +1,12 @@
+{
+  "pages": [
+    "pages/game/index"
+  ],
+  "window": {
+    "backgroundColor": "#07130f",
+    "navigationBarBackgroundColor": "#07130f",
+    "navigationBarTextStyle": "white",
+    "navigationBarTitleText": "广东麻将验证版"
+  },
+  "lazyCodeLoading": "requiredComponents"
+}

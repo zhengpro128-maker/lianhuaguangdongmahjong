@@ -1,0 +1,9 @@
+{
+  "desc": "H5 web-view validation shell",
+  "rules": [
+    {
+      "action": "allow",
+      "page": "*"
+    }
+  ]
+}
