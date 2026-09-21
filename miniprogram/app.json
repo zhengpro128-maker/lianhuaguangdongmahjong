@@ -6,7 +6,8 @@
     "backgroundColor": "#07130f",
     "navigationBarBackgroundColor": "#07130f",
     "navigationBarTextStyle": "white",
-    "navigationBarTitleText": "广东麻将验证版"
+    "navigationBarTitleText": "广东麻将验证版",
+    "pageOrientation": "landscape"
   },
   "lazyCodeLoading": "requiredComponents"
 }
