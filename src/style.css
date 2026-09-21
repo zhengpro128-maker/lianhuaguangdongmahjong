@@ -2829,11 +2829,17 @@ button { font: inherit; }
   left: calc(var(--safe-left) + 2px);
   transform: none;
 }
-/* 本家卡固定在左下角，手牌从卡片右侧的安全车道开始。 */
+/* 本家卡固定在左下角；完整手牌从卡片右侧的安全车道开始。 */
 .game-app.mini-program-layout .hand-rack {
   justify-content: flex-start;
   padding-right: calc(var(--safe-right) + 3px);
   padding-left: calc(var(--safe-left) + 52px);
+}
+/* 副露后的余牌数量明显变少，继续左对齐会在左下角堆成一团、右侧大面积留白。
+   此时改用安全车道内的居中锚点：左边仍避开本家信息卡，余牌自然向右补位。 */
+.game-app.mini-program-layout .hand-rack.has-melds {
+  justify-content: center;
+  transform: none;
 }
 .game-app.mini-program-layout .hand-rack .hand-tile-slot {
   width: min(44px, calc((100cqw - var(--safe-left) - var(--safe-right) - 58px) / 14));
