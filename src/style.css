@@ -2613,14 +2613,17 @@ button { font: inherit; }
   .game-app[data-table-theme="llmAnime"] .user-identity > .player-info > span { font-size: clamp(10px, .78vw, 12px); }
 
   .turn-action-row {
+    z-index: 70;
     right: calc(var(--safe-right) + 8px);
     bottom: var(--controls-bottom);
     gap: 6px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     justify-content: flex-end;
   }
-  .action-bar { gap: 5px; flex-wrap: wrap; justify-content: flex-end; }
+  .action-bar { gap: 5px; flex-wrap: nowrap; justify-content: flex-end; }
   .action { min-width: var(--control-hit-target); height: var(--control-hit-target); padding: 4px 8px; }
+  /* 响应胡牌时，胡必须处于操作栏可见端，不能被换行或右侧副露挤到手牌区。 */
+  .action[data-action-role="major"] { order: -1; flex: 0 0 var(--control-hit-target); }
   .waiting-action { width: var(--control-hit-target); height: var(--control-hit-target); }
 
   .llm-bubble { max-width: min(150px, 36cqw); }
