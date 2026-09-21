@@ -2796,7 +2796,7 @@ button { font: inherit; }
   top: calc(100% + 4px);
   right: 0;
   display: grid;
-  width: 132px;
+  width: 224px;
   padding: 6px;
   border: 1px solid rgba(231,207,147,.55);
   border-radius: 8px;
@@ -2837,6 +2837,80 @@ button { font: inherit; }
   background: #68726a;
 }
 .mini-settings-menu button i.active { background: #59ae59; }
+/* 主题和声音沿用桌面已有的预览卡/拨杆，只缩小为适合横屏小程序的尺寸。 */
+.mini-settings-menu .mini-settings-theme-menu,
+.mini-settings-menu .mini-settings-audio-menu {
+  position: static;
+  width: auto;
+  max-width: none;
+  max-height: min(214px, calc(100dvh - var(--safe-top) - 94px));
+  padding: 0;
+  overflow-y: auto;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.mini-settings-menu .mini-settings-theme-menu { grid-template-columns: 1fr; gap: 2px; }
+.mini-settings-menu .mini-settings-theme-menu::before,
+.mini-settings-menu .mini-settings-audio-menu::before { display: none; }
+.mini-settings-menu .mini-settings-theme-menu > button {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) 9px;
+  gap: 6px;
+  min-height: 52px;
+  padding: 4px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+}
+.mini-settings-menu .mini-settings-theme-menu > button:active,
+.mini-settings-menu .mini-settings-theme-menu > button.active {
+  border-color: color-mix(in srgb, var(--theme-border) 48%, transparent);
+  background: color-mix(in srgb, var(--theme-accent) 12%, transparent);
+}
+.mini-settings-menu .mini-settings-theme-menu .theme-card-preview { width: 48px; }
+.mini-settings-menu .mini-settings-theme-menu strong { font-size: 12px; }
+.mini-settings-menu .mini-settings-theme-menu small { margin-top: 1px; font-size: 8px; }
+.mini-settings-menu .mini-settings-theme-menu > button > i {
+  width: 9px;
+  height: 9px;
+  margin-left: 2px;
+  border: 1px solid #84785e;
+  border-radius: 50%;
+  background: transparent;
+}
+.mini-settings-menu .mini-settings-theme-menu > button.active > i { border-color: var(--theme-accent); background: var(--theme-accent); }
+.mini-settings-menu .mini-settings-audio-menu > button {
+  min-height: 39px;
+  padding: 5px 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+}
+.mini-settings-menu .mini-settings-audio-menu > button:active { border-color: color-mix(in srgb, var(--theme-border) 48%, transparent); background: color-mix(in srgb, var(--theme-accent) 12%, transparent); }
+.mini-settings-menu .mini-settings-audio-menu strong { font: 700 12px "Noto Serif SC", serif; }
+.mini-settings-menu .mini-settings-audio-menu small { display: block; margin-top: 1px; color: var(--theme-text-muted); font-size: 8px; white-space: nowrap; }
+.mini-settings-menu .mini-settings-audio-menu > button > i {
+  position: relative;
+  width: 27px;
+  height: 15px;
+  margin-left: 8px;
+  border: 1px solid #766f5e;
+  border-radius: 99px;
+  background: #24322d;
+}
+.mini-settings-menu .mini-settings-audio-menu > button > i::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #9c9a8e;
+  transition: transform .18s ease, background .18s ease;
+}
+.mini-settings-menu .mini-settings-audio-menu > button > i.active { border-color: var(--theme-accent); background: color-mix(in srgb, var(--theme-accent) 30%, transparent); }
+.mini-settings-menu .mini-settings-audio-menu > button > i.active::after { background: var(--theme-accent); transform: translateX(12px); }
 
 /* 平板（触控且 ≥1024×768）：切回 PC/桌面样式（卡片、座位、手牌、顶栏）。 */
 @container (min-width: 1024px) and (min-height: 768px) {
