@@ -168,19 +168,40 @@ onBeforeUnmount(() => {
           <p>{{ matchName }} · {{ roundLabel }}<span v-if="honba"> · {{ honba }}本场</span></p>
           <template v-if="settingsSection === 'theme'">
             <button class="settings-back" @click="settingsSection = null">‹ 返回设置</button>
-            <button
-              v-for="option in themeOptions"
-              :key="option.value"
-              :class="{ active: option.value === themeName }"
-              :disabled="themeLocked"
-              @click="chooseTheme(option.value)"
-            >{{ option.label }}</button>
+            <div class="theme-menu mini-settings-theme-menu" role="menu" aria-label="牌桌主题">
+              <button
+                v-for="option in themeOptions"
+                :key="option.value"
+                :class="{ active: option.value === themeName }"
+                :disabled="themeLocked"
+                role="menuitemradio"
+                :aria-checked="option.value === themeName"
+                @click="chooseTheme(option.value)"
+              >
+                <span class="theme-card-preview" :style="{ background: option.previewBackground }" aria-hidden="true">
+                  <img :src="option.previewUrl" alt="" loading="lazy" @error="hideBrokenPreview" />
+                </span>
+                <span class="theme-card-copy"><strong>{{ option.label }}</strong><small>{{ option.description }}</small></span>
+                <i aria-hidden="true"></i>
+              </button>
+            </div>
           </template>
           <template v-else-if="settingsSection === 'audio'">
             <button class="settings-back" @click="settingsSection = null">‹ 返回设置</button>
-            <button role="switch" :aria-checked="soundOn" @click="soundOn = !soundOn"><span>声音总开关</span><i :class="{ active: soundOn }" aria-hidden="true"></i></button>
-            <button role="switch" :aria-checked="bgmOn" :disabled="!soundOn" @click="bgmOn = !bgmOn"><span>BGM</span><i :class="{ active: bgmOn }" aria-hidden="true"></i></button>
-            <button role="switch" :aria-checked="effectsOn" :disabled="!soundOn" @click="effectsOn = !effectsOn"><span>音效</span><i :class="{ active: effectsOn }" aria-hidden="true"></i></button>
+            <div class="audio-menu mini-settings-audio-menu" role="group" aria-label="声音设置">
+              <button role="switch" :aria-checked="soundOn" @click="soundOn = !soundOn">
+                <span><strong>声音总开关</strong><small>同时控制 BGM 与音效</small></span>
+                <i :class="{ active: soundOn }" aria-hidden="true"></i>
+              </button>
+              <button role="switch" :aria-checked="bgmOn" :disabled="!soundOn" @click="bgmOn = !bgmOn">
+                <span><strong>BGM</strong><small>牌桌背景音乐</small></span>
+                <i :class="{ active: bgmOn }" aria-hidden="true"></i>
+              </button>
+              <button role="switch" :aria-checked="effectsOn" :disabled="!soundOn" @click="effectsOn = !effectsOn">
+                <span><strong>音效</strong><small>牌声、提示音与角色语音</small></span>
+                <i :class="{ active: effectsOn }" aria-hidden="true"></i>
+              </button>
+            </div>
           </template>
           <template v-else>
             <button :disabled="themeLocked" @click="openSettingsSection('theme')">牌桌主题</button>
