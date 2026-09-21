@@ -51,6 +51,7 @@ const robotIconUrl = `${import.meta.env.BASE_URL}img/robot.svg`
 
 const rulesOpen = ref(false)
 const resultVisible = ref(true)
+const miniProgramLayout = new URLSearchParams(window.location.search).get('miniProgram') === '1'
 const selectedMatch = ref<MatchType>('east')
 const selectedRule = ref<RuleVariant>(DEFAULT_RULE_VARIANT)
 const gameTableReady = ref(false)
@@ -443,7 +444,7 @@ function changeTableTheme(theme: TableThemeName) {
   <OrientationGate :theme-name="tableThemeName" />
   <main
     class="game-app"
-    :class="[{ 'is-lobby': showLobby }, themePresentation.typography.headingClass]"
+    :class="[{ 'is-lobby': showLobby, 'mini-program-layout': miniProgramLayout }, themePresentation.typography.headingClass]"
     :data-table-theme="tableThemeName"
     :data-theme-player-frame="themePresentation.hud.playerFrame"
     :data-theme-particle="themePresentation.shell.particle"
