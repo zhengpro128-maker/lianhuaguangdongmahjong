@@ -1,8 +1,13 @@
 const { GAME_WEB_URL } = require('../../config')
 
+function miniProgramGameUrl(url) {
+  const separator = url.includes('?') ? '&' : '?'
+  return `${url}${separator}miniProgram=1`
+}
+
 Page({
   data: {
-    gameUrl: GAME_WEB_URL,
+    gameUrl: miniProgramGameUrl(GAME_WEB_URL),
   },
 
   onLoad() {
