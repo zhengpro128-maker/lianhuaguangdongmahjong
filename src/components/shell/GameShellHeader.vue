@@ -39,10 +39,14 @@ const emit = defineEmits<{
 }>()
 
 const imageBase = `${import.meta.env.BASE_URL}img/`
+const miniProgramLayout = new URLSearchParams(window.location.search).get('miniProgram') === '1'
 const themeMenuOpen = ref(false)
 const audioMenuOpen = ref(false)
+const settingsMenuOpen = ref(false)
+const settingsSection = ref<'theme' | 'audio' | null>(null)
 const themePicker = ref<HTMLElement | null>(null)
 const audioPicker = ref<HTMLElement | null>(null)
+const settingsPicker = ref<HTMLElement | null>(null)
 const { soundOn, bgmOn, effectsOn } = useAudioControls()
 const hasAudibleAudio = computed(() => soundOn.value && (bgmOn.value || effectsOn.value))
 const signalText = computed(() => (
@@ -60,6 +64,7 @@ function hideBrokenPreview(event: Event) {
 
 function chooseTheme(theme: TableThemeName) {
   themeMenuOpen.value = false
+  settingsSection.value = null
   if (theme !== props.themeName) {
     saveTableThemePreference(theme)
     emit('changeTheme', theme)
@@ -70,6 +75,10 @@ function closeThemeMenu(event: PointerEvent) {
   const target = event.target as Node
   if (!themePicker.value?.contains(target)) themeMenuOpen.value = false
   if (!audioPicker.value?.contains(target)) audioMenuOpen.value = false
+  if (!settingsPicker.value?.contains(target)) {
+    settingsMenuOpen.value = false
+    settingsSection.value = null
+  }
 }
 
 function toggleThemeMenu() {
@@ -83,10 +92,27 @@ function toggleAudioMenu() {
   audioMenuOpen.value = !audioMenuOpen.value
 }
 
+function toggleSettingsMenu() {
+  settingsMenuOpen.value = !settingsMenuOpen.value
+  settingsSection.value = null
+}
+
+function openSettingsSection(section: 'theme' | 'audio') {
+  settingsSection.value = settingsSection.value === section ? null : section
+}
+
+function openRulesFromSettings() {
+  settingsMenuOpen.value = false
+  settingsSection.value = null
+  emit('openRules')
+}
+
 function closeMenusOnEscape(event: KeyboardEvent) {
   if (event.key !== 'Escape') return
   themeMenuOpen.value = false
   audioMenuOpen.value = false
+  settingsMenuOpen.value = false
+  settingsSection.value = null
 }
 
 onMounted(() => {
@@ -102,12 +128,12 @@ onBeforeUnmount(() => {
 <template>
   <header
     class="top-bar"
-    :class="{ 'menu-open': themeMenuOpen || audioMenuOpen }"
+    :class="{ 'menu-open': themeMenuOpen || audioMenuOpen || settingsMenuOpen, 'mini-program-header': miniProgramLayout }"
     :data-sound-enabled="soundOn ? 'true' : 'false'"
     :data-bgm-enabled="bgmOn ? 'true' : 'false'"
     :data-effects-enabled="effectsOn ? 'true' : 'false'"
   >
-    <div v-if="hasPlayers" class="round-info">{{ matchName }} · {{ roundLabel }}<span v-if="honba"> · {{ honba }}本场</span></div>
+    <div v-if="hasPlayers && !miniProgramLayout" class="round-info">{{ matchName }} · {{ roundLabel }}<span v-if="honba"> · {{ honba }}本场</span></div>
     <div v-if="hasPlayers" class="base-score-badge">
       <span v-if="gameMode === 'remote' && roomId" class="badge-room">房间 {{ roomId }}</span>
       <span>底分{{ baseScore }}</span>
@@ -121,6 +147,49 @@ onBeforeUnmount(() => {
       <span v-if="gameMode === 'remote' && signalQuality <= signalWarningThreshold" class="signal-warn">{{ signalText }}</span>
     </div>
     <nav>
+      <button
+        v-if="gameMode === 'remote' && phase !== 'lobby'"
+        class="quit-match topbar-control"
+        aria-label="退出对局"
+        title="退出对局"
+        @click="emit('quit')"
+      ><img :src="`${imageBase}door-open.svg`" alt="" /></button>
+      <div v-if="miniProgramLayout" ref="settingsPicker" class="mini-settings-picker">
+        <button
+          class="mini-settings-toggle topbar-control"
+          aria-label="对局设置"
+          :aria-expanded="settingsMenuOpen"
+          title="对局设置"
+          @click.stop="toggleSettingsMenu"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.2a3.8 3.8 0 1 0 0 7.6 3.8 3.8 0 0 0 0-7.6Zm8.1 3.8 1.5-1.2-1.9-3.3-1.8.7a7.7 7.7 0 0 0-1.5-.9L16.1 5h-3.8L12 7.3a7.7 7.7 0 0 0-1.5.9l-1.8-.7-1.9 3.3L8.3 12a7.5 7.5 0 0 0 0 1.8L6.8 15l1.9 3.3 1.8-.7c.5.4 1 .7 1.5.9l.3 2.3h3.8l.3-2.3c.5-.2 1-.5 1.5-.9l1.8.7 1.9-3.3-1.5-1.2a7.5 7.5 0 0 0 0-1.8Z" /></svg>
+        </button>
+        <div v-if="settingsMenuOpen" class="mini-settings-menu" role="menu" aria-label="对局设置">
+          <p>{{ matchName }} · {{ roundLabel }}<span v-if="honba"> · {{ honba }}本场</span></p>
+          <template v-if="settingsSection === 'theme'">
+            <button class="settings-back" @click="settingsSection = null">‹ 返回设置</button>
+            <button
+              v-for="option in themeOptions"
+              :key="option.value"
+              :class="{ active: option.value === themeName }"
+              :disabled="themeLocked"
+              @click="chooseTheme(option.value)"
+            >{{ option.label }}</button>
+          </template>
+          <template v-else-if="settingsSection === 'audio'">
+            <button class="settings-back" @click="settingsSection = null">‹ 返回设置</button>
+            <button role="switch" :aria-checked="soundOn" @click="soundOn = !soundOn"><span>声音总开关</span><i :class="{ active: soundOn }" aria-hidden="true"></i></button>
+            <button role="switch" :aria-checked="bgmOn" :disabled="!soundOn" @click="bgmOn = !bgmOn"><span>BGM</span><i :class="{ active: bgmOn }" aria-hidden="true"></i></button>
+            <button role="switch" :aria-checked="effectsOn" :disabled="!soundOn" @click="effectsOn = !effectsOn"><span>音效</span><i :class="{ active: effectsOn }" aria-hidden="true"></i></button>
+          </template>
+          <template v-else>
+            <button :disabled="themeLocked" @click="openSettingsSection('theme')">牌桌主题</button>
+            <button @click="openSettingsSection('audio')">声音设置</button>
+            <button @click="openRulesFromSettings">查看规则</button>
+          </template>
+        </div>
+      </div>
+      <template v-else>
       <div ref="themePicker" class="theme-picker">
         <button
           class="theme-toggle topbar-control"
@@ -151,13 +220,6 @@ onBeforeUnmount(() => {
           </button>
         </div>
       </div>
-      <button
-        v-if="gameMode === 'remote' && phase !== 'lobby'"
-        class="quit-match topbar-control"
-        aria-label="退出对局"
-        title="退出对局"
-        @click="emit('quit')"
-      ><img :src="`${imageBase}door-open.svg`" alt="" /></button>
       <div ref="audioPicker" class="audio-picker">
         <button
           class="icon-button topbar-control"
@@ -196,6 +258,7 @@ onBeforeUnmount(() => {
         </svg>
         <img v-else :src="`${imageBase}manual.png`" alt="" />
       </button>
+      </template>
     </nav>
   </header>
 </template>
