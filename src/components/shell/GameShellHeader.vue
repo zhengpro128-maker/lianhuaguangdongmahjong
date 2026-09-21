@@ -135,7 +135,6 @@ onBeforeUnmount(() => {
   >
     <div v-if="hasPlayers && !miniProgramLayout" class="round-info">{{ matchName }} · {{ roundLabel }}<span v-if="honba"> · {{ honba }}本场</span></div>
     <div v-if="hasPlayers" class="base-score-badge">
-      <span v-if="gameMode === 'remote' && roomId" class="badge-room">房间 {{ roomId }}</span>
       <span>底分{{ baseScore }}</span>
       <img
         v-if="gameMode === 'remote'"
