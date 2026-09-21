@@ -28,7 +28,8 @@ interface Props {
   animeCharacterId: CharacterId
   tableThemeName: TableThemeName
   roomMeta: RoomMeta | null
-  joinableRooms: JoinableRoom[]
+  /** WebSocket 版提供房间列表；P2P 版没有公共房间服务时保持为空。 */
+  joinableRooms?: JoinableRoom[]
   sessionStatus: string
   sessionError: string
   roomTimeLimit: number | null
@@ -56,7 +57,9 @@ interface Props {
   singlePlayerOnly?: boolean
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  joinableRooms: () => [],
+})
 const emit = defineEmits<{
   'update:gameMode': [value: GameMode]
   'update:selectedMatch': [value: MatchType]
