@@ -9,6 +9,7 @@ import type { ServerMessage } from '../protocol/messages'
 const MESSAGE_KINDS: ServerMessageKind[] = [
   'state_snapshot', 'turn_request', 'claim_request', 'rob_kong_request',
   'round_start', 'rejoin_ok', 'rejoin_err', 'table_action', 'score_flow',
+  'turn_timer',
   'announcement', 'llm_message', 'llm_status', 'llm_audio', 'hand_result', 'continue_prompt', 'match_finished',
   'room_closed', 'pong', 'error',
 ]
@@ -36,6 +37,7 @@ const VALID_MESSAGES: ServerMessage[] = [
   { kind: 'rejoin_err', code: 'NOT_FOUND' },
   { kind: 'table_action', event: { id: 1, type: 'peng', actorIndex: 0, sourceIndex: 1, tile: 'm1', meldIndex: 0 } },
   { kind: 'score_flow', deltas: [{ playerIndex: 0, amount: 10 }] },
+  { kind: 'turn_timer', seat: 0, seconds: 12 },
   { kind: 'announcement', text: '碰', tone: 'gold', id: 1 },
   { kind: 'llm_message', seat: 2, text: '这一手稳住。', id: 1 },
   { kind: 'llm_status', seat: 2, active: true, text: '让我想想怎么打。' },

@@ -561,7 +561,14 @@ button { font: inherit; }
 .user-melds { position: absolute; bottom: clamp(88px, 11.3vh, 112px); left: 1%; display: flex; gap: 8px; }
 .user-meld { display: flex; gap: 1px; padding: 2px; border-radius: 3px; background: rgba(0,0,0,.2); }
 .hand-rack { position: absolute; right: 0; bottom: 9px; left: 0; display: flex; align-items: flex-end; justify-content: center; gap: clamp(1px, .2vw, 4px); min-height: 88px; padding: 10px 14px 5px; border: 0; border-radius: 5px 5px 20px 20px; transform-origin: 50% 100%; }
-.hand-rack.has-melds { justify-content: flex-start; padding-right: 42%; padding-left: 11%; }
+/* 副露后手牌数减少：不再把整行钉死在左侧，改为向左偏移的居中排布。
+   这样既给右侧副露视觉留出空间，也不会造成左侧拥挤、右侧大面积留白。 */
+.hand-rack.has-melds {
+  justify-content: center;
+  padding-right: 27%;
+  padding-left: 5%;
+  transform: translateX(-6%);
+}
 .hand-tile-slot { position: relative; display: flex; flex: 0 0 auto; align-items: flex-end; touch-action: none; }
 .hand-hit-area { position: absolute; inset: 0; pointer-events: none; }
 .ting-arrow {
@@ -596,6 +603,19 @@ button { font: inherit; }
 .turn-timer span { font: 800 clamp(34px, 3.2vw, 50px) Georgia, serif; line-height: .9; }.turn-timer small { font-size: clamp(13px, 1vw, 17px); font-weight: 700; }
 .turn-timer.prompt-timer { border-color: rgba(238, 181, 90, .72); box-shadow: 0 0 18px rgba(213, 148, 52, .24); }
 .turn-timer.prompt-timer small { white-space: nowrap; }
+/* 房间内所有客户端共用同一份服务端秒表，放在牌桌中心而非本家操作栏。 */
+.public-turn-timer {
+  position: absolute;
+  z-index: 45;
+  top: 50%;
+  left: 50%;
+  min-width: 58px;
+  padding: 5px 8px 4px;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+.public-turn-timer span { font-size: clamp(25px, 2.5vw, 38px); }
+.public-turn-timer small { font-size: 10px; }
 
 .action-bar { display: flex; gap: 9px; align-items: center; }
 .autoplay-action.active { border-color: #d2aa58; background: radial-gradient(circle at 42% 33%, #b98737, #6e4f1e 69%, #241a08); color: #ffe6a5; box-shadow: 0 4px 10px rgba(0,0,0,.48), 0 0 12px rgba(239,190,75,.35), inset 0 0 0 2px rgba(255,255,255,.05); }

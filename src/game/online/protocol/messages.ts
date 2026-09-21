@@ -49,6 +49,8 @@ export type ServerMessage =
   | { kind: 'rejoin_err'; code: string }
   | { kind: 'table_action'; event: TableActionEvent }
   | { kind: 'score_flow'; deltas: ScoreDelta[] }
+  /** 服务端权威的公共回合倒计时；seat 为绝对座位。 */
+  | { kind: 'turn_timer'; seat: number; seconds: number }
   | { kind: 'announcement'; text: string; tone: string; id?: number }
   | ({ kind: 'llm_message'; seat: number; text: string; id: number; priority?: LlmSpeechPriority } & LlmSpeechMetadata)
   | { kind: 'llm_status'; seat: number; active: boolean; text?: string }

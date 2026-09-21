@@ -611,6 +611,9 @@ function onAvatarError(entry: GamePlayer) {
     <Transition name="opening-cue" mode="out-in">
       <div v-if="openingStage === 'start'" key="start" class="opening-overlay start-cue"><span>{{ matchName }} · {{ roundLabel }}</span><strong>对局开始</strong><i></i></div>
     </Transition>
+    <div v-if="turnSeconds > 0 && currentPlayer >= 0" class="turn-timer public-turn-timer" aria-label="当前回合剩余时间">
+      <span>{{ turnSeconds }}</span><small>秒</small>
+    </div>
 
     <section class="user-area">
       <div class="user-identity" :class="{ active: currentPlayer === 0, 'action-active': tableActionEvent?.actorIndex === 0 }" :style="userAnimeStyle">
@@ -703,7 +706,6 @@ function onAvatarError(entry: GamePlayer) {
         :title="autoPlay ? '机器人托管中：点击恢复手动' : '点击机器人托管：到您的回合自动出牌/过牌'"
         @click="$emit('toggleAutoPlay')"
       ><b>托管</b></button>
-      <div v-if="(isUserTurn || actionPrompt) && turnSeconds > 0" class="turn-timer" :class="{ 'prompt-timer': actionPrompt }"><span>{{ turnSeconds }}</span></div>
     </div>
     <div v-if="activeWaits && waitsOpen" class="waiting-tip compact-waiting-tip" :class="{ 'blood-flow-waiting-tip': bloodFlow }">
       <div v-if="bloodFlow" class="blood-flow-wait-grid" :style="{ gridTemplateColumns: `repeat(${Math.min(4, bloodFlowWaitTiles.length) || 1}, minmax(0, 1fr))` }">

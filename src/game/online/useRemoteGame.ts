@@ -426,6 +426,10 @@ export function useRemoteGame({
     rob_kong_request: requestCoordinator.apply,
     table_action: transientEventPresenter.handleTableAction,
     score_flow: transientEventPresenter.handleScoreFlow,
+    turn_timer: (msg) => {
+      // 服务端向全房广播；本家与旁观的其他座位显示完全相同的剩余时间。
+      turnSeconds.value = msg.seconds
+    },
     announcement: transientEventPresenter.handleAnnouncement,
     llm_message: (msg) => {
       if (!shouldSuppressLegacyAnimeSpeech(getThemeName(), msg)) onLlmMessage(toLocal(msg.seat), msg.text)

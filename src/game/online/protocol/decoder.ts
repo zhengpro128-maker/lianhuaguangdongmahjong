@@ -218,6 +218,8 @@ export function decodeServerMessage(raw: unknown): ServerMessage | null {
         return isArrayOf(raw.deltas, (item): item is JsonObject => (
           isObject(item) && isNumber(item.playerIndex) && isNumber(item.amount)
         ))
+      case 'turn_timer':
+        return isIntegerBetween(raw.seat, 0, 3) && isIntegerBetween(raw.seconds, 0, 60)
       case 'announcement':
         return isString(raw.text) && isString(raw.tone) && isOptional(raw.id, isNumber)
       case 'llm_message':

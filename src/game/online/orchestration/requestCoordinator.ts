@@ -47,6 +47,7 @@ export function createRequestCoordinator({
   function clearCountdown() {
     if (countdownHandle != null) globalThis.clearInterval(countdownHandle)
     countdownHandle = null
+    state.turnSeconds.value = 0
   }
 
   function startCountdown(onExpire: () => void) {
