@@ -704,21 +704,7 @@ export const LOTUS_RULESET: RuleSet = {
       points: dealer ? 200 : 100,
       details: [{ label: '平胡', multiplier: 1 }],
     }),
-    applyKongScore: (players, kongPlayerIndex, type, fromIndex = null) => {
-      const payers = type === 'discard'
-        ? [fromIndex]
-        : players.map((_, index) => index).filter((index) => index !== kongPlayerIndex)
-      const payment = type === 'concealed' ? 200 : 100
-      const validPayers = payers.filter((index): index is number => Number.isInteger(index) && index !== kongPlayerIndex)
-      validPayers.forEach((index) => {
-        players[index].score -= payment
-        players[kongPlayerIndex].score += payment
-      })
-      return [
-        { playerIndex: kongPlayerIndex, amount: payment * validPayers.length },
-        ...validPayers.map((playerIndex) => ({ playerIndex, amount: -payment })),
-      ].filter(({ amount }) => amount !== 0)
-    },
+    applyKongScore: () => [],
     applyWinScore: (players, winnerIndex, points, _payerIndex = null, dealerIndex = null) => {
       let total = 0
       players.forEach((player, index) => {

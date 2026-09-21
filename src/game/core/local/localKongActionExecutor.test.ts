@@ -11,7 +11,7 @@ function player(seat: number, hand: GamePlayer['hand'] = []): GamePlayer {
 }
 
 describe('localKongActionExecutor', () => {
-  it('executes a concealed kong, scores it, and schedules one tail draw', async () => {
+  it('executes a concealed kong without immediate scoring and schedules one tail draw', async () => {
     const state = createLocalGameState()
     state.players.push(
       player(0, ['m1', 'm1', 'm1', 'm1', 'p2']),
@@ -34,9 +34,9 @@ describe('localKongActionExecutor', () => {
 
     expect(state.players[0].hand).toEqual(['p2'])
     expect(state.players[0].melds[0]).toMatchObject({ type: 'angang', tile: 'm1' })
-    expect(state.players.map((item) => item.score)).toEqual([1600, 800, 800, 800])
+    expect(state.players.map((item) => item.score)).toEqual([1000, 1000, 1000, 1000])
     expect(showTableAction).toHaveBeenCalledWith('concealed-gang', 0, null, 'm1', 0)
-    expect(showScoreFlow).toHaveBeenCalledOnce()
+    expect(showScoreFlow).not.toHaveBeenCalled()
 
     scheduled[0]()
     expect(beginTurn).toHaveBeenCalledWith(0, { fromTail: true })

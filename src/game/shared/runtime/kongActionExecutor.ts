@@ -35,7 +35,8 @@ export function createKongActionExecutor(options: KongActionExecutorOptions) {
     player.drawnTileIndex = -1
     player.melds.push({ type: 'angang', tile, tiles: [tile, tile, tile, tile] })
     options.showTableAction('concealed-gang', playerIndex, null, tile, player.melds.length - 1)
-    options.showScoreFlow(options.scoreKong(state.players, playerIndex, 'concealed'))
+    const scoreDeltas = options.scoreKong(state.players, playerIndex, 'concealed')
+    if (scoreDeltas.length) options.showScoreFlow(scoreDeltas)
     if (!isLocalLlmSeat(playerIndex)) options.playSound('gang.mp3')
     if (!noContinue) options.later(() => { options.beginTurn(playerIndex, { fromTail: true }) }, 350)
   }
@@ -58,7 +59,8 @@ export function createKongActionExecutor(options: KongActionExecutorOptions) {
     const player = state.players[playerIndex]
     const meld = player.melds.find((item) => item.type === 'gang' && item.added && item.pending)
     if (meld) meld.pending = false
-    options.showScoreFlow(options.scoreKong(state.players, playerIndex, 'added'))
+    const scoreDeltas = options.scoreKong(state.players, playerIndex, 'added')
+    if (scoreDeltas.length) options.showScoreFlow(scoreDeltas)
     options.later(() => { options.beginTurn(playerIndex, { fromTail: true }) }, options.addedKongDelay)
   }
   return { performConcealedKong, declareAddedKong, settleAddedKong }

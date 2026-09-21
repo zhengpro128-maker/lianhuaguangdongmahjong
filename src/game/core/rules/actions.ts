@@ -52,7 +52,7 @@ export function performPeng(ctx: ActionContext, playerIndex: number, tile: TileT
 
 /**
  * 点杠（吃他家弃牌的杠）：拿掉弃牌、手牌移除 3 张、组成杠副露、
- * 结算杠分，轮到本家，播报动画与音效。后续补摸由调用方负责。
+ * 不作即时杠分收付，轮到本家，播报动画与音效。后续补摸由调用方负责。
  */
 export function performDiscardGang(ctx: ActionContext, playerIndex: number, tile: TileType, from: number): void {
   const player = ctx.players[playerIndex]
@@ -67,6 +67,6 @@ export function performDiscardGang(ctx: ActionContext, playerIndex: number, tile
     ?? applyKongScore(ctx.players, playerIndex, 'discard', from)
   ctx.currentPlayer.value = playerIndex
   ctx.showTableAction('discard-gang', playerIndex, from, tile, player.melds.length - 1)
-  ctx.showScoreFlow(scoreDeltas)
+  if (scoreDeltas.length) ctx.showScoreFlow(scoreDeltas)
   if (!isLocalLlmSeat(playerIndex)) ctx.playSound('gang.mp3')
 }

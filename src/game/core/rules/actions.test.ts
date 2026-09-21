@@ -91,7 +91,7 @@ describe('performPeng 共享碰执行', () => {
 })
 
 describe('performDiscardGang 共享点杠执行', () => {
-  it('移除手牌 3 张、组成杠副露、结算点杠分数并轮到本家', () => {
+  it('移除手牌 3 张、组成杠副露、不即时计分并轮到本家', () => {
     const players = [
       player(['east', 'east', 'east', 'm1']),
       player(['m1'], 1),
@@ -105,11 +105,11 @@ describe('performDiscardGang 共享点杠执行', () => {
     expect(players[0].hand).toEqual(['m1'])
     expect(players[0].melds[0]).toEqual({ type: 'gang', tile: 'east', from: 1, tiles: ['east', 'east', 'east', 'east'] })
     expect(players[1].discards).toEqual(['s1'])
-    expect(players[0].score).toBe(1100)
-    expect(players[1].score).toBe(900)
+    expect(players[0].score).toBe(1000)
+    expect(players[1].score).toBe(1000)
     expect(ctx.currentPlayer.value).toBe(0)
     expect(ctx.events).toContain('sound:gang.mp3')
-    expect(ctx.events).toContain('score:0:100,1:-100')
+    expect(ctx.events).not.toContain('score:0:100,1:-100')
   })
 
   it('对任意座位（含 AI）同样生效', () => {
@@ -125,8 +125,8 @@ describe('performDiscardGang 共享点杠执行', () => {
 
     expect(players[2].hand).toEqual(['p2'])
     expect(players[2].melds[0].type).toBe('gang')
-    expect(players[0].score).toBe(900)
-    expect(players[2].score).toBe(1100)
+    expect(players[0].score).toBe(1000)
+    expect(players[2].score).toBe(1000)
     expect(ctx.currentPlayer.value).toBe(2)
   })
 })
