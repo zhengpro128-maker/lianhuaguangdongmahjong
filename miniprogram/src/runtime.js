@@ -58,40 +58,47 @@ export function bootMiniGame(wxApi = globalThis.wx) {
         table.update(state); hud.update(state)
         overlayDirty = true; dirty = false
       }
+      syncLoginButton()
       if (overlayDirty) { table.markOverlayDirty(); overlayDirty = false }
       table.render(time); lastFrame = time
     }
     frame = requestFrame(draw)
   }
-  async function onlineAction(action) {
-    if (onlineBusy) return
-    if (action.type !== 'profile') { loginButton?.destroy(); loginButton = null }
-    if (action.type === 'profile' && wxApi.createUserInfoButton) {
-      if (loginButton) return
-      const hit = hud.hits.find(item => item.action.type === 'profile')
-      if (!hit) return
-      loginButton = wxApi.createUserInfoButton({ type: 'text', text: '点击授权头像昵称',
+  function syncLoginButton() {
+    const hit = hud.hits.find(item => item.action.type === 'login')
+    const show = visible && !disposed && !onlineBusy && !auth.identity && !hud.modal && hit
+    if (!show) { loginButton?.hide(); return }
+    if (!wxApi.createUserInfoButton) return
+    if (!loginButton) {
+      loginButton = wxApi.createUserInfoButton({ type: 'text', text: '微信登录',
         style: { left: hit.x, top: hit.y, width: hit.w, height: hit.h, lineHeight: hit.h,
           backgroundColor: '#b99249', color: '#102418', textAlign: 'center', fontSize: 12, borderRadius: 6 } })
-      wxApi.showToast?.({ title: '请再点击授权按钮', icon: 'none' })
       loginButton.onTap(async result => {
-        loginButton?.destroy(); loginButton = null
+        if (onlineBusy || disposed) return
         if (!result.userInfo) {
-          wxApi.showModal?.({ title: '未获得头像昵称', content: '未授权玩家资料。可再次点击微信登录授权；创建房间时仍可使用默认资料登录。', showCancel: false })
-          return
+          loginStatus = '未获得头像昵称授权，登录未完成'
+          wxApi.showModal?.({ title: '登录未完成', content: result.errMsg || loginStatus, showCancel: false })
+          invalidate(); return
         }
         await performOnline({ type: 'login', profile: result.userInfo })
       })
-      return
     }
-    if (action.type === 'profile') {
-      wxApi.showModal?.({ title: '资料授权不可用', content: '当前微信环境未提供头像昵称授权按钮，身份登录仍可正常使用。', showCancel: false })
+    if (loginButton.style) Object.assign(loginButton.style, { left: hit.x, top: hit.y, width: hit.w, height: hit.h, lineHeight: hit.h })
+    loginButton.show()
+  }
+  async function onlineAction(action) {
+    if (onlineBusy) return
+    if (action.type === 'login') {
+      // The native button already exists before the user's first touch.
+      // Canvas events must not recreate it or destroy its pending callback.
+      if (!wxApi.createUserInfoButton) wxApi.showModal?.({ title: '无法授权', content: '当前环境不支持微信原生头像昵称授权，请使用手机微信体验版。', showCancel: false })
       return
     }
     await performOnline(action)
   }
   async function performOnline(action) {
     onlineBusy = true; loginStatus = '正在登录 / 连接服务器…'; invalidate()
+    loginButton?.hide()
     wxApi.showLoading?.({ title: '正在连接…', mask: true })
     try {
       if (action.type === 'login') {
@@ -102,7 +109,7 @@ export function bootMiniGame(wxApi = globalThis.wx) {
         wxApi.showModal?.({ title: '微信登录成功', content: `玩家编号：${user.displayId}\n昵称：${user.nickname}\n${user.avatarUrl ? '已获取头像' : '身份登录已完成。点击大厅的头像昵称按钮可单独申请资料授权。'}`, showCancel: false })
       }
       else {
-        if (!auth.identity) game.setProfile(await auth.authorize())
+        if (!auth.identity) throw new Error('请先点击微信登录，授权头像昵称后再进入联机房间')
         if (action.type === 'create-room') await game.enterOnline(auth.identity, undefined, settings.matchType)
         if (action.type === 'join-room') {
           const result = await new Promise(resolve => wxApi.showModal({ title: '加入房间', editable: true,
@@ -123,7 +130,7 @@ export function bootMiniGame(wxApi = globalThis.wx) {
   }
   async function act(action) {
     if (disposed) return
-    if (['login', 'profile', 'create-room', 'join-room', 'ready-room', 'start-room', 'leave-room', 'resume-room'].includes(action.type)) return onlineAction(action)
+    if (['login', 'create-room', 'join-room', 'ready-room', 'start-room', 'leave-room', 'resume-room'].includes(action.type)) return onlineAction(action)
     switch (action.type) {
       case 'start':
         if (starting) return
