@@ -1,3 +1,5 @@
+import { createWechatAuth } from './wechat-auth'
+import { installWechatNetwork } from './online-client'
 import { installMiniGamePlatform } from './platform.ts'
 import { createMiniGame } from './game-bridge.ts'
 import { ThreeTable } from './three-table.js'
@@ -18,6 +20,9 @@ export function bootMiniGame(wxApi = globalThis.wx) {
   // The FIRST wx canvas is the screen. Create it before any texture factory.
   const canvas = wxApi.createCanvas()
   installMiniGamePlatform(wxApi)
+  const auth = createWechatAuth(wxApi)
+  installWechatNetwork(wxApi, () => auth.identity?.sessionToken || '')
+  let loginButton = null, onlineBusy = false
   let saved = {}
   try { saved = wxApi.getStorageSync(SETTINGS_KEY) || {} } catch { /* storage unavailable */ }
   const settings = { ruleVariant: 'wuhan-huanghuang', matchType: saved.matchType === 'hanchan' ? 'hanchan' : 'east' }
@@ -39,7 +44,7 @@ export function bootMiniGame(wxApi = globalThis.wx) {
   function snapshot() {
     const state = game.snapshot()
     return { ...state, screen: state.phase === 'lobby' ? 'lobby' : 'game',
-      settings, selectedRule: 'wuhan-huanghuang', selectedMatch: settings.matchType,
+      identity: auth.identity ? { nickname: auth.identity.nickname, avatarUrl: auth.identity.avatarUrl } : null, onlineBusy, settings, selectedRule: 'wuhan-huanghuang', selectedMatch: settings.matchType,
       themeName: 'jade', soundEnabled, loading: starting, loadError }
   }
   function invalidate() { dirty = true }
@@ -58,8 +63,50 @@ export function bootMiniGame(wxApi = globalThis.wx) {
     }
     frame = requestFrame(draw)
   }
+  async function onlineAction(action) {
+    if (onlineBusy) return
+    if (action.type !== 'login') { loginButton?.destroy(); loginButton = null }
+    if (action.type === 'login' && wxApi.createUserInfoButton) {
+      loginButton?.destroy()
+      const hit = hud.hits.find(item => item.action.type === 'login')
+      loginButton = wxApi.createUserInfoButton({ type: 'text', text: '点击授权头像昵称',
+        style: { left: hit.x, top: hit.y, width: hit.w, height: hit.h, lineHeight: hit.h,
+          backgroundColor: '#b99249', color: '#102418', textAlign: 'center', fontSize: 12, borderRadius: 6 } })
+      loginButton.onTap(async result => {
+        loginButton?.destroy(); loginButton = null
+        await performOnline({ type: 'login', profile: result.userInfo || {} })
+      })
+      return
+    }
+    await performOnline(action)
+  }
+  async function performOnline(action) {
+    onlineBusy = true; invalidate()
+    try {
+      if (action.type === 'login') game.setProfile(await auth.authorize(action.profile))
+      else {
+        if (!auth.identity) game.setProfile(await auth.authorize())
+        if (action.type === 'create-room') await game.enterOnline(auth.identity, undefined, settings.matchType)
+        if (action.type === 'join-room') {
+          const result = await new Promise(resolve => wxApi.showModal({ title: '加入房间', editable: true,
+            placeholderText: '输入 6 位房间号', success: resolve, fail: () => resolve({ confirm: false }) }))
+          if (result.confirm) {
+            const code = (result.content || '').trim().toUpperCase()
+            if (!/^[A-Z2-9]{6}$/.test(code)) throw new Error('请输入正确的 6 位房间号')
+            await game.enterOnline(auth.identity, code)
+          }
+        }
+        if (action.type === 'resume-room') await game.resumeOnline(auth.identity)
+        if (action.type === 'ready-room') await game.readyOnline()
+        if (action.type === 'start-room') await game.startOnline()
+        if (action.type === 'leave-room') await game.leaveOnline()
+      }
+    } catch (error) { wxApi.showModal?.({ title: '联机提示', content: error?.message || error?.errMsg || '网络连接失败，请重试', showCancel: false }) }
+    finally { onlineBusy = false; invalidate() }
+  }
   async function act(action) {
     if (disposed) return
+    if (['login', 'create-room', 'join-room', 'ready-room', 'start-room', 'leave-room', 'resume-room'].includes(action.type)) return onlineAction(action)
     switch (action.type) {
       case 'start':
         if (starting) return
@@ -83,7 +130,7 @@ export function bootMiniGame(wxApi = globalThis.wx) {
       case 'discard': game.discard(action.index); break
       case 'action': game.action(action.id, action); break
       case 'next': game.nextRound(); break
-      case 'lobby': game.backToLobby(); break
+      case 'lobby': if (game.snapshot().online) await game.leaveOnline(); else game.backToLobby(); break
       case 'auto': game.setAutoPlay?.(!game.snapshot().autoPlay); break
       case 'clear-selection': game.clearSelection?.(); break
       case 'hint': game.hint?.(); break
@@ -91,7 +138,7 @@ export function bootMiniGame(wxApi = globalThis.wx) {
     invalidate()
   }
   game = createMiniGame({ onChange: invalidate, playSound: audio.playSound,
-    playSoundAndWait: audio.playSoundAndWait, getThemeName: () => 'jade', countdownEnabled: false })
+    playSoundAndWait: audio.playSoundAndWait, getThemeName: () => 'jade', waitForTableReady: () => table.ready, countdownEnabled: false })
   hud = new MiniHud({ createCanvas: () => wxApi.createCanvas(), createImage: () => wxApi.createImage(),
     onAction: act, onInvalidate: () => { overlayDirty = true } })
   hud.resize(system)
@@ -127,6 +174,7 @@ export function bootMiniGame(wxApi = globalThis.wx) {
     overlayDirty = true
   }
   const onHide = () => {
+    loginButton?.hide()
     visible = false; touchStart = null
     if (frame !== null) { cancelFrame(frame); frame = null }
     audio.setHidden(true); game.pause?.()
@@ -138,6 +186,7 @@ export function bootMiniGame(wxApi = globalThis.wx) {
   }
   const onShow = () => {
     if (disposed) return
+    loginButton?.show()
     visible = true; lastFrame = 0
     audio.setHidden(false); game.resume?.(); onResize()
     if (frame === null) frame = requestFrame(draw)
@@ -158,6 +207,7 @@ export function bootMiniGame(wxApi = globalThis.wx) {
     dispose() {
       if (disposed) return
       disposed = true
+      loginButton?.destroy(); loginButton = null
       if (frame !== null) cancelFrame(frame)
       wxApi.offHide?.(onHide); wxApi.offShow?.(onShow); wxApi.offWindowResize?.(onResize)
       if (useWxTouches) {

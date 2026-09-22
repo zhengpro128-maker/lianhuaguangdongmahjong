@@ -5,6 +5,8 @@ import { tileFaceFile, tileName } from '../../src/game/core/rules/tiles'
 import { useWuhanGame } from '../../src/game/variants/wuhan/useWuhanGame'
 import { WUHAN_RULESET } from '../../src/game/variants/wuhan/rules'
 import { chooseFallbackDiscardIndex, decideClaim, decideTurn } from '../../src/game/variants/lotus/lotusAi'
+import { createRemoteSessionStore } from '../../src/game/online/session/remoteSessionStore'
+import { useRemoteGame } from '../../src/game/online/useRemoteGame'
 import { installMiniGamePlatform } from './platform'
 
 export const MINI_RULE_VARIANT = 'wuhan-huanghuang' as const
@@ -21,7 +23,9 @@ type PortState = { [K in typeof GAME_PORT_STATE_KEYS[number]]: Value<GamePort[K]
 export type MiniGameSnapshot = PortState & {
   ruleVariant: typeof MINI_RULE_VARIANT
   rulesetId: typeof MINI_RULE_VARIANT
-  gameMode: 'local'
+  gameMode: 'local' | 'online'
+  canResume: boolean
+  online: { roomId: string; seats: unknown[]; isCreator: boolean; mySeat: number; error: string; status: string } | null
   autoPlay: boolean
   paused: boolean
   countdownEnabled: boolean
@@ -42,6 +46,7 @@ interface MiniGameOptions {
   onError?: (error: unknown) => void
   playSound?: (name: string, volume?: number, onFinish?: () => void) => unknown
   playSoundAndWait?: (name: string, volume?: number) => Promise<void>
+  waitForTableReady?: () => Promise<unknown>
   getThemeName?: () => string
   countdownEnabled?: boolean
 }
@@ -63,7 +68,10 @@ export function tileAssetPath(tile: TileType): string | null {
 /** The mini game uses the actual browser Wuhan engine, including AI, scoring and match progression. */
 export function createMiniGame(options: MiniGameOptions = {}) {
   installMiniGamePlatform()
-  let port: ReturnType<typeof useWuhanGame>
+  let port: ReturnType<typeof useWuhanGame> | ReturnType<typeof useRemoteGame>
+  const remote = () => port as ReturnType<typeof useRemoteGame>
+  let online = false
+  let identity = { nickname: '微信玩家', avatarUrl: '' }
   let scope: EffectScope | null = null
   let disposed = false, paused = false, autoPlay = false, generation = 0
   let autoTimer: ReturnType<typeof setTimeout> | null = null
@@ -71,8 +79,9 @@ export function createMiniGame(options: MiniGameOptions = {}) {
   let decisionKey = '', submittedKey = '', seconds = 0
   let cancelStart: (() => void) | null = null
 
+  function disconnected() { return online && remote().wsStatus.value !== 'connected' }
   function actions(): MiniAction[] {
-    if (!port || paused || disposed) return []
+    if (!port || paused || disposed || disconnected()) return []
     const prompt = port.actionPrompt.value
     const result: MiniAction[] = []
     if (port.phase.value === 'prompt' && prompt) {
@@ -96,10 +105,18 @@ export function createMiniGame(options: MiniGameOptions = {}) {
       const value = port[key]
       return [key, copy(isRef(value) ? value.value : value)]
     })) as PortState
+    if (online) {
+      state.players = state.players.map((player, seat) => ({ ...player, seat,
+        avatar: player.avatar?.startsWith('https://') ? player.avatar : `assets/avatars/${['lotus', 'ah-lok', 'shisan', 'young-master'][seat]}.png` }))
+      state.user = state.players[0]
+    }
     const table = port.capabilities.value.lotusTable
-    return { ...state, ruleVariant: MINI_RULE_VARIANT, rulesetId: MINI_RULE_VARIANT, gameMode: 'local',
-      autoPlay, paused, countdownEnabled: options.countdownEnabled === true,
-      turnSeconds: options.countdownEnabled ? seconds : 0,
+    return { ...state, ruleVariant: MINI_RULE_VARIANT, rulesetId: MINI_RULE_VARIANT, gameMode: online ? 'online' : 'local',
+      canResume: !!createRemoteSessionStore().loadSession(),
+      online: online ? { roomId: remote().roomId.value, seats: copy(remote().roomSeats.value), isCreator: remote().isCreator.value,
+        mySeat: remote().mySeat.value, error: remote().sessionError.value, status: remote().wsStatus.value } : null,
+      autoPlay: online ? remote().autoPlay.value : autoPlay, paused, countdownEnabled: options.countdownEnabled === true,
+      turnSeconds: online ? port.turnSeconds.value : options.countdownEnabled ? seconds : 0,
       actions: actions(), jokerTiles: [...(table?.jokerTiles ?? [])], wildcardTiles: [...(table?.wildcardTiles ?? [])],
       flipTile: table?.flipTile ?? null, flipStack: table?.flipStack ?? null,
       wallBreakIndex: table?.wallBreakIndex ?? 0, secondDice: [...(port.secondDice.value ?? [])],
@@ -151,6 +168,7 @@ export function createMiniGame(options: MiniGameOptions = {}) {
   }
 
   function syncTimers() {
+    if (online) return
     const nextKey = decisionIdentity()
     if (decisionKey !== nextKey) {
       decisionKey = nextKey; submittedKey = ''; seconds = nextKey ? 12 : 0
@@ -181,13 +199,19 @@ export function createMiniGame(options: MiniGameOptions = {}) {
     generation += 1; cancelStart?.(); cancelStart = null
     clearAutoTimer(); clearCountdown(); decisionKey = ''; submittedKey = ''; seconds = 0
     scope?.stop(); scope = null
-    port?.returnToLobby()
+    if (online) {
+      const savedSession = disposed ? createRemoteSessionStore().loadSession() : null
+      remote().remoteActions.stopPolling()
+      remote().remoteActions.clearSession()
+      remote().startGame()
+      if (savedSession) createRemoteSessionStore().saveSession(savedSession)
+    } else port?.returnToLobby()
   }
   function build() {
     const epoch = generation
     scope = effectScope(true)
     scope.run(() => {
-      port = useWuhanGame({
+      port = online ? useRemoteGame({ playSound: options.playSound, playSoundAndWait: options.playSoundAndWait, getThemeName: () => 'jade', waitForTableReady: async () => { await options.waitForTableReady?.() } }) : useWuhanGame({
         // Countdown ownership stays here so hiding WeChat cannot discard the user's hand.
         countdownEnabled: false, getThemeName: () => 'jade',
         playSound: (name, volume, done) => {
@@ -197,7 +221,7 @@ export function createMiniGame(options: MiniGameOptions = {}) {
         playSoundAndWait: async (name, volume) => {
           if (epoch === generation && !disposed && !paused) await options.playSoundAndWait?.(name, volume)
         },
-        humanPlayerSeed: { name: '巅峰雀神', avatar: 'assets/avatars/lotus.png', playerKind: 'human' },
+        humanPlayerSeed: { name: identity.nickname === '微信玩家' ? '巅峰雀神' : identity.nickname, avatar: identity.avatarUrl || 'assets/avatars/lotus.png', playerKind: 'human' },
         aiPlayerSeeds: [
           { name: '南粤阿乐', avatar: 'assets/avatars/ah-lok.png', playerKind: 'bot' },
           { name: '西关十三姨', avatar: 'assets/avatars/shisan.png', playerKind: 'bot' },
@@ -217,21 +241,21 @@ export function createMiniGame(options: MiniGameOptions = {}) {
     if (settings.ruleVariant && settings.ruleVariant !== MINI_RULE_VARIANT) throw new Error('小游戏仅支持武汉晃晃')
     if (settings.gameMode && settings.gameMode !== 'local') throw new Error('小游戏暂仅支持单机对战')
     if (settings.matchType && !['east', 'hanchan'].includes(settings.matchType)) throw new Error('Unknown match type')
-    release(); autoPlay = false; build()
+    release(); online = false; autoPlay = false; build()
     const cancelled = new Promise<void>(resolve => { cancelStart = resolve })
     const opening = Promise.resolve(port.startGame(settings.matchType ?? 'east')).then(() => {})
     emit()
     await Promise.race([opening, cancelled])
   }
   function selectTile(index: number) {
-    if (disposed || paused || !Number.isInteger(index) || index < 0 || index >= (port.user.value?.hand.length ?? 0)) return false
+    if (disposed || paused || disconnected() || !Number.isInteger(index) || index < 0 || index >= (port.user.value?.hand.length ?? 0)) return false
     if (!port.isUserTurn.value) return false
     port.selectTile(index); return true
   }
   function discard(index = port.selectedIndex.value) {
-    if (disposed || paused || !port.isUserTurn.value || !Number.isInteger(index) || index < 0 || index >= (port.user.value?.hand.length ?? 0)) return false
+    if (disposed || paused || disconnected() || !port.isUserTurn.value || !Number.isInteger(index) || index < 0 || index >= (port.user.value?.hand.length ?? 0)) return false
     const key = decisionIdentity()
-    if (submittedKey === key) return false
+    if (!online && submittedKey === key) return false
     submittedKey = key
     clearAutoTimer(); port.userDiscard(index); return true
   }
@@ -242,7 +266,7 @@ export function createMiniGame(options: MiniGameOptions = {}) {
     if (!item) return false
     if (id === 'discard') return discard(payload.index)
     const key = decisionIdentity()
-    if (submittedKey === key) return false
+    if (!online && submittedKey === key) return false
     submittedKey = key
     clearAutoTimer()
     if (id === 'hu') port.userHu()
@@ -253,21 +277,40 @@ export function createMiniGame(options: MiniGameOptions = {}) {
     else if (item.type === 'chi') port.capabilities.value.chi?.choose(item.optionIndex!)
     return true
   }
-  function backToLobby() { if (disposed) return; release(); autoPlay = false; build(); emit() }
-  function nextRound() { if (!disposed && !paused && port.phase.value === 'settled') { port.nextRound(); emit() } }
-  function setAutoPlay(enabled: boolean) { if (disposed) return; autoPlay = !!enabled; clearAutoTimer(); syncTimers(); emit() }
+  function backToLobby() { if (disposed) return; release(); online = false; autoPlay = false; build(); emit() }
+  function nextRound() { if (!disposed && !paused && !disconnected() && port.phase.value === 'settled') { port.nextRound(); emit() } }
+  function setAutoPlay(enabled: boolean) { if (online) { remote().toggleAutoPlay(); return } if (disposed) return; autoPlay = !!enabled; clearAutoTimer(); syncTimers(); emit() }
   function pause() { paused = true; clearAutoTimer(); clearCountdown(); emit() }
   function resume() { paused = false; syncTimers(); emit() }
   function clearSelection() { if (!disposed) port.clearUserSelection() }
   function hint() {
-    if (disposed || paused || !port.isUserTurn.value || !port.user.value) return false
+    if (disposed || paused || disconnected() || !port.isUserTurn.value || !port.user.value) return false
     const waits = port.userTingOptions.value
     const tile = [...waits].sort((a, b) => b.remaining - a.remaining)[0]?.discard
     const index = tile ? port.user.value.hand.indexOf(tile) : chooseFallbackDiscardIndex(port.user.value.hand, port.jokerTiles.value)
     return selectTile(index)
   }
   function dispose() { if (!disposed) { disposed = true; release() } }
+  async function enterOnline(profile: typeof identity, roomId?: string, match: MatchType = 'east') {
+    release(); online = true; identity = profile; build()
+    remote().nickname.value = profile.nickname
+    try {
+      if (roomId) await remote().remoteActions.joinRoom(roomId)
+      else await remote().remoteActions.createRoom(match, 4, MINI_RULE_VARIANT, false)
+    } catch (error) { backToLobby(); throw error }
+    emit()
+  }
+  async function resumeOnline(profile: typeof identity) {
+    release(); online = true; identity = profile; build()
+    await remote().remoteActions.resumeSession()
+    emit()
+  }
+  async function leaveOnline() {
+    if (online) await remote().remoteActions.leaveRoom()
+    backToLobby()
+  }
   build()
-  return { start, snapshot, selectTile, select: selectTile, discard, action, nextRound, backToLobby,
+  return { setProfile: (profile: typeof identity) => { identity = { nickname: profile.nickname, avatarUrl: profile.avatarUrl }; emit() }, enterOnline, resumeOnline, leaveOnline, readyOnline: () => remote().remoteActions.toggleReady(),
+    startOnline: () => remote().remoteActions.startMatch(), start, snapshot, selectTile, select: selectTile, discard, action, nextRound, backToLobby,
     setAutoPlay, pause, resume, clearSelection, hint, dispose, tileName, tileAssetPath }
 }

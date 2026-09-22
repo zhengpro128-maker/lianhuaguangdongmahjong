@@ -19,7 +19,8 @@
     "build:mini": "node miniprogram/scripts/prepare-assets.mjs && vite build --config miniprogram/vite.config.mjs && node miniprogram/scripts/check-package.mjs",
     "test:mini": "vitest run --config miniprogram/vitest.config.mjs",
     "preview:mini": "node miniprogram/scripts/preview.mjs",
-    "test:mini:e2e": "node miniprogram/scripts/smoke.mjs && node miniprogram/scripts/round-smoke.mjs"
+    "test:mini:e2e": "node miniprogram/scripts/smoke.mjs && node miniprogram/scripts/round-smoke.mjs",
+    "typecheck:mini": "tsc -p miniprogram/tsconfig.json"
   },
   "dependencies": {
     "three": "^0.185.1",
