@@ -37,6 +37,10 @@
       {
         "type": "file",
         "value": "assets/manifest.json"
+      },
+      {
+        "type": "file",
+        "value": "tsconfig.json"
       }
     ],
     "include": []

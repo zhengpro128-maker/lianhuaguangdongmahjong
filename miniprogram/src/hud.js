@@ -140,6 +140,7 @@ export class MiniHud {
   }
 
   drawLobby() {
+    if (this.state.online?.roomId) return this.drawOnlineRoom()
     const w = this.width, h = this.height, left = Math.max(22, this.safe.left + 12), right = Math.max(22, this.safe.right + 12)
     const ctx = this.ctx
     const bg = ctx.createRadialGradient(w * .35, h * .42, 10, w * .4, h * .45, w * .7)
@@ -158,10 +159,15 @@ export class MiniHud {
     this.image('assets/themes/lobby/v1/jade.png', left, previewY, previewW, previewH)
     ctx.restore(); this.box(left, previewY, previewW, previewH, null, 'rgba(185,146,73,.5)', 12)
     this.text('默认墨玉', left, previewY + previewH + 20, 13, PALETTE.text, 'left', 'bold')
-    this.text('深色玉石 · 克制金属高光', left, previewY + previewH + 40, 10, PALETTE.textMuted)
+    if (this.state.canResume) this.button(left, previewY + previewH + 35, previewW, 32, '重进联机房间', { type: 'resume-room' }, { small: true, disabled: this.state.onlineBusy })
+    else this.text('深色玉石 · 克制金属高光', left, previewY + previewH + 40, 10, PALETTE.textMuted)
     const panelY = contentTop + 3, panelH = Math.min(bodyH - 8, 392)
     this.box(panelX, panelY, panelW, panelH, 'rgba(8,29,20,.85)', 'rgba(185,146,73,.3)', 15)
     const pad = clamp(panelW * .055, 14, 22), innerX = panelX + pad, innerW = panelW - pad * 2
+    const onlineY = Math.max(8, this.safe.top + 3), onlineX = left + 245
+    ;[['login', this.state.identity?.nickname || '微信登录'], ['create-room', '创建房间'], ['join-room', '加入房间']].forEach(([type, label], i) => {
+      this.button(onlineX + i * 90, onlineY, 84, 32, label, { type }, { small: true, disabled: this.state.onlineBusy })
+    })
     this.text('单机对战', innerX, panelY + 25, 18, PALETTE.accent, 'left', 'bold')
     this.text('与 AI 同桌', panelX + panelW - pad, panelY + 25, 11, PALETTE.textMuted, 'right')
     this.text('选择场次', innerX, panelY + 60, 11, PALETTE.textMuted)
@@ -175,6 +181,25 @@ export class MiniHud {
     this.button(innerX, startY, innerW, 52, this.state.loading ? '正在准备牌桌…' : `开始${match === 'hanchan' ? '半庄场' : '东风场'}`, { type: 'start' }, { primary: true, subtitle: '武汉晃晃 · 四人对局', disabled: !!this.state.loading })
     if (this.state.loadError) this.text(this.state.loadError, innerX, startY + 67, 10, PALETTE.negative, 'left', 'normal', innerW)
     else this.text('游戏结果禁止用于赌博行为', innerX + innerW / 2, startY + 68, 9, PALETTE.textMuted, 'center')
+  }
+
+  drawOnlineRoom() {
+    const room = this.state.online, w = this.width, h = this.height
+    this.box(0, 0, w, h, '#071a11', null, 0)
+    this.text(`武汉晃晃 · 房间 ${room.roomId}`, w / 2, 42, 22, PALETTE.accent, 'center', 'bold')
+    this.text(`连接：${room.status === 'connected' ? '已连接' : '连接恢复中'} · 将房间号告诉好友即可加入`, w / 2, 78, 12, PALETTE.textMuted, 'center')
+    const width = Math.min(160, (w - 80) / 4)
+    for (let i = 0; i < 4; i++) {
+      const seat = room.seats[i], x = w / 2 - width * 2 + i * width
+      this.box(x + 5, h * .31, width - 10, 90, PALETTE.panelElevated, PALETTE.border)
+      this.text(seat?.nickname || '等待加入', x + width / 2, h * .31 + 27, 14, PALETTE.text, 'center')
+      this.text(seat ? (seat.ready ? '已准备' : '未准备') : '空座由 AI 补位', x + width / 2, h * .31 + 60, 11, PALETTE.textMuted, 'center')
+    }
+    const y = h - 90, busy = this.state.onlineBusy || room.status !== 'connected'
+    this.button(w / 2 - 210, y, 120, 40, '退出房间', { type: 'leave-room' }, { disabled: this.state.onlineBusy })
+    this.button(w / 2 - 60, y, 120, 40, room.seats[room.mySeat]?.ready ? '取消准备' : '准备', { type: 'ready-room' }, { disabled: busy })
+    if (room.isCreator) this.button(w / 2 + 90, y, 120, 40, '开始对局', { type: 'start-room' }, { primary: true, disabled: busy })
+    if (room.error) this.text(room.error, w / 2, h - 26, 12, PALETTE.negative, 'center')
   }
 
   drawTable() {
@@ -217,6 +242,7 @@ export class MiniHud {
     this.button(w - right - 71, h - this.safe.bottom - 85, 71, 31, '听牌提示', { local: 'hint' }, { small: true })
     let status = s.autoPlay ? '托管中，自动完成出牌与响应' : s.actionPrompt ? '请选择吃、碰、杠、胡或过' : s.isUserTurn ? (s.selectedIndex >= 0 ? '再次点击或上滑出牌 · 红中 / 癞子直接出牌开杠' : '轮到你出牌 · 点击选中，再点或上滑打出') : '等待其他玩家出牌'
     if (s.phase === 'opening' || s.phase === 'dealing') status = ({ dice: '庄家掷骰', flip: '翻牌确定癞子', deal: '正在发牌', start: '准备开局' })[s.openingStage] || '正在发牌'
+    if (s.online && s.online.status !== 'connected') status = '连接中断，正在自动重连…'
     this.text(status, w / 2, handY - 13, 10, PALETTE.textMuted, 'center', 'normal', w - 225)
     if (s.announcement?.text && !this.hasResult()) {
       const label = s.announcement.text, bw = Math.min(w * .6, 470), by = h * .30
@@ -239,10 +265,10 @@ export class MiniHud {
     this.box(x, y, w, h, active ? 'rgba(26,66,45,.96)' : 'rgba(6,27,17,.9)', active ? PALETTE.accent : 'rgba(185,146,73,.4)', 9)
     this.ctx.save(); rounded(this.ctx, x + 6, y + 6, avatar, avatar, 6); this.ctx.clip()
     this.box(x + 6, y + 6, avatar, avatar, PALETTE.surface)
-    this.image(`assets/avatars/${AVATARS[index % 4]}.png`, x + 6, y + 6, avatar, avatar)
+    this.image(player.avatar || `assets/avatars/${AVATARS[index % 4]}.png`, x + 6, y + 6, avatar, avatar)
     this.ctx.restore()
     const textX = x + avatar + 12
-    this.text(self ? player.name || '你' : WIND[(index - (this.state.dealer || 0) + 4) % 4], textX, y + 17, self ? 10 : 11, PALETTE.text, 'left', 'bold', w - avatar - 16)
+    this.text(player.name || (self ? '你' : WIND[(index - (this.state.dealer || 0) + 4) % 4]), textX, y + 17, self ? 10 : 11, PALETTE.text, 'left', 'bold', w - avatar - 16)
     this.text(player.score ?? 1000, textX, y + 36, 12, PALETTE.accent, 'left', 'bold', w - avatar - 16)
     if (!self) this.text(player.name || `玩家 ${index + 1}`, x + w / 2, y + h - 8, 9, PALETTE.textMuted, 'center', 'normal', w - 10)
     if (index === this.state.dealer) { this.box(x + 1, y - 6, 19, 16, PALETTE.accent, null, 4); this.text('庄', x + 10, y + 2, 10, '#24301d', 'center', 'bold') }
