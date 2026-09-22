@@ -51,8 +51,22 @@ export class MiniHud {
     this.dpr = clamp(system.pixelRatio || 1, 1, 2)
     this.menuButton = system.menuButton || null
     const safe = system.safeArea
-    this.safe = { left: Math.max(0, safe?.left || 0), top: Math.max(0, safe?.top || 0),
-      right: Math.max(0, this.width - (safe?.right ?? this.width)), bottom: Math.max(0, this.height - (safe?.bottom ?? this.height)) }
+    // Some WeChat hosts retain portrait safeArea coordinates after rotating the
+    // screen canvas. Never subtract that portrait right edge from landscape width.
+    const stalePortrait = this.width > this.height && safe
+      && safe.bottom > this.height && safe.right <= this.height + 1
+    if (stalePortrait) {
+      const portraitHeight = Math.max(system.screenHeight || 0, system.screenWidth || 0, this.width)
+      const edge = Math.max(0, safe.top || 0, portraitHeight - safe.bottom)
+      this.safe = { left: Math.min(edge, this.width * .12), right: Math.min(edge, this.width * .12), top: 0, bottom: 0 }
+    } else {
+      const inset = (value, limit) => Number.isFinite(value) && value >= 0 && value <= limit ? value : 0
+      this.safe = { left: inset(safe?.left, this.width * .12), top: inset(safe?.top, this.height * .2),
+        right: inset(this.width - (safe?.right ?? this.width), this.width * .12),
+        bottom: inset(this.height - (safe?.bottom ?? this.height), this.height * .2) }
+    }
+    const menu = this.menuButton
+    if (menu && (menu.left < this.width / 2 || menu.right > this.width || menu.bottom > this.height / 3)) this.menuButton = null
     this.canvas.width = Math.round(this.width * this.dpr); this.canvas.height = Math.round(this.height * this.dpr)
     this.render()
   }
