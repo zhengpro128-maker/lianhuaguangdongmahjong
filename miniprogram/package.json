@@ -1,0 +1,13 @@
+{
+  "name": "wuhan-huanghuang-minigame",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "build": "node scripts/prepare-assets.mjs && vite build --config vite.config.mjs && node scripts/check-package.mjs",
+    "test": "vitest run --config vitest.config.mjs",
+    "preview": "node scripts/preview.mjs"
+  },
+  "devDependencies": {
+    "sharp": "^0.35.4"
+  }
+}
