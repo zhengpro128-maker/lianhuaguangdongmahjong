@@ -179,7 +179,7 @@ export class MiniHud {
     this.box(panelX, panelY, panelW, panelH, 'rgba(8,29,20,.85)', 'rgba(185,146,73,.3)', 15)
     const pad = clamp(panelW * .055, 14, 22), innerX = panelX + pad, innerW = panelW - pad * 2
     const onlineY = Math.max(8, this.safe.top + 3), onlineX = left + 245
-    ;[[this.state.identity ? 'profile' : 'login', this.state.identity ? '头像昵称' : '微信登录'], ['create-room', '创建房间'], ['join-room', '加入房间']].forEach(([type, label], i) => {
+    ;[['login', this.state.identity?.nickname || '微信登录'], ['create-room', '创建房间'], ['join-room', '加入房间']].forEach(([type, label], i) => {
       this.button(onlineX + i * 90, onlineY, 84, 32, label, { type }, { small: true, disabled: this.state.onlineBusy })
     })
     this.text('单机对战', innerX, panelY + 25, 18, PALETTE.accent, 'left', 'bold')

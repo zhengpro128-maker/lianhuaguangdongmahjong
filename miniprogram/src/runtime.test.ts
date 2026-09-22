@@ -7,7 +7,7 @@ vi.mock('./game-bridge.ts', () => ({ createMiniGame: (options: any) => {
   capture.order.push('game')
   const state = { phase: 'lobby', autoPlay: false }
   capture.game = { snapshot: vi.fn(() => ({ ...state })), start: vi.fn(async () => { state.phase = 'dealing'; options.onChange() }),
-    selectTile: vi.fn(), discard: vi.fn(), action: vi.fn(), nextRound: vi.fn(),
+    setProfile: vi.fn(), selectTile: vi.fn(), discard: vi.fn(), action: vi.fn(), nextRound: vi.fn(),
     backToLobby: vi.fn(() => { state.phase = 'lobby'; options.onChange() }),
     setAutoPlay: vi.fn((value: boolean) => { state.autoPlay = value }), pause: vi.fn(), resume: vi.fn(),
     clearSelection: vi.fn(), hint: vi.fn(), dispose: vi.fn() }
@@ -19,6 +19,7 @@ vi.mock('./three-table.js', () => ({ ThreeTable: class {
   constructor(public canvas: any) { capture.order.push('table'); capture.table = this }
 } }))
 vi.mock('./hud.js', () => ({ MiniHud: class {
+  hits = [{ x: 300, y: 10, w: 84, h: 32, action: { type: 'login' } }]
   canvas: any
   update = vi.fn(); resize = vi.fn(); handleTouch = vi.fn(); handleSwipe = vi.fn(); dispose = vi.fn()
   constructor(options: any) { capture.order.push('hud'); this.canvas = options.createCanvas(); capture.hud = this }
@@ -49,7 +50,7 @@ beforeEach(() => {
     wxApi[`off${event}`] = vi.fn()
   }
 })
-afterEach(() => { app?.dispose(); app = null; vi.unstubAllGlobals(); vi.restoreAllMocks() })
+afterEach(() => { app?.dispose(); app = null; vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.restoreAllMocks() })
 function touch(identifier: number, x: number, y: number) { return { identifier, clientX: x, clientY: y } }
 function event(...touches: ReturnType<typeof touch>[]) { return { changedTouches: touches, touches } }
 function paint(time = 100) {
@@ -150,4 +151,27 @@ describe('WeChat runtime lifecycle and gestures', () => {
     expect(capture.audio.dispose).toHaveBeenCalledOnce()
     expect(wxApi.setKeepScreenOn).toHaveBeenLastCalledWith({ keepScreenOn: false })
   })
+})
+
+it('creates the native authorization button before the first tap and completes profile plus identity together', async () => {
+  vi.stubEnv('VITE_API_BASE', 'https://example.com')
+  let tap: any
+  const native = { style: {}, show: vi.fn(), hide: vi.fn(), destroy: vi.fn(), onTap: (fn: any) => { tap = fn } }
+  wxApi.createUserInfoButton = vi.fn(() => native)
+  wxApi.login = vi.fn(({ success }) => success({ code: 'real-code' }))
+  wxApi.request = vi.fn(({ success }) => success({ statusCode: 200, data: { sessionToken: 'session',
+    account: { id: 'openid', displayName: '小明', avatarUrl: 'https://example.com/avatar.png' } } }))
+  app = bootMiniGame(wxApi)
+  paint()
+  expect(wxApi.createUserInfoButton).toHaveBeenCalledTimes(1)
+  await app.dispatch({ type: 'login' })
+  expect(wxApi.createUserInfoButton).toHaveBeenCalledTimes(1)
+  expect(native.destroy).not.toHaveBeenCalled()
+  await tap({ errMsg: 'deny' })
+  expect(wxApi.login).not.toHaveBeenCalled()
+  expect(app.snapshot().identity).toBeNull()
+  await tap({ userInfo: { nickName: '小明', avatarUrl: 'https://example.com/avatar.png' } })
+  expect(wxApi.login).toHaveBeenCalledTimes(1)
+  expect(app.snapshot().identity).toMatchObject({ nickname: '小明', avatarUrl: 'https://example.com/avatar.png' })
+  expect(capture.game.setProfile).toHaveBeenCalled()
 })
