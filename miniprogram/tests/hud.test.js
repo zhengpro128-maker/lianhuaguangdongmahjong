@@ -77,3 +77,25 @@ describe('native HUD interaction', () => {
     expect(onAction).toHaveBeenCalledWith({ type: 'next' })
   })
 })
+
+ describe('rotated device safe areas', () => {
+  it('does not treat the portrait right edge as a landscape right inset', () => {
+    const { hud } = makeHud()
+    hud.resize({ windowWidth: 844, windowHeight: 390, screenWidth: 390, screenHeight: 844,
+      safeArea: { left: 0, right: 390, top: 47, bottom: 810 },
+      menuButton: { left: 290, right: 377, top: 50, bottom: 82 } })
+    hud.update(turn)
+    expect(hud.safe).toEqual({ left: 47, right: 47, top: 0, bottom: 0 })
+    expect(hud.menuButton).toBeNull()
+    const auto = hud.hitRegions.find(hit => hit.action.type === 'auto')
+    expect(auto.x).toBeGreaterThan(700)
+    expect(hud.handHits).toHaveLength(14)
+    expect(hud.handHits.every(hit => hit.x >= 0 && hit.x + hit.w <= 844)).toBe(true)
+  })
+  it('preserves a valid landscape safe area', () => {
+    const { hud } = makeHud()
+    hud.resize({ windowWidth: 844, windowHeight: 390,
+      safeArea: { left: 47, right: 797, top: 0, bottom: 369 } })
+    expect(hud.safe).toEqual({ left: 47, right: 47, top: 0, bottom: 21 })
+  })
+})
