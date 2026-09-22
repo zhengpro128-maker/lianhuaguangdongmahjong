@@ -44,7 +44,7 @@ export function bootMiniGame(wxApi = globalThis.wx) {
   function snapshot() {
     const state = game.snapshot()
     return { ...state, screen: state.phase === 'lobby' ? 'lobby' : 'game',
-      identity: auth.identity ? { nickname: auth.identity.nickname, avatarUrl: auth.identity.avatarUrl } : null, onlineBusy, settings, selectedRule: 'wuhan-huanghuang', selectedMatch: settings.matchType,
+      identity: auth.identity ? { nickname: auth.identity.nickname, avatarUrl: auth.identity.avatarUrl, displayId: auth.identity.displayId } : null, onlineBusy, settings, selectedRule: 'wuhan-huanghuang', selectedMatch: settings.matchType,
       themeName: 'jade', soundEnabled, loading: starting, loadError }
   }
   function invalidate() { dirty = true }
@@ -72,9 +72,14 @@ export function bootMiniGame(wxApi = globalThis.wx) {
       loginButton = wxApi.createUserInfoButton({ type: 'text', text: '点击授权头像昵称',
         style: { left: hit.x, top: hit.y, width: hit.w, height: hit.h, lineHeight: hit.h,
           backgroundColor: '#b99249', color: '#102418', textAlign: 'center', fontSize: 12, borderRadius: 6 } })
+      wxApi.showToast?.({ title: '请再点击授权按钮', icon: 'none' })
       loginButton.onTap(async result => {
         loginButton?.destroy(); loginButton = null
-        await performOnline({ type: 'login', profile: result.userInfo || {} })
+        if (!result.userInfo) {
+          wxApi.showModal?.({ title: '未获得头像昵称', content: '未授权玩家资料。可再次点击微信登录授权；创建房间时仍可使用默认资料登录。', showCancel: false })
+          return
+        }
+        await performOnline({ type: 'login', profile: result.userInfo })
       })
       return
     }
@@ -82,8 +87,13 @@ export function bootMiniGame(wxApi = globalThis.wx) {
   }
   async function performOnline(action) {
     onlineBusy = true; invalidate()
+    wxApi.showLoading?.({ title: '正在连接…', mask: true })
     try {
-      if (action.type === 'login') game.setProfile(await auth.authorize(action.profile))
+      if (action.type === 'login') {
+        const user = await auth.authorize(action.profile)
+        game.setProfile(user)
+        wxApi.showModal?.({ title: '微信登录成功', content: `玩家编号：${user.displayId}\n昵称：${user.nickname}\n${user.avatarUrl ? '已获取头像' : '微信未返回头像，当前使用默认头像'}`, showCancel: false })
+      }
       else {
         if (!auth.identity) game.setProfile(await auth.authorize())
         if (action.type === 'create-room') await game.enterOnline(auth.identity, undefined, settings.matchType)
@@ -102,7 +112,7 @@ export function bootMiniGame(wxApi = globalThis.wx) {
         if (action.type === 'leave-room') await game.leaveOnline()
       }
     } catch (error) { wxApi.showModal?.({ title: '联机提示', content: error?.message || error?.errMsg || '网络连接失败，请重试', showCancel: false }) }
-    finally { onlineBusy = false; invalidate() }
+    finally { wxApi.hideLoading?.(); onlineBusy = false; invalidate() }
   }
   async function act(action) {
     if (disposed) return

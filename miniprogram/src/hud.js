@@ -164,7 +164,7 @@ export class MiniHud {
     this.button(left + 96, Math.max(8, this.safe.top + 3), 58, 32, '规则', { local: 'rules' }, { small: true })
     this.button(left + 161, Math.max(8, this.safe.top + 3), 76, 32, this.state.soundEnabled === false ? '声音：关' : '声音：开', { type: 'sound' }, { small: true })
     const leftW = Math.min(390, (w - left - right) * .31), panelX = left + leftW + 26, panelW = w - panelX - right
-    this.text('WUHAN HUANGHUANG', left, contentTop + 8, 10, PALETTE.accentSecondary, 'left', 'bold')
+    this.text(this.state.identity ? `已登录 · 编号 ${this.state.identity.displayId}` : 'WUHAN HUANGHUANG', left, contentTop + 8, 10, PALETTE.accentSecondary, 'left', 'bold')
     this.text('武汉晃晃', left, contentTop + 39, clamp(h * .074, 25, 38), PALETTE.text, 'left', 'bold')
     this.text('四人同桌 · 翻癞子 · 地道玩法', left, contentTop + 67, 12, PALETTE.textMuted)
     const previewY = contentTop + 100, previewH = Math.min(leftW * 9 / 16, bodyH - 128), previewW = Math.min(leftW, previewH * 16 / 9)
@@ -206,7 +206,8 @@ export class MiniHud {
     for (let i = 0; i < 4; i++) {
       const seat = room.seats[i], x = w / 2 - width * 2 + i * width
       this.box(x + 5, h * .31, width - 10, 90, PALETTE.panelElevated, PALETTE.border)
-      this.text(seat?.nickname || '等待加入', x + width / 2, h * .31 + 27, 14, PALETTE.text, 'center')
+      if (seat) this.image(seat.avatar || (i === room.mySeat ? this.state.identity?.avatarUrl : '') || 'assets/avatars/lotus.png', x + 12, h * .31 + 10, 30, 30)
+      this.text(seat?.nickname || '等待加入', x + width / 2 + (seat ? 15 : 0), h * .31 + 27, 14, PALETTE.text, 'center')
       this.text(seat ? (seat.ready ? '已准备' : '未准备') : '空座由 AI 补位', x + width / 2, h * .31 + 60, 11, PALETTE.textMuted, 'center')
     }
     const y = h - 90, busy = this.state.onlineBusy || room.status !== 'connected'
