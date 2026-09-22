@@ -22,7 +22,7 @@ export function bootMiniGame(wxApi = globalThis.wx) {
   installMiniGamePlatform(wxApi)
   const auth = createWechatAuth(wxApi)
   installWechatNetwork(wxApi, () => auth.identity?.sessionToken || '')
-  let loginButton = null, onlineBusy = false
+  let loginButton = null, onlineBusy = false, loginStatus = ''
   let saved = {}
   try { saved = wxApi.getStorageSync(SETTINGS_KEY) || {} } catch { /* storage unavailable */ }
   const settings = { ruleVariant: 'wuhan-huanghuang', matchType: saved.matchType === 'hanchan' ? 'hanchan' : 'east' }
@@ -44,7 +44,7 @@ export function bootMiniGame(wxApi = globalThis.wx) {
   function snapshot() {
     const state = game.snapshot()
     return { ...state, screen: state.phase === 'lobby' ? 'lobby' : 'game',
-      identity: auth.identity ? { nickname: auth.identity.nickname, avatarUrl: auth.identity.avatarUrl, displayId: auth.identity.displayId } : null, onlineBusy, settings, selectedRule: 'wuhan-huanghuang', selectedMatch: settings.matchType,
+      identity: auth.identity ? { nickname: auth.identity.nickname, avatarUrl: auth.identity.avatarUrl, displayId: auth.identity.displayId } : null, onlineBusy, loginStatus, settings, selectedRule: 'wuhan-huanghuang', selectedMatch: settings.matchType,
       themeName: 'jade', soundEnabled, loading: starting, loadError }
   }
   function invalidate() { dirty = true }
@@ -65,10 +65,11 @@ export function bootMiniGame(wxApi = globalThis.wx) {
   }
   async function onlineAction(action) {
     if (onlineBusy) return
-    if (action.type !== 'login') { loginButton?.destroy(); loginButton = null }
-    if (action.type === 'login' && wxApi.createUserInfoButton) {
-      loginButton?.destroy()
-      const hit = hud.hits.find(item => item.action.type === 'login')
+    if (action.type !== 'profile') { loginButton?.destroy(); loginButton = null }
+    if (action.type === 'profile' && wxApi.createUserInfoButton) {
+      if (loginButton) return
+      const hit = hud.hits.find(item => item.action.type === 'profile')
+      if (!hit) return
       loginButton = wxApi.createUserInfoButton({ type: 'text', text: '点击授权头像昵称',
         style: { left: hit.x, top: hit.y, width: hit.w, height: hit.h, lineHeight: hit.h,
           backgroundColor: '#b99249', color: '#102418', textAlign: 'center', fontSize: 12, borderRadius: 6 } })
@@ -83,16 +84,22 @@ export function bootMiniGame(wxApi = globalThis.wx) {
       })
       return
     }
+    if (action.type === 'profile') {
+      wxApi.showModal?.({ title: '资料授权不可用', content: '当前微信环境未提供头像昵称授权按钮，身份登录仍可正常使用。', showCancel: false })
+      return
+    }
     await performOnline(action)
   }
   async function performOnline(action) {
-    onlineBusy = true; invalidate()
+    onlineBusy = true; loginStatus = '正在登录 / 连接服务器…'; invalidate()
     wxApi.showLoading?.({ title: '正在连接…', mask: true })
     try {
       if (action.type === 'login') {
         const user = await auth.authorize(action.profile)
         game.setProfile(user)
-        wxApi.showModal?.({ title: '微信登录成功', content: `玩家编号：${user.displayId}\n昵称：${user.nickname}\n${user.avatarUrl ? '已获取头像' : '微信未返回头像，当前使用默认头像'}`, showCancel: false })
+        loginStatus = `已登录：${user.nickname} · 编号 ${user.displayId}`
+        wxApi.hideLoading?.()
+        wxApi.showModal?.({ title: '微信登录成功', content: `玩家编号：${user.displayId}\n昵称：${user.nickname}\n${user.avatarUrl ? '已获取头像' : '身份登录已完成。点击大厅的头像昵称按钮可单独申请资料授权。'}`, showCancel: false })
       }
       else {
         if (!auth.identity) game.setProfile(await auth.authorize())
@@ -111,12 +118,12 @@ export function bootMiniGame(wxApi = globalThis.wx) {
         if (action.type === 'start-room') await game.startOnline()
         if (action.type === 'leave-room') await game.leaveOnline()
       }
-    } catch (error) { wxApi.showModal?.({ title: '联机提示', content: error?.message || error?.errMsg || '网络连接失败，请重试', showCancel: false }) }
+    } catch (error) { loginStatus = error?.message || error?.errMsg || '连接失败，请重试'; wxApi.hideLoading?.(); wxApi.showModal?.({ title: '联机提示', content: error?.message || error?.errMsg || '网络连接失败，请重试', showCancel: false }) }
     finally { wxApi.hideLoading?.(); onlineBusy = false; invalidate() }
   }
   async function act(action) {
     if (disposed) return
-    if (['login', 'create-room', 'join-room', 'ready-room', 'start-room', 'leave-room', 'resume-room'].includes(action.type)) return onlineAction(action)
+    if (['login', 'profile', 'create-room', 'join-room', 'ready-room', 'start-room', 'leave-room', 'resume-room'].includes(action.type)) return onlineAction(action)
     switch (action.type) {
       case 'start':
         if (starting) return
