@@ -16,6 +16,12 @@ import type { ServerPlayerDto, ServerSnapshot } from '../protocol/dto'
 import type { RoundStartMessage } from '../protocol/messages'
 import { createOpeningSnapshotGate } from './openingGate'
 
+function openingWallTotal(rulesetId: ServerSnapshot['rulesetId']): number {
+  if (rulesetId === 'wuhan-huanghuang') return 120
+  if (rulesetId === 'lotus-legacy') return WALL_TOTAL - 2
+  return WALL_TOTAL
+}
+
 export interface OpeningTimelineState {
   phase: RefLike<GamePhase>
   players: GamePlayer[]
@@ -143,7 +149,7 @@ export function createOpeningTimeline({
     openingSnapshot = snapshot
     // 立即填充座位骨架（players 非空 → GameTableHud/3D 场景挂载），
     // 让骰子 presenter 在开局动画开始前就绪；手牌留空由发牌动画填充。
-    const wallTotal = snapshot.rulesetId === 'lotus-legacy' ? WALL_TOTAL - 2 : WALL_TOTAL
+    const wallTotal = openingWallTotal(snapshot.rulesetId)
     state.wallCount.value = wallTotal
     const snapshotWall = snapshot.wall ?? []
     const placeholders = Math.max(0, wallTotal - snapshotWall.length)

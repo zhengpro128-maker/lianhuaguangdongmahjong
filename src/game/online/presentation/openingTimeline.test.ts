@@ -161,6 +161,21 @@ describe('openingTimeline', () => {
     expect(state.flipTile.value).toBeNull()
   })
 
+  it('uses the 120-tile Wuhan wall during the opening animation', () => {
+    const { state, timeline } = harness()
+    timeline.start({
+      kind: 'round_start', matchStarted: true, round: 1, dealer: 2, honba: 0,
+      dice: [2, 5], secondDice: [4, 6], flipTile: 'm1', flipStack: 4, flipSeat: 1,
+    })
+    timeline.captureSnapshot({
+      ...snapshot(), rulesetId: 'wuhan-huanghuang', wallCount: 67,
+      wall: Array<TileType>(67).fill('s1'), headDrawn: 53,
+    })
+
+    expect(state.wallCount.value).toBe(120)
+    expect(state.wall.value).toHaveLength(120)
+  })
+
   it('cancels pending animation without sending readiness', async () => {
     const { sent, timeline } = harness()
     timeline.start({ kind: 'round_start', matchStarted: true, round: 1, dealer: 2, honba: 0, dice: [2, 5] })
