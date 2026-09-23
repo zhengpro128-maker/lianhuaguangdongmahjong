@@ -97,9 +97,11 @@ export function bootMiniGame(wxApi = globalThis.wx) {
     await performOnline(action)
   }
   async function performOnline(action) {
-    onlineBusy = true; loginStatus = '正在登录 / 连接服务器…'; invalidate()
+    onlineBusy = true
+    if (action.type !== 'leave-room') loginStatus = '正在登录 / 连接服务器…'
+    invalidate()
     loginButton?.hide()
-    wxApi.showLoading?.({ title: '正在连接…', mask: true })
+    wxApi.showLoading?.({ title: action.type === 'leave-room' ? '正在退出…' : '正在连接…', mask: true })
     try {
       if (action.type === 'login') {
         const user = await auth.authorize(action.profile)
@@ -123,7 +125,11 @@ export function bootMiniGame(wxApi = globalThis.wx) {
         if (action.type === 'resume-room') await game.resumeOnline(auth.identity)
         if (action.type === 'ready-room') await game.readyOnline()
         if (action.type === 'start-room') await game.startOnline()
-        if (action.type === 'leave-room') await game.leaveOnline()
+        if (action.type === 'leave-room') {
+          await game.leaveOnline()
+          loginStatus = auth.identity ? `已登录：${auth.identity.nickname} · 编号 ${auth.identity.displayId}` : ''
+          wxApi.showToast?.({ title: '已退出联机房间', icon: 'success' })
+        }
       }
     } catch (error) { loginStatus = error?.message || error?.errMsg || '连接失败，请重试'; wxApi.hideLoading?.(); wxApi.showModal?.({ title: '联机提示', content: error?.message || error?.errMsg || '网络连接失败，请重试', showCancel: false }) }
     finally { wxApi.hideLoading?.(); onlineBusy = false; invalidate() }

@@ -200,6 +200,8 @@ export class MiniHud {
   drawOnlineRoom() {
     const room = this.state.online, w = this.width, h = this.height
     this.box(0, 0, w, h, '#071a11', null, 0)
+    const left = Math.max(12, this.safe.left + 6), top = Math.max(8, this.safe.top + 3)
+    this.button(left, top, 76, 32, '退出联机', { local: 'leave-online' }, { small: true, disabled: this.state.onlineBusy })
     this.text(`武汉晃晃 · 房间 ${room.roomId}`, w / 2, 42, 22, PALETTE.accent, 'center', 'bold')
     this.text(`连接：${room.status === 'connected' ? '已连接' : '连接恢复中'} · 将房间号告诉好友即可加入`, w / 2, 78, 12, PALETTE.textMuted, 'center')
     const width = Math.min(160, (w - 80) / 4)
@@ -211,7 +213,7 @@ export class MiniHud {
       this.text(seat ? (seat.ready ? '已准备' : '未准备') : '空座由 AI 补位', x + width / 2, h * .31 + 60, 11, PALETTE.textMuted, 'center')
     }
     const y = h - 90, busy = this.state.onlineBusy || room.status !== 'connected'
-    this.button(w / 2 - 210, y, 120, 40, '退出房间', { type: 'leave-room' }, { disabled: this.state.onlineBusy })
+    this.button(w / 2 - 210, y, 120, 40, '退出房间', { local: 'leave-online' }, { disabled: this.state.onlineBusy })
     this.button(w / 2 - 60, y, 120, 40, room.seats[room.mySeat]?.ready ? '取消准备' : '准备', { type: 'ready-room' }, { disabled: busy })
     if (room.isCreator) this.button(w / 2 + 90, y, 120, 40, '开始对局', { type: 'start-room' }, { primary: true, disabled: busy })
     if (room.error) this.text(room.error, w / 2, h - 26, 12, PALETTE.negative, 'center')
@@ -223,8 +225,9 @@ export class MiniHud {
     const topGradient = this.ctx.createLinearGradient(0, top, 0, top + 62)
     topGradient.addColorStop(0, 'rgba(3,14,9,.95)'); topGradient.addColorStop(1, 'rgba(3,14,9,0)')
     this.ctx.fillStyle = topGradient; this.ctx.fillRect(0, 0, w, top + 64)
-    this.button(left, top + 3, 50, 31, '返回', { local: 'leave' }, { small: true })
-    this.text('武汉晃晃', left + 61, top + 18, 13, PALETTE.accent, 'left', 'bold')
+    const online = !!s.online?.roomId
+    this.button(left, top + 3, online ? 76 : 50, 31, online ? '退出联机' : '返回', { local: online ? 'leave-online' : 'leave' }, { small: true })
+    this.text('武汉晃晃', left + (online ? 87 : 61), top + 18, 13, PALETTE.accent, 'left', 'bold')
     this.text(`${s.matchName || (s.matchType === 'hanchan' ? '半庄场' : '东风场')} · ${s.roundLabel || '准备开局'}`, w / 2, top + 19, 13, PALETTE.text, 'center', 'bold')
     // WeChat capsule occupies the far upper-right. Keep controls underneath it.
     const toolbarY = Math.max(top + 40, (this.menuButton?.bottom || 0) + 7)
@@ -413,6 +416,13 @@ export class MiniHud {
       this.text('当前对局将结束，确定返回大厅？', b.x + b.w / 2, b.y + 88, 14, PALETTE.text, 'center')
       this.button(b.x + 24, b.y + b.h - 66, (b.w - 60) / 2, 42, '继续对局', { local: 'close' })
       this.button(b.x + b.w / 2 + 6, b.y + b.h - 66, (b.w - 60) / 2, 42, '返回大厅', { type: 'lobby' }, { primary: true })
+    } else if (this.modal === 'leave-online') {
+      const b = this.modalShell('退出联机', 440, 224)
+      const playing = this.state.phase !== 'lobby'
+      this.text(playing ? '确定退出当前联机对局？' : '确定退出当前联机房间？', b.x + b.w / 2, b.y + 82, 15, PALETTE.text, 'center', 'bold')
+      this.text(playing ? '退出后将释放座位，本局由 AI 接管。' : '退出后将释放座位，并返回游戏大厅。', b.x + b.w / 2, b.y + 115, 12, PALETTE.textMuted, 'center')
+      this.button(b.x + 24, b.y + b.h - 66, (b.w - 60) / 2, 42, '继续游戏', { local: 'close' })
+      this.button(b.x + b.w / 2 + 6, b.y + b.h - 66, (b.w - 60) / 2, 42, '确认退出', { type: 'leave-room' }, { primary: true })
     } else if (this.modal === 'hint') {
       const b = this.modalShell('听牌提示', 520, 280)
       const s = this.state, waits = s.userDiscardWaits || s.userCurrentWaits
@@ -504,6 +514,7 @@ export class MiniHud {
         case 'rule-prev': this.rulePage--; break
         case 'rule-next': this.rulePage++; break
         case 'leave': this.modal = 'leave'; break
+        case 'leave-online': this.modal = 'leave-online'; break
         case 'hint': this.modal = 'hint'; break
         case 'chi': this.modal = 'chi'; break
         case 'hide-result': this.hiddenResult = this.resultKey(); break
