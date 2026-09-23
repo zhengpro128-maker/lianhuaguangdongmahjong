@@ -77,7 +77,7 @@ export function createRemoteSessionStore(
       try {
         const session = JSON.parse(raw) as Partial<StoredSession>
         if (!session.roomId || !session.rejoinCode) return null
-        if (session.mode !== 'east' && session.mode !== 'hanchan') return null
+        if (!['east', 'hanchan', 'rounds4', 'rounds8', 'rounds16'].includes(session.mode)) return null
         const rulesetId = session.rulesetId ?? 'lotus-classic'
         if (rulesetId !== 'lotus-classic' && rulesetId !== 'lotus-legacy' && rulesetId !== 'wuhan-huanghuang') return null
         return {

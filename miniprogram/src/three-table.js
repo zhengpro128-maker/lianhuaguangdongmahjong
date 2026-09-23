@@ -251,6 +251,8 @@ export class ThreeTable {
 
   update(state) {
     if (this.disposed) return
+    this.tableViewport = state.tableLayout?.board
+    this.updateCameraAspect()
     const next = miniTableProps(state)
     // Presenters keep this object by reference, so do not replace its identity.
     Object.keys(this.props).forEach(key => { if (!(key in next)) delete this.props[key] })
@@ -309,10 +311,15 @@ export class ThreeTable {
     const height = Math.max(1, this.system.windowHeight || this.canvas.height)
     this.renderer.setPixelRatio(Math.min(this.system.pixelRatio || 1, 2))
     this.renderer.setSize(width, height, false)
-    this.camera.aspect = width / height
+    this.updateCameraAspect()
+    this.markOverlayDirty()
+  }
+
+  updateCameraAspect() {
+    const board = this.tableViewport
+    this.camera.aspect = board ? board.w / board.h : this.system.windowWidth / this.system.windowHeight
     this.camera.fov = responsiveCameraFov(DEFAULT_TABLE_SCENE_PROFILE.camera.fov, this.camera.aspect)
     this.camera.updateProjectionMatrix()
-    this.markOverlayDirty()
   }
 
   render() {
@@ -336,8 +343,19 @@ export class ThreeTable {
     this.renderer.toneMappingExposure = frame?.exposure ?? profile.exposure
     this.camera.position.set(frame?.shakeX ?? 0, profile.camera.positionY, profile.camera.positionZ + (frame?.shakeZ ?? 0))
     this.camera.lookAt(0, 0, profile.camera.lookAtZ)
+    const width = this.system.windowWidth, height = this.system.windowHeight
+    const board = this.tableViewport || { x: 0, y: 0, w: width, h: height }
+    this.renderer.setViewport(0, 0, width, height)
+    this.renderer.setScissorTest(false)
+    this.renderer.setClearColor(0x071a11)
+    this.renderer.clear()
+    this.renderer.setViewport(board.x, height - board.y - board.h, board.w, board.h)
+    this.renderer.setScissor(board.x, height - board.y - board.h, board.w, board.h)
+    this.renderer.setScissorTest(true)
     this.renderer.autoClear = true
     this.renderer.render(this.scene, this.camera)
+    this.renderer.setScissorTest(false)
+    this.renderer.setViewport(0, 0, width, height)
     if (this.overlayMesh) {
       this.renderer.autoClear = false
       this.renderer.clearDepth()

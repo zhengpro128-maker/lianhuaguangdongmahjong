@@ -43,7 +43,7 @@ import type { TableThemeName } from '../../components/table/three/tableTheme'
 import { resolveAnimeAudioPolicy, shouldSuppressLegacyAnimeSpeech } from '../core/presentation/animeAudioPolicy'
 
 const WS_BASE = API_BASE.replace(/^http/, 'ws')
-const MATCH_NAMES = { east: '东风场', hanchan: '半庄场' }
+const MATCH_NAMES = { east: '东风场', hanchan: '半庄场', rounds4: '4 局', rounds8: '8 局', rounds16: '16 局' }
 
 interface UseRemoteGameOptions {
   playSound?: (name: string, volume?: number, onFinish?: () => void) => unknown
@@ -226,7 +226,7 @@ export function useRemoteGame({
   ))
   const windName = computed(() => (round.value > 4 ? '南' : '东'))
   const handNumber = computed(() => ((round.value - 1) % 4) + 1)
-  const roundLabel = computed(() => `${windName.value}${handNumber.value}局`)
+  const roundLabel = computed(() => matchType.value.startsWith('rounds') ? `第 ${round.value} 局` : `${windName.value}${handNumber.value}局`)
   const matchName = computed(() => MATCH_NAMES[matchType.value])
   const standings = computed(() => players
     .map((player, index) => ({ ...player, playerIndex: index }))

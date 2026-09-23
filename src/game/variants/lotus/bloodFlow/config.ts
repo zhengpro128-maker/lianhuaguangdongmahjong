@@ -42,7 +42,7 @@ export const BLOOD_FLOW_CONFIG: BloodFlowRuleConfig = Object.freeze({
   eventMultipliers: Object.freeze({ discard: 1, 'self-draw': 2, 'robbed-kong': 2, 'kong-bloom': 4 }),
   openingMinimumMultiplier: 8,
   kongPayments: Object.freeze({ discard: 1, added: 1, concealed: 2, wind: 2 }),
-  rounds: Object.freeze({ east: 4, hanchan: 8 }),
+  rounds: Object.freeze({ east: 4, hanchan: 8, rounds4: 4, rounds8: 8, rounds16: 16 }),
   lockAfterFirstWin: true,
   multipleWinners: true,
   allowNegativeScores: true,

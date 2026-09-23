@@ -4,7 +4,7 @@ import { installWechatNetwork } from './online-client'
 
 let game: ReturnType<typeof createMiniGame>
 afterEach(() => { game?.dispose(); vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals() })
-it('uses native authenticated requests, rotates remote seats and sends player actions', async () => {
+it.each(['rounds4', 'rounds8', 'rounds16'] as const)('uses %s in native authenticated requests, rotates remote seats and sends player actions', async (mode) => {
   vi.useFakeTimers()
   const root = globalThis as any
   vi.stubGlobal('fetch', root.fetch); vi.stubGlobal('WebSocket', root.WebSocket)
@@ -18,24 +18,27 @@ it('uses native authenticated requests, rotates remote seats and sends player ac
       requests.push(r)
       const path = new URL(r.url).pathname
       const body = path.endsWith('/join') ? { roomId: 'ABC234', nickname: '小明', rejoinCode: 'secret', seat: 2 }
-        : { roomId: 'ABC234', mode: 'east', rulesetId: 'wuhan-huanghuang', creatorSeat: 2, seats: [] }
+        : { roomId: 'ABC234', mode, rulesetId: 'wuhan-huanghuang', creatorSeat: 2, seats: [] }
       r.success({ statusCode: 200, data: body })
     } }
   installWechatNetwork(wx, () => 'session-token')
   game = createMiniGame()
-  await game.enterOnline({ nickname: '小明', avatarUrl: 'https://example.com/avatar.png' })
-  expect(JSON.parse(requests[0].data)).toMatchObject({ rulesetId: 'wuhan-huanghuang', capacity: 4 })
+  await game.enterOnline({ nickname: '小明', avatarUrl: 'https://example.com/avatar.png' }, undefined, mode)
+  expect(JSON.parse(requests[0].data)).toMatchObject({ mode, rulesetId: 'wuhan-huanghuang', capacity: 4 })
   expect(requests.every(r => r.header.Authorization === 'Bearer session-token')).toBe(true)
   handlers.open({})
   const receive = (message: any) => handlers.message({ data: JSON.stringify(message) })
-  receive({ kind: 'rejoin_ok', roomId: 'ABC234', seat: 2, mode: 'east', nickname: '小明', rejoinCode: 'secret', rejoin: false })
-  receive({ kind: 'state_snapshot', roomId: 'ABC234', mode: 'east', rulesetId: 'wuhan-huanghuang', phase: 'drawing', round: 1,
+  receive({ kind: 'rejoin_ok', roomId: 'ABC234', seat: 2, mode, nickname: '小明', rejoinCode: 'secret', rejoin: false })
+  receive({ kind: 'state_snapshot', roomId: 'ABC234', mode, rulesetId: 'wuhan-huanghuang', phase: 'drawing', round: 1,
     dealer: 0, honba: 0, wallCount: 80, wall: [], headDrawn: 0, currentPlayer: 2,
     flipTile: null, flipStack: null, openingStack: null, seat: 2, result: null, announcement: null,
     matchFinished: false, lastDiscard: null, winPresentation: null, winningPlayerIndex: -1,
     players: Array.from({ length: 4 }, (_, seat) => ({ seat, name: seat === 2 ? '小明' : `玩家${seat}`, avatar: '',
       score: 1000, hand: seat === 2 ? ['m1', 'm2', 'm3'] : [null, null, null], discards: [], melds: [], redCount: 0, drawnTileIndex: -1 })) })
   receive({ kind: 'turn_request', ctx: { hand: ['m1', 'm2', 'm3'], melds: [], exposedMelds: 0, kongBloom: false, skipDraw: false, afterKong: false } })
+  expect(game.snapshot().matchType).toBe(mode)
+  expect(game.snapshot().roundLabel).toBe('第 1 局')
+  expect(game.snapshot().canResume).toBe(true)
   expect(game.snapshot().user).toMatchObject({ name: '小明', seat: 0 })
   expect(game.snapshot().players[1].hand).toEqual([])
   expect(game.discard(0)).toBe(true)

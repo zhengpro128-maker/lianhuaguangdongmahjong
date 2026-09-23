@@ -1,3 +1,5 @@
+import { MINI_MATCH_OPTIONS, miniMatchRounds } from './match-options'
+import { miniTableLayout } from './table-layout'
 import { THEME_PRESENTATIONS } from '../../src/theme/themePresentation.ts'
 import { resolveTableActionPresentation, resolveRoundResultPresentation } from '../../src/theme/themeEventPresentation.ts'
 
@@ -14,7 +16,7 @@ const RULES = [
   ['自摸计分', '自摸屁胡从 3 分起算，胡家杠番先计入基础分；每名付款者再按自己持有的杠独立翻倍。自摸大胡在牌型分上 ×1.5，门前清、杠上开花不重复计算。'],
   ['点炮计分', '点炮时三家均付款。七对、清一色、碰碰胡的放炮者按基础应付分 ×1.2，其他点炮按 ×2，其余两家不翻倍。'],
   ['杠番与封顶', '硬胡 ×2；红中杠、直杠、补杠 ×2，暗杠和癞子杠 ×4。每名付款者最多支付 50 分。每人起始 1000 分。'],
-  ['场制与荒庄', '东风场 4 局，半庄场 8 局。牌墙剩余 8 张时停止摸牌并荒庄。点击手牌选中，再次点击或向上滑动出牌。'],
+  ['场制与荒庄', '可选 4 局、8 局或 16 局，每次胡牌或荒庄都计为一局，连庄也计入局数。牌墙剩余 8 张时停止摸牌并荒庄。点击手牌选中，再次点击或向上滑动出牌。'],
 ]
 
 function clamp(value, min, max) { return Math.max(min, Math.min(max, value)) }
@@ -67,6 +69,7 @@ export class MiniHud {
     }
     const menu = this.menuButton
     if (menu && (menu.left < this.width / 2 || menu.right > this.width || menu.bottom > this.height / 3)) this.menuButton = null
+    this.layout = miniTableLayout(this.width, this.height, this.safe, this.menuButton)
     this.canvas.width = Math.round(this.width * this.dpr); this.canvas.height = Math.round(this.height * this.dpr)
     this.render()
   }
@@ -153,69 +156,70 @@ export class MiniHud {
     this.text('横过手机，展开完整四人牌桌', this.width / 2, this.height / 2 + 20, 14, PALETTE.textMuted, 'center')
   }
 
+  drawMatchOptions(x, y, width, height, selected, local = false) {
+    const gap = 10, bw = (width - gap * 2) / 3
+    MINI_MATCH_OPTIONS.forEach(({ value, rounds }, i) => this.button(x + i * (bw + gap), y, bw, height, `${rounds} 局`,
+      local ? { local: 'room-match', value } : { type: 'match', value }, { active: selected === value }))
+  }
+
   drawLobby() {
     if (this.state.online?.roomId) return this.drawOnlineRoom()
-    const w = this.width, h = this.height, left = Math.max(22, this.safe.left + 12), right = Math.max(22, this.safe.right + 12)
-    const ctx = this.ctx
-    const bg = ctx.createRadialGradient(w * .35, h * .42, 10, w * .4, h * .45, w * .7)
-    bg.addColorStop(0, '#143626'); bg.addColorStop(1, '#07110d'); ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h)
-    const contentTop = Math.max(55, this.safe.top + 44), bodyH = h - contentTop - 28
-    this.text('武汉晃晃', left, Math.max(25, this.safe.top + 21), 16, PALETTE.accent, 'left', 'bold')
-    this.button(left + 96, Math.max(8, this.safe.top + 3), 58, 32, '规则', { local: 'rules' }, { small: true })
-    this.button(left + 161, Math.max(8, this.safe.top + 3), 76, 32, this.state.soundEnabled === false ? '声音：关' : '声音：开', { type: 'sound' }, { small: true })
-    const leftW = Math.min(390, (w - left - right) * .31), panelX = left + leftW + 26, panelW = w - panelX - right
-    this.text(this.state.loginStatus || (this.state.identity ? `已登录 · 编号 ${this.state.identity.displayId}` : 'WUHAN HUANGHUANG'), left, contentTop + 8, 10, PALETTE.accentSecondary, 'left', 'bold')
-    this.text('武汉晃晃', left, contentTop + 39, clamp(h * .074, 25, 38), PALETTE.text, 'left', 'bold')
-    this.text('四人同桌 · 翻癞子 · 地道玩法', left, contentTop + 67, 12, PALETTE.textMuted)
-    const previewY = contentTop + 100, previewH = Math.min(leftW * 9 / 16, bodyH - 128), previewW = Math.min(leftW, previewH * 16 / 9)
-    ctx.save(); rounded(ctx, left, previewY, previewW, previewH, 12); ctx.clip()
-    this.box(left, previewY, previewW, previewH, PALETTE.surface)
-    this.image('assets/themes/lobby/v1/jade.png', left, previewY, previewW, previewH)
-    ctx.restore(); this.box(left, previewY, previewW, previewH, null, 'rgba(185,146,73,.5)', 12)
-    this.text('默认墨玉', left, previewY + previewH + 20, 13, PALETTE.text, 'left', 'bold')
-    if (this.state.canResume) this.text('你仍在一个联机房间中', left, previewY + previewH + 40, 10, PALETTE.accentSecondary)
-    else this.text('深色玉石 · 克制金属高光', left, previewY + previewH + 40, 10, PALETTE.textMuted)
-    const panelY = contentTop + 3, panelH = Math.min(bodyH - 8, 392)
-    this.box(panelX, panelY, panelW, panelH, 'rgba(8,29,20,.85)', 'rgba(185,146,73,.3)', 15)
-    const pad = clamp(panelW * .055, 14, 22), innerX = panelX + pad, innerW = panelW - pad * 2
-    const compactLobby = panelH < 270
-    const onlineY = Math.max(8, this.safe.top + 3), onlineX = left + 245
-    const onlineActions = this.state.canResume
-      ? [['login', this.state.identity?.nickname || '微信登录'], ['resume-room', '重进房间'], ['leave-saved-room', '退出当前房间']]
-      : [['login', this.state.identity?.nickname || '微信登录'], ['create-room', '创建房间'], ['join-room', '加入房间']]
-    onlineActions.forEach(([type, label], i) => {
-      this.button(onlineX + i * 90, onlineY, 84, 32, label, type === 'leave-saved-room' ? { local: 'leave-saved-online' } : { type }, { small: true, disabled: this.state.onlineBusy })
-    })
-    this.text('联机房间', innerX, panelY + 24, 17, PALETTE.accent, 'left', 'bold')
-    this.button(panelX + panelW - pad - 58, panelY + 7, 58, 28, this.state.roomListLoading ? '刷新中' : '刷新', { type: 'refresh-rooms' }, { small: true, disabled: !this.state.identity || this.state.roomListLoading })
-    const rooms = this.state.roomList || [], listY = panelY + 42, listGap = 7, roomW = (innerW - listGap) / 2
-    if (!this.state.identity) {
-      this.box(innerX, listY, innerW, 56, PALETTE.panelElevated, 'rgba(185,146,73,.2)', 8)
-      this.text(this.state.invitedRoomId ? `好友邀请房间 ${this.state.invitedRoomId}` : '登录后可查看并直接加入房间', innerX + innerW / 2, listY + 21, 12, PALETTE.text, 'center', 'bold')
-      this.text('点击上方“微信登录”完成授权', innerX + innerW / 2, listY + 42, 10, PALETTE.textMuted, 'center')
-    } else if (rooms.length) {
-      rooms.slice(0, 4).forEach((room, index) => {
-        const roomH = compactLobby ? 30 : 36
-        const x = innerX + (index % 2) * (roomW + listGap), y = listY + Math.floor(index / 2) * (roomH + 7)
-        const mode = room.mode === 'hanchan' ? '半庄' : '东风'
-        this.button(x, y, roomW, roomH, compactLobby ? `${room.roomId} · ${room.occupied}/${room.capacity} · ${mode}` : `${room.roomId} · ${mode}`,
-          { type: 'join-listed-room', roomId: room.roomId }, { small: true, subtitle: compactLobby ? undefined : `${room.occupied}/${room.capacity} 人 · 点击加入`, disabled: this.state.onlineBusy })
-      })
-    } else {
-      this.box(innerX, listY, innerW, 56, PALETTE.panelElevated, 'rgba(185,146,73,.2)', 8)
-      this.text(this.state.roomListLoading ? '正在获取房间…' : this.state.roomListError ? '房间列表加载失败' : '暂时没有可加入的房间', innerX + innerW / 2, listY + 23, 12, PALETTE.text, 'center', 'bold')
-      this.text(this.state.roomListError || '你可以创建一个新房间邀请好友', innerX + innerW / 2, listY + 43, 9, this.state.roomListError ? PALETTE.negative : PALETTE.textMuted, 'center', 'normal', innerW - 20)
+    const s = this.state, w = this.width, h = this.height
+    const left = Math.max(22, this.safe.left + 12), right = Math.max(22, this.safe.right + 12)
+    const ctx = this.ctx, top = Math.max(10, this.safe.top + 5)
+    const bg = ctx.createRadialGradient(w * .3, h * .4, 10, w * .4, h * .45, w * .7)
+    bg.addColorStop(0, '#193f2e'); bg.addColorStop(1, '#07110d'); ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h)
+    this.text('武汉晃晃', left, top + 17, 16, PALETTE.accent, 'left', 'bold')
+    this.button(left + 96, top, 58, 32, '规则', { local: 'rules' }, { small: true })
+    this.button(left + 163, top, 76, 32, s.soundEnabled === false ? '声音：关' : '声音：开', { type: 'sound' }, { small: true })
+    const contentTop = Math.max(top + 55, (this.menuButton?.bottom || 0) + 15)
+    const bodyH = h - contentTop - Math.max(24, this.safe.bottom + 12)
+    const leftW = (w - left - right) * .32, panelX = left + leftW + 24, panelW = w - panelX - right
+    this.text('WUHAN HUANGHUANG', left, contentTop + 8, 10, PALETTE.accentSecondary, 'left', 'bold')
+    this.text('武汉晃晃', left, contentTop + 44, clamp(h * .08, 26, 38), PALETTE.text, 'left', 'bold')
+    this.text('四人同桌 · 翻癞子', left, contentTop + 73, 12, PALETTE.textMuted)
+    const previewY = contentTop + 99, previewH = Math.max(40, Math.min(leftW * 9 / 16, bodyH - 135))
+    ctx.save(); rounded(ctx, left, previewY, leftW, previewH, 12); ctx.clip()
+    this.image('assets/themes/lobby/v1/jade.png', left, previewY, leftW, previewH)
+    ctx.restore(); this.box(left, previewY, leftW, previewH, null, 'rgba(185,146,73,.4)', 12)
+    this.text('默认墨玉 · 四人牌桌', left, previewY + previewH + 21, 11, PALETTE.textMuted)
+    this.box(panelX, contentTop, panelW, bodyH, 'rgba(8,29,20,.9)', 'rgba(185,146,73,.3)', 15)
+    const pad = 18, x = panelX + pad, innerW = panelW - pad * 2, y = contentTop
+    const page = s.lobbyPage || 'modes'
+    if (page === 'modes') {
+      this.text('选择游戏模式', x, y + 28, 19, PALETTE.accent, 'left', 'bold')
+      const gap = 12, cardW = (innerW - gap) / 2, cardY = y + 62, cardH = Math.max(78, bodyH - 110)
+      this.button(x, cardY, cardW, cardH, '单机模式', { type: 'lobby-page', value: 'local' }, { subtitle: '与 AI 对战 · 直接开始', disabled: s.onlineBusy })
+      this.button(x + cardW + gap, cardY, cardW, cardH, s.onlineBusy ? '正在登录…' : '联机模式',
+        s.identity ? { type: 'lobby-page', value: 'online' } : { type: 'login' },
+        { primary: true, subtitle: s.identity ? '创建房间 · 邀请好友' : '微信登录 · 与好友同桌', disabled: s.onlineBusy })
+      this.text(s.invitedRoomId ? `好友邀请：房间 ${s.invitedRoomId} · 点击联机模式加入` : s.loginStatus || '选择适合你的节奏，随时开一桌', x, y + bodyH - 22, 10, PALETTE.textMuted, 'left', 'normal', innerW)
+      return
     }
-    const localY = panelY + (compactLobby ? 116 : 139)
-    this.text('单机对战', innerX, localY, 13, PALETTE.accent, 'left', 'bold')
-    this.text('与 AI 同桌', panelX + panelW - pad, localY, 10, PALETTE.textMuted, 'right')
-    const match = this.state.selectedMatch || this.state.settings?.matchType || 'east', gap = 9
-    const matchH = compactLobby ? 34 : 38
-    this.button(innerX, localY + 12, (innerW - gap) / 2, matchH, compactLobby ? '东风场 · 4 局' : '东风场', { type: 'match', value: 'east' }, { active: match === 'east', small: true, subtitle: compactLobby ? undefined : '4 局' })
-    this.button(innerX + (innerW + gap) / 2, localY + 12, (innerW - gap) / 2, matchH, compactLobby ? '半庄场 · 8 局' : '半庄场', { type: 'match', value: 'hanchan' }, { active: match === 'hanchan', small: true, subtitle: compactLobby ? undefined : '8 局' })
-    const startH = compactLobby ? 38 : 43, startY = panelY + panelH - startH - 14
-    this.button(innerX, startY, innerW, startH, this.state.loading ? '正在准备牌桌…' : `开始${match === 'hanchan' ? '半庄场' : '东风场'}`, { type: 'start' }, { primary: true, subtitle: '武汉晃晃 · 四人对局', disabled: !!this.state.loading })
-    if (this.state.loadError) this.text(this.state.loadError, innerX, startY - 8, 9, PALETTE.negative, 'left', 'normal', innerW)
+    this.button(x, y + 12, 60, 30, '返回', { type: 'lobby-page', value: 'modes' }, { small: true })
+    this.text(page === 'local' ? '单机模式' : '联机模式', x + 74, y + 27, 18, PALETTE.accent, 'left', 'bold')
+    if (page === 'local') {
+      this.text('选择对局局数', x, y + 71, 14, PALETTE.text, 'left', 'bold')
+      this.drawMatchOptions(x, y + 94, innerW, Math.min(64, bodyH - 175), s.selectedMatch)
+      this.text('与三位 AI 同桌 · 连庄计入局数', x, y + bodyH - 80, 11, PALETTE.textMuted)
+      this.button(x, y + bodyH - 60, innerW, 42, s.loading ? '正在准备牌桌…' : `开始 ${miniMatchRounds(s.selectedMatch)} 局对战`, { type: 'start' }, { primary: true, disabled: s.loading })
+      if (s.loadError) this.text(s.loadError, x, y + bodyH - 9, 9, PALETTE.negative, 'left', 'normal', innerW)
+      return
+    }
+    this.text(`${s.identity?.nickname || ''} · ID ${s.identity?.displayId || ''}`, x, y + 60, 11, PALETTE.textMuted, 'left', 'normal', innerW)
+    const buttonW = (innerW - 10) / 2, actionY = y + 80
+    this.button(x, actionY, buttonW, 36, s.canResume ? '重进房间' : '创建房间', s.canResume ? { type: 'resume-room' } : { local: 'create-room' }, { primary: true, small: true, disabled: s.onlineBusy })
+    this.button(x + buttonW + 10, actionY, buttonW, 36, s.canResume ? '退出当前房间' : '加入房间', s.canResume ? { local: 'leave-saved-online' } : { type: 'join-room' }, { small: true, disabled: s.onlineBusy })
+    this.text('可加入的房间', x, y + 143, 12, PALETTE.accent, 'left', 'bold')
+    this.button(x + innerW - 54, y + 129, 54, 26, s.roomListLoading ? '刷新中' : '刷新', { type: 'refresh-rooms' }, { small: true, disabled: s.roomListLoading || s.onlineBusy })
+    const rooms = s.roomList || [], listY = y + 168
+    const rowH = Math.min(42, (bodyH - 186) / 2)
+    if (rooms.length) rooms.slice(0, 4).forEach((room, i) => {
+      this.button(x + (i % 2) * (buttonW + 10), listY + Math.floor(i / 2) * (rowH + 8), buttonW, rowH,
+        `${room.roomId} · ${miniMatchRounds(room.mode)} 局 · ${room.occupied}/${room.capacity}人`,
+        { type: 'join-listed-room', roomId: room.roomId }, { small: true, disabled: s.onlineBusy })
+    })
+    else this.wrapped(s.roomListError || (s.roomListLoading ? '正在获取房间…' : '暂无房间，创建一桌邀请好友吧'), x, listY + 14, innerW, 12, 19, PALETTE.textMuted, 2)
   }
 
   drawOnlineRoom() {
@@ -224,7 +228,7 @@ export class MiniHud {
     const left = Math.max(12, this.safe.left + 6), top = Math.max(8, this.safe.top + 3)
     this.button(left, top, 76, 32, '退出联机', { local: 'leave-online' }, { small: true, disabled: this.state.onlineBusy })
     this.text(`武汉晃晃 · 房间 ${room.roomId}`, w / 2, 42, 22, PALETTE.accent, 'center', 'bold')
-    this.text(`连接：${room.status === 'connected' ? '已连接' : '连接恢复中'} · 将房间号告诉好友即可加入`, w / 2, 78, 12, PALETTE.textMuted, 'center')
+    this.text(`${miniMatchRounds(this.state.matchType)} 局 · 连接：${room.status === 'connected' ? '已连接' : '连接恢复中'} · 将房间号告诉好友即可加入`, w / 2, 78, 12, PALETTE.textMuted, 'center')
     const width = Math.min(160, (w - 80) / 4)
     for (let i = 0; i < 4; i++) {
       const seat = room.seats[i], x = w / 2 - width * 2 + i * width
@@ -247,76 +251,68 @@ export class MiniHud {
 
   drawTable() {
     const s = this.state, w = this.width, h = this.height
-    const left = Math.max(10, this.safe.left + 5), right = Math.max(10, this.safe.right + 5), top = Math.max(5, this.safe.top)
-    const topGradient = this.ctx.createLinearGradient(0, top, 0, top + 62)
-    topGradient.addColorStop(0, 'rgba(3,14,9,.95)'); topGradient.addColorStop(1, 'rgba(3,14,9,0)')
-    this.ctx.fillStyle = topGradient; this.ctx.fillRect(0, 0, w, top + 64)
+    const { left, right, top, rail, board } = this.layout
     const online = !!s.online?.roomId
-    this.button(left, top + 3, online ? 76 : 50, 31, online ? '退出联机' : '返回', { local: online ? 'leave-online' : 'leave' }, { small: true })
-    this.text('武汉晃晃', left + (online ? 87 : 61), top + 18, 13, PALETTE.accent, 'left', 'bold')
-    this.text(`${s.matchName || (s.matchType === 'hanchan' ? '半庄场' : '东风场')} · ${s.roundLabel || '准备开局'}`, w / 2, top + 19, 13, PALETTE.text, 'center', 'bold')
-    // WeChat capsule occupies the far upper-right. Keep controls underneath it.
-    const toolbarY = Math.max(top + 40, (this.menuButton?.bottom || 0) + 7)
-    this.button(w - right - 116, toolbarY, 51, 29, '规则', { local: 'rules' }, { small: true })
-    this.button(w - right - 58, toolbarY, 58, 29, s.soundEnabled === false ? '静音' : '声音', { type: 'sound' }, { small: true })
-    const players = s.players || [], own = s.user || players[0]
-    const ownSeat = own?.seat ?? 0
+    this.box(0, 0, w, board.y, '#071a11', null, 0)
+    this.box(0, board.y, board.x, h - board.y, '#071a11', null, 0)
+    this.box(board.x + board.w, board.y, w - board.x - board.w, h - board.y, '#071a11', null, 0)
+    this.button(left, top, rail, 30, online ? '退出联机' : '返回大厅', { local: online ? 'leave-online' : 'leave' }, { small: true })
+    this.text(`${miniMatchRounds(s.matchType)} 局 · 第 ${Math.min(s.round || 1, miniMatchRounds(s.matchType))} 局`, board.x, top + 20, 12, PALETTE.text, 'left', 'bold')
+    const toolbarY = Math.max(top + 48, (this.menuButton?.bottom || 0) + 8)
+    const controlW = (rail - 6) / 2
+    this.button(w - right - rail, toolbarY, controlW, 28, '规则', { local: 'rules' }, { small: true })
+    this.button(w - right - controlW, toolbarY, controlW, 28, s.soundEnabled === false ? '静音' : '声音', { type: 'sound' }, { small: true })
+    const players = s.players || [], own = s.user || players[0], ownSeat = own?.seat ?? 0
     players.forEach((player, index) => {
       const rel = (index - ownSeat + 4) % 4
-      const cardW = rel === 0 ? 110 : 94, cardH = rel === 0 ? 55 : 64
-      const position = rel === 0 ? [left, h - this.safe.bottom - 69]
-        : rel === 1 ? [w - right - cardW, h * .43 - 15]
-          : rel === 2 ? [w * .665 - cardW / 2, top + 44]
-            : [left, h * .43 - 15]
+      const cardW = rel === 2 ? 124 : rail, cardH = 48
+      const sideY = Math.max(toolbarY + 108, board.y + board.h * .48 - cardH / 2)
+      const position = rel === 0 ? [left, h - this.safe.bottom - 62]
+        : rel === 1 ? [w - right - cardW, sideY]
+          : rel === 2 ? [w / 2 - cardW / 2, top]
+            : [left, sideY]
       this.drawSeat(player, index, position[0], position[1], cardW, cardH, rel === 0)
     })
     const capabilities = s.capabilities?.lotusTable || {}, joker = s.jokerTiles || capabilities.jokerTiles || [], flip = s.flipTile || capabilities.flipTile
-    const indicatorX = w - right - 113, indicatorY = toolbarY + 39
-    this.box(indicatorX, indicatorY, 113, 58, 'rgba(5,24,15,.85)', 'rgba(185,146,73,.38)', 8)
+    const indicatorX = w - right - rail, indicatorY = toolbarY + 36
+    this.box(indicatorX, indicatorY, rail, 58, 'rgba(5,24,15,.85)', 'rgba(185,146,73,.38)', 8)
     this.text('翻牌', indicatorX + 10, indicatorY + 12, 9, PALETTE.textMuted)
-    this.text('癞子', indicatorX + 64, indicatorY + 12, 9, PALETTE.accent)
+    this.text('癞子', indicatorX + rail / 2 + 5, indicatorY + 12, 9, PALETTE.accent)
     if (flip) this.drawTile(flip, indicatorX + 10, indicatorY + 23, 22, 29)
     else this.text('—', indicatorX + 20, indicatorY + 36, 13, PALETTE.textMuted)
-    joker.forEach((tile, index) => this.drawTile(tile, indicatorX + 63 + index * 23, indicatorY + 23, 22, 29, { joker: true }))
+    joker.forEach((tile, index) => this.drawTile(tile, indicatorX + rail / 2 + 5 + index * 23, indicatorY + 23, 22, 29, { joker: true }))
+    this.box(board.x, board.y + board.h, board.w, h - board.y - board.h, '#071a11', null, 0)
     this.drawHand(own)
     this.drawActions()
     this.drawActionCue()
     const handY = this.handY || h - 80
     this.button(w - right - 71, h - this.safe.bottom - 46, 71, 31, s.autoPlay ? '取消托管' : '托管', { type: 'auto' }, { small: true, active: s.autoPlay })
-    this.button(w - right - 71, h - this.safe.bottom - 85, 71, 31, '听牌提示', { local: 'hint' }, { small: true })
+    this.button(w - right - 71, h - this.safe.bottom - 83, 71, 31, '听牌提示', { local: 'hint' }, { small: true })
     let status = s.autoPlay ? '托管中，自动完成出牌与响应' : s.actionPrompt ? '请选择吃、碰、杠、胡或过' : s.isUserTurn ? (s.selectedIndex >= 0 ? '再次点击或上滑出牌 · 红中 / 癞子直接出牌开杠' : '轮到你出牌 · 点击选中，再点或上滑打出') : '等待其他玩家出牌'
     if (s.phase === 'opening' || s.phase === 'dealing') status = ({ dice: '庄家掷骰', flip: '翻牌确定癞子', deal: '正在发牌', start: '准备开局' })[s.openingStage] || '正在发牌'
     if (s.online && s.online.status !== 'connected') status = '连接中断，正在自动重连…'
-    this.text(status, w / 2, handY - 13, 10, PALETTE.textMuted, 'center', 'normal', w - 225)
-    if (s.announcement?.text && !this.hasResult()) {
-      const label = s.announcement.text, bw = Math.min(w * .6, 470), by = h * .30
-      const banner = this.ctx.createLinearGradient(w / 2 - bw / 2, 0, w / 2 + bw / 2, 0)
-      banner.addColorStop(0, 'rgba(3,14,7,0)'); banner.addColorStop(.3, 'rgba(3,14,7,.75)')
-      banner.addColorStop(.7, 'rgba(3,14,7,.75)'); banner.addColorStop(1, 'rgba(3,14,7,0)')
-      this.ctx.fillStyle = banner; this.ctx.fillRect(w / 2 - bw / 2, by, bw, 37)
-      this.text(label, w / 2, by + 19, 21, PALETTE.accent, 'center', 'bold', bw - 20)
-    }
-    if (s.openingStage === 'start') {
-      this.box(w / 2 - 130, h * .37, 260, 75, 'rgba(5,23,15,.94)', 'rgba(185,146,73,.7)', 10)
-      this.text('对局开始', w / 2, h * .37 + 30, 28, PALETTE.accent, 'center', 'bold')
-      this.text(`${s.matchName || ''} · ${s.roundLabel || ''}`, w / 2, h * .37 + 58, 12, PALETTE.textMuted, 'center')
-    }
+    this.text(status, w / 2, board.y + board.h + 13, 10, PALETTE.textMuted, 'center', 'normal', w - 225)
+    if (s.announcement?.text && !this.hasResult()) this.wrapped(s.announcement.text, left, board.y + 18, rail, 11, 18, PALETTE.accent, 3)
     if (this.hasResult() && this.hiddenResult === this.resultKey()) this.button(w / 2 - 60, handY - 61, 120, 33, '查看结算', { local: 'result' }, { primary: true, small: true })
   }
 
   drawSeat(player, index, x, y, w, h, self) {
-    const active = this.state.currentPlayer === index, avatar = Math.min(h - 12, 42)
+    const active = this.state.currentPlayer === index, avatar = Math.min(h - 12, 36)
     this.box(x, y, w, h, active ? 'rgba(26,66,45,.96)' : 'rgba(6,27,17,.9)', active ? PALETTE.accent : 'rgba(185,146,73,.4)', 9)
     this.ctx.save(); rounded(this.ctx, x + 6, y + 6, avatar, avatar, 6); this.ctx.clip()
     this.box(x + 6, y + 6, avatar, avatar, PALETTE.surface)
     this.image(player.avatar || `assets/avatars/${AVATARS[index % 4]}.png`, x + 6, y + 6, avatar, avatar)
     this.ctx.restore()
     const textX = x + avatar + 12
-    this.text(player.name || (self ? '你' : WIND[(index - (this.state.dealer || 0) + 4) % 4]), textX, y + 17, self ? 10 : 11, PALETTE.text, 'left', 'bold', w - avatar - 16)
-    this.text(player.score ?? 1000, textX, y + 36, 12, PALETTE.accent, 'left', 'bold', w - avatar - 16)
-    if (!self) this.text(player.name || `玩家 ${index + 1}`, x + w / 2, y + h - 8, 9, PALETTE.textMuted, 'center', 'normal', w - 10)
-    if (index === this.state.dealer) { this.box(x + 1, y - 6, 19, 16, PALETTE.accent, null, 4); this.text('庄', x + 10, y + 2, 10, '#24301d', 'center', 'bold') }
-    if (active && this.state.turnSeconds > 0) this.text(this.state.turnSeconds, x + w - 8, y - 8, 11, PALETTE.accent, 'right', 'bold')
+    const name = player.name || (self ? '你' : WIND[(index - (this.state.dealer || 0) + 4) % 4])
+    this.ctx.font = 'bold 11px \"PingFang SC\", sans-serif'
+    const nameWidth = w - avatar - 16
+    let label = name
+    while (label.length > 1 && this.ctx.measureText(label).width > nameWidth) label = label.slice(0, -2) + '…'
+    this.text(label, textX, y + 17, 11, PALETTE.text, 'left', 'bold', nameWidth)
+    this.text(player.score ?? 1000, textX, y + 34, 12, PALETTE.accent, 'left', 'bold', w - avatar - 16)
+    if (index === this.state.dealer) { this.box(x + 2, y + 2, 16, 14, PALETTE.accent, null, 4); this.text('庄', x + 10, y + 9, 9, '#24301d', 'center', 'bold') }
+    if (active && this.state.turnSeconds > 0) this.text(this.state.turnSeconds, x + w - 8, y + h - 10, 10, PALETTE.accent, 'right', 'bold')
     const delta = this.state.scoreFlowEvent?.deltas?.find(item => item.playerIndex === index)?.amount
     if (delta) this.text(`${delta > 0 ? '+' : ''}${delta}`, x + w / 2, y - 18, 20, delta > 0 ? PALETTE.positive : PALETTE.negative, 'center', 'bold')
   }
@@ -344,11 +340,11 @@ export class MiniHud {
   drawHand(player) {
     if (!player) return
     const s = this.state, hand = player.hand || [], w = this.width, h = this.height
-    const available = w - Math.max(138, this.safe.left + 122) - Math.max(92, this.safe.right + 87)
+    const available = this.layout.board.w
     const gap = 2, drawnGap = player.drawnTileIndex >= 0 ? 9 : 0
     const tileW = clamp((available - Math.max(0, hand.length - 1) * gap - drawnGap) / Math.max(14, hand.length), 18, 54)
     const tileH = tileW * 1.37, rowW = hand.length * (tileW + gap) - gap + drawnGap
-    const startX = (w - rowW) / 2 + 16, y = h - Math.max(14, this.safe.bottom + 9) - tileH
+    const startX = this.layout.board.x + (available - rowW) / 2, y = h - Math.max(14, this.safe.bottom + 9) - tileH
     this.handY = y
     const jokerTiles = s.jokerTiles || s.capabilities?.lotusTable?.jokerTiles || []
     let offset = 0
@@ -370,7 +366,7 @@ export class MiniHud {
     const chiActions = actions.filter(action => action.type === 'chi')
     if (chiActions.length > 1) actions = actions.filter(action => action.type !== 'chi').concat({ id: 'chi', type: 'chi', label: '吃' })
     if (!actions.length) return
-    const xEnd = this.width - Math.max(104, this.safe.right + 92), gap = 8
+    const xEnd = this.layout.board.x + this.layout.board.w, gap = 8
     const bw = 64, bh = 42, perRow = Math.max(1, Math.floor((this.width - 230) / (bw + gap)))
     actions.forEach((action, index) => {
       const column = index % perRow, row = Math.floor(index / perRow)
@@ -391,20 +387,9 @@ export class MiniHud {
     if (!event || this.hasResult()) return
     const presentation = resolveTableActionPresentation(event.type)
     if (!presentation) return
-    const w = this.width, h = this.height, position = [
-      [w * .5, h * .65], [w * .81, h * .43], [w * .5, h * .29], [w * .19, h * .43],
-    ][event.actorIndex] || [w / 2, h / 2]
-    const [x, y] = position, radius = presentation.kind === 'win' ? 51 : 38, ctx = this.ctx
-    ctx.save()
-    const glow = ctx.createRadialGradient(x, y, 1, x, y, radius * 1.4)
-    glow.addColorStop(0, 'rgba(25,69,49,.96)'); glow.addColorStop(.52, 'rgba(195,151,62,.4)'); glow.addColorStop(1, 'rgba(195,151,62,0)')
-    ctx.fillStyle = glow; ctx.fillRect(x - radius * 1.4, y - radius * 1.4, radius * 2.8, radius * 2.8)
-    ctx.translate(x, y); ctx.rotate(Math.PI / 4)
-    this.box(-radius * .59, -radius * .59, radius * 1.18, radius * 1.18, null, 'rgba(229,200,120,.78)', 5)
-    ctx.rotate(-Math.PI / 4)
-    ctx.shadowBlur = 9; ctx.shadowColor = '#b88e3c'
-    this.text(presentation.label, 0, 1, presentation.label.length > 1 ? 28 : 36, '#ffe5a1', 'center', 'bold')
-    ctx.restore()
+    const { left, rail, board } = this.layout
+    this.box(left, board.y + 72, rail, 26, PALETTE.panelElevated, PALETTE.border, 6)
+    this.text(presentation.label, left + rail / 2, board.y + 85, 16, PALETTE.accent, 'center', 'bold', rail - 12)
   }
 
   hasResult() { return !!this.state.result && ['settled', 'finished'].includes(this.state.phase) || !!this.state.matchFinished }
@@ -423,7 +408,12 @@ export class MiniHud {
   }
 
   drawModal() {
-    if (this.modal === 'rules') {
+    if (this.modal === 'create-room') {
+      const b = this.modalShell('创建联机房间', 460, 245)
+      this.text('选择局数 · 连庄计入局数', b.x + 24, b.y + 70, 13, PALETTE.textMuted)
+      this.drawMatchOptions(b.x + 24, b.y + 96, b.w - 48, 50, this.roomMatch, true)
+      this.button(b.x + 24, b.y + b.h - 68, b.w - 48, 42, `创建 ${miniMatchRounds(this.roomMatch)} 局房间`, { type: 'create-room', matchType: this.roomMatch }, { primary: true, disabled: this.state.onlineBusy })
+    } else if (this.modal === 'rules') {
       const b = this.modalShell('武汉晃晃玩法', 620, 420)
       const count = b.h < 340 ? 2 : 3, pages = Math.ceil(RULES.length / count)
       this.rulePage = clamp(this.rulePage, 0, pages - 1)
@@ -535,6 +525,8 @@ export class MiniHud {
     }
     if (action.local) {
       switch (action.local) {
+        case 'create-room': this.roomMatch = this.state.selectedMatch || 'rounds4'; this.modal = 'create-room'; break
+        case 'room-match': this.roomMatch = action.value; break
         case 'close': this.modal = null; break
         case 'rules': this.rulePage = 0; this.modal = 'rules'; break
         case 'rule-prev': this.rulePage--; break

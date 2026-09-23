@@ -7,6 +7,7 @@ import { WUHAN_RULESET } from '../../src/game/variants/wuhan/rules'
 import { chooseFallbackDiscardIndex, decideClaim, decideTurn } from '../../src/game/variants/lotus/lotusAi'
 import { createRemoteSessionStore } from '../../src/game/online/session/remoteSessionStore'
 import { useRemoteGame } from '../../src/game/online/useRemoteGame'
+import { normalizeMiniMatch } from './match-options'
 import { installMiniGamePlatform } from './platform'
 
 export const MINI_RULE_VARIANT = 'wuhan-huanghuang' as const
@@ -244,10 +245,10 @@ export function createMiniGame(options: MiniGameOptions = {}) {
     if (disposed) throw new Error('The mini game has been disposed')
     if (settings.ruleVariant && settings.ruleVariant !== MINI_RULE_VARIANT) throw new Error('小游戏仅支持武汉晃晃')
     if (settings.gameMode && settings.gameMode !== 'local') throw new Error('小游戏暂仅支持单机对战')
-    if (settings.matchType && !['east', 'hanchan'].includes(settings.matchType)) throw new Error('Unknown match type')
+    if (settings.matchType && !['east', 'hanchan', 'rounds4', 'rounds8', 'rounds16'].includes(settings.matchType)) throw new Error('Unknown match type')
     release(); online = false; autoPlay = false; build()
     const cancelled = new Promise<void>(resolve => { cancelStart = resolve })
-    const opening = Promise.resolve(port.startGame(settings.matchType ?? 'east')).then(() => {})
+    const opening = Promise.resolve(port.startGame(normalizeMiniMatch(settings.matchType))).then(() => {})
     emit()
     await Promise.race([opening, cancelled])
   }
@@ -295,12 +296,12 @@ export function createMiniGame(options: MiniGameOptions = {}) {
     return selectTile(index)
   }
   function dispose() { if (!disposed) { disposed = true; release() } }
-  async function enterOnline(profile: typeof identity, roomId?: string, match: MatchType = 'east') {
+  async function enterOnline(profile: typeof identity, roomId?: string, match: MatchType = 'rounds4') {
     release(); online = true; identity = profile; build()
     remote().nickname.value = profile.nickname
     try {
       if (roomId) await remote().remoteActions.joinRoom(roomId)
-      else await remote().remoteActions.createRoom(match, 4, MINI_RULE_VARIANT, false)
+      else await remote().remoteActions.createRoom(normalizeMiniMatch(match), 4, MINI_RULE_VARIANT, false)
     } catch (error) {
       const message = remote().sessionError?.value || (error instanceof Error ? error.message : '联机房间连接失败')
       backToLobby()

@@ -1,3 +1,4 @@
+import { normalizeMiniMatch } from './match-options'
 import { createWechatAuth } from './wechat-auth'
 import { installWechatNetwork } from './online-client'
 import { installMiniGamePlatform } from './platform.ts'
@@ -29,12 +30,12 @@ export function bootMiniGame(wxApi = globalThis.wx) {
     return /^[A-Z2-9]{6}$/.test(roomId) ? roomId : ''
   }
   let pendingInviteRoom = sharedRoomId(wxApi.getLaunchOptionsSync?.())
-  let loginButton = null, onlineBusy = false
+  let loginButton = null, onlineBusy = false, lobbyPage = 'modes'
   let loginStatus = pendingInviteRoom ? `好友邀请你加入房间 ${pendingInviteRoom}，请先微信登录` : ''
   let roomList = [], roomListLoading = false, roomListError = ''
   let saved = {}
   try { saved = wxApi.getStorageSync(SETTINGS_KEY) || {} } catch { /* storage unavailable */ }
-  const settings = { ruleVariant: 'wuhan-huanghuang', matchType: saved.matchType === 'hanchan' ? 'hanchan' : 'east' }
+  const settings = { ruleVariant: 'wuhan-huanghuang', matchType: normalizeMiniMatch(saved.matchType) }
   let soundEnabled = saved.soundEnabled !== false
   const audio = createMiniAudio(wxApi, soundEnabled)
   let system = windowInfo(wxApi)
@@ -55,12 +56,12 @@ export function bootMiniGame(wxApi = globalThis.wx) {
     const state = game.snapshot()
     return { ...state, screen: state.phase === 'lobby' ? 'lobby' : 'game',
       identity: auth.identity ? { nickname: auth.identity.nickname, avatarUrl: auth.identity.avatarUrl, displayId: auth.identity.displayId } : null, onlineBusy, loginStatus, settings, selectedRule: 'wuhan-huanghuang', selectedMatch: settings.matchType,
-      themeName: 'jade', soundEnabled, loading: starting, loadError,
+      tableLayout: hud?.layout, lobbyPage, themeName: 'jade', soundEnabled, loading: starting, loadError,
       roomList, roomListLoading, roomListError, invitedRoomId: pendingInviteRoom }
   }
   function invalidate() { dirty = true }
   async function refreshRooms() {
-    if (disposed || !visible || !auth.identity || roomListLoading || game.snapshot().online?.roomId) return
+    if (disposed || !visible || !auth.identity || lobbyPage !== 'online' || game.snapshot().phase !== 'lobby' || roomListLoading || game.snapshot().online?.roomId) return
     roomListLoading = true; roomListError = ''; invalidate()
     try {
       const result = await getJoinableRooms()
@@ -100,9 +101,9 @@ export function bootMiniGame(wxApi = globalThis.wx) {
     if (!show) { loginButton?.hide(); return }
     if (!wxApi.createUserInfoButton) return
     if (!loginButton) {
-      loginButton = wxApi.createUserInfoButton({ type: 'text', text: '微信登录',
+      loginButton = wxApi.createUserInfoButton({ type: 'text', text: '',
         style: { left: hit.x, top: hit.y, width: hit.w, height: hit.h, lineHeight: hit.h,
-          backgroundColor: '#b99249', color: '#102418', textAlign: 'center', fontSize: 12, borderRadius: 6 } })
+          backgroundColor: 'rgba(0,0,0,0)', color: 'rgba(0,0,0,0)', textAlign: 'center', fontSize: 12, borderRadius: 6 } })
       loginButton.onTap(async result => {
         if (onlineBusy || disposed) return
         if (!result.userInfo) {
@@ -136,6 +137,7 @@ export function bootMiniGame(wxApi = globalThis.wx) {
       if (action.type === 'login') {
         const user = await auth.authorize(action.profile)
         game.setProfile(user)
+        lobbyPage = 'online'
         loginStatus = `已登录：${user.nickname} · 编号 ${user.displayId}`
         const invitedRoom = pendingInviteRoom
         if (invitedRoom) {
@@ -144,8 +146,6 @@ export function bootMiniGame(wxApi = globalThis.wx) {
           wxApi.showToast?.({ title: `已加入房间 ${invitedRoom}`, icon: 'success' })
         } else {
           await refreshRooms()
-          wxApi.hideLoading?.()
-          wxApi.showModal?.({ title: '微信登录成功', content: `玩家编号：${user.displayId}\n昵称：${user.nickname}\n已获取头像，可直接选择大厅房间加入。`, showCancel: false })
         }
       }
       else {
@@ -157,8 +157,8 @@ export function bootMiniGame(wxApi = globalThis.wx) {
           if (auth.identity) await refreshRooms()
           wxApi.showToast?.({ title: '已退出联机房间', icon: 'success' })
         } else {
-          if (!auth.identity) throw new Error('请先点击微信登录，授权头像昵称后再进入联机房间')
-          if (action.type === 'create-room') await game.enterOnline(auth.identity, undefined, settings.matchType)
+          if (!auth.identity) throw new Error('请先点击联机模式，完成微信登录后再进入房间')
+          if (action.type === 'create-room') await game.enterOnline(auth.identity, undefined, normalizeMiniMatch(action.matchType || settings.matchType))
           if (action.type === 'join-listed-room') {
             await game.enterOnline(auth.identity, action.roomId)
             if (pendingInviteRoom === action.roomId) pendingInviteRoom = ''
@@ -184,6 +184,11 @@ export function bootMiniGame(wxApi = globalThis.wx) {
     if (disposed) return
     if (['login', 'create-room', 'join-room', 'join-listed-room', 'ready-room', 'start-room', 'leave-room', 'resume-room'].includes(action.type)) return onlineAction(action)
     switch (action.type) {
+      case 'lobby-page':
+        if (action.value === 'online' && !auth.identity) return onlineAction({ type: 'login' })
+        lobbyPage = ['local', 'online'].includes(action.value) ? action.value : 'modes'
+        if (lobbyPage === 'online') await refreshRooms()
+        break
       case 'refresh-rooms': await refreshRooms(); break
       case 'share-room':
         if (wxApi.shareAppMessage) wxApi.shareAppMessage(sharePayload())
@@ -205,7 +210,7 @@ export function bootMiniGame(wxApi = globalThis.wx) {
           }
         } finally { starting = false; invalidate() }
         break
-      case 'match': settings.matchType = action.value === 'hanchan' ? 'hanchan' : 'east'; saveSettings(); break
+      case 'match': settings.matchType = normalizeMiniMatch(action.value); saveSettings(); break
       case 'sound': soundEnabled = !soundEnabled; audio.setEnabled(soundEnabled); saveSettings(); break
       case 'select': game.selectTile(action.index); break
       case 'discard': game.discard(action.index); break
@@ -267,7 +272,6 @@ export function bootMiniGame(wxApi = globalThis.wx) {
   }
   const onShow = options => {
     if (disposed) return
-    loginButton?.show()
     visible = true; lastFrame = 0
     audio.setHidden(false); game.resume?.(); onResize()
     const invitedRoom = sharedRoomId(options)

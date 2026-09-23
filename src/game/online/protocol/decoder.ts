@@ -9,7 +9,7 @@ const GAME_PHASES = new Set<GamePhase>([
   'lobby', 'dealing', 'opening', 'playing', 'drawing', 'thinking', 'checking',
   'discard', 'prompt', 'kong', 'win-effect', 'revealing', 'settled', 'finished',
 ])
-const MATCH_TYPES = new Set(['east', 'hanchan'])
+const MATCH_TYPES = new Set(['east', 'hanchan', 'rounds4', 'rounds8', 'rounds16'])
 const HONORS = new Set(['east', 'south', 'west', 'north', 'red', 'green', 'white'])
 const MELD_TYPES = new Set(['peng', 'gang', 'angang', 'flower', 'chi'])
 const TABLE_ACTION_TYPES = new Set([
