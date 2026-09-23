@@ -75,7 +75,7 @@ describe('mini game shared Wuhan bridge', () => {
     await firstStart
     await until(() => bridge.snapshot().isUserTurn)
     await replacement
-    expect(bridge.snapshot()).toMatchObject({ matchType: 'hanchan', round: 1 })
+    expect(bridge.snapshot()).toMatchObject({ matchType: 'rounds8', matchName: '8 局', round: 1, roundLabel: '第 1 局' })
     expect(bridge.snapshot().players).toHaveLength(4)
     bridge.backToLobby()
     const state = bridge.snapshot()

@@ -23,7 +23,7 @@ export function advanceMatchState({ round, dealer, honba, matchType, result, pla
   const dealerKeepsSeat = (!result.draw && result.winnerIndex === dealer)
     || (result.draw && result.dealerTenpai)
   const next = dealerKeepsSeat
-    ? { round, dealer, honba: honba + 1 }
+    ? { round: matchType.startsWith('rounds') ? round + 1 : round, dealer, honba: honba + 1 }
     : { round: round + 1, dealer: (dealer + 1) % playerCount, honba: 0 }
   return {
     ...next,

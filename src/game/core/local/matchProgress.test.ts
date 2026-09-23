@@ -42,3 +42,15 @@ describe('场次推进', () => {
     })
   })
 })
+
+
+it.each([['rounds4', 4], ['rounds8', 8], ['rounds16', 16]] as const)('%s counts every completed hand, including dealer repeats and draws', (matchType, rounds) => {
+  for (const result of [{ winnerIndex: 0 }, { winnerIndex: 2 }, { draw: true, dealerTenpai: true }, { draw: true, dealerTenpai: false }]) {
+    for (let round = 1; round <= rounds; round++) {
+      const next = advanceMatchState({ ...base, matchType, round, result })
+      expect(next.round).toBe(round + 1)
+      expect(next.finished).toBe(round === rounds)
+      expect(next.dealer).toBe(result.winnerIndex === 0 || result.dealerTenpai ? 0 : 1)
+    }
+  }
+})

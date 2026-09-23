@@ -7,8 +7,8 @@ export const PLAYER_SEED = [
   { name: '东山少爷', avatar: `${AVATAR_BASE}young-master.svg`, score: 1000 },
 ]
 
-export const MATCH_HANDS = { east: 4, hanchan: 8 } as const
-export const MATCH_NAMES = { east: '东风场', hanchan: '半庄场' } as const
+export const MATCH_HANDS = { east: 4, hanchan: 8, rounds4: 4, rounds8: 8, rounds16: 16 } as const
+export const MATCH_NAMES = { east: '东风场', hanchan: '半庄场', rounds4: '4 局', rounds8: '8 局', rounds16: '16 局' } as const
 
 // 视觉节奏延迟（非 AI 思考，用于动作动画展示与牌桌节奏）。
 export const PACE_MS = {

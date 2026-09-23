@@ -10,6 +10,7 @@ function player(seat = 0) {
 function tableForUpdate() {
   const table = Object.create(ThreeTable.prototype)
   Object.assign(table, {
+    camera: new THREE.PerspectiveCamera(), system: { windowWidth: 844, windowHeight: 390 },
     disposed: false, loaded: true, props: miniTableProps(), signature: '', machineSignature: '',
     browserTable: { updateMachineTexture: vi.fn() },
     tableTiles: { rebuild: vi.fn() }, clearDynamicScene: vi.fn(),

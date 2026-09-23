@@ -3,7 +3,7 @@ import { MiniHud } from '../src/hud.js'
 
 function makeHud() {
   const gradient = { addColorStop() {} }
-  const ctx = new Proxy({ measureText: text => ({ width: text.length * 7 }), createLinearGradient: () => gradient,
+  const ctx = new Proxy({ fillText: vi.fn(), measureText: text => ({ width: text.length * 7 }), createLinearGradient: () => gradient,
     createRadialGradient: () => gradient }, { get: (target, key) => target[key] ?? (() => {}) })
   const canvas = { getContext: () => ctx }, onAction = vi.fn(), onInvalidate = vi.fn()
   const hud = new MiniHud({ createCanvas: () => canvas, createImage: () => ({}), onAction, onInvalidate })
@@ -75,7 +75,7 @@ describe('native HUD interaction', () => {
 
   it('shows joinable rooms in the lobby and exposes room sharing after joining', () => {
     const { hud, onAction } = makeHud()
-    hud.update({ ...turn, phase: 'lobby', screen: 'lobby', identity: { nickname: '小明', displayId: '12345678' },
+    hud.update({ ...turn, phase: 'lobby', screen: 'lobby', lobbyPage: 'online', identity: { nickname: '小明', displayId: '12345678' },
       roomList: [
         { roomId: 'ABC234', mode: 'east', rulesetId: 'wuhan-huanghuang', occupied: 2, capacity: 4 },
         { roomId: 'DEF567', mode: 'hanchan', rulesetId: 'wuhan-huanghuang', occupied: 1, capacity: 4 },
@@ -94,7 +94,7 @@ describe('native HUD interaction', () => {
 
   it('offers a confirmed exit for a saved online room from the home lobby', () => {
     const { hud, onAction } = makeHud()
-    hud.update({ ...turn, phase: 'lobby', screen: 'lobby', canResume: true,
+    hud.update({ ...turn, phase: 'lobby', screen: 'lobby', lobbyPage: 'online', canResume: true,
       identity: { nickname: '小明', displayId: '12345678' }, roomList: [], onlineBusy: false })
     expect(hud.hitRegions.some(hit => hit.action.type === 'create-room')).toBe(false)
     expect(hud.hitRegions.some(hit => hit.action.type === 'join-room')).toBe(false)
@@ -111,11 +111,15 @@ describe('native HUD interaction', () => {
     const roomList = ['ABC234', 'DEF567', 'GHJ789', 'KLM234'].map((roomId, index) => ({
       roomId, mode: index % 2 ? 'hanchan' : 'east', rulesetId: 'wuhan-huanghuang', occupied: index + 1, capacity: 4,
     }))
-    hud.update({ ...turn, phase: 'lobby', screen: 'lobby', identity: { nickname: '小明', displayId: '12345678' }, roomList })
+    hud.update({ ...turn, phase: 'lobby', screen: 'lobby', lobbyPage: 'online', identity: { nickname: '小明', displayId: '12345678' }, roomList })
     const rooms = hud.hitRegions.filter(hit => hit.action.type === 'join-listed-room')
+    expect(rooms).toHaveLength(4)
+    expect(Math.max(...rooms.map(hit => hit.y + hit.h))).toBeLessThan(320)
+    expect(hud.hitRegions.some(hit => hit.action.type === 'start')).toBe(false)
+    hud.update({ phase: 'lobby', lobbyPage: 'local', selectedMatch: 'rounds4' })
     const matches = hud.hitRegions.filter(hit => hit.action.type === 'match')
+    expect(matches.map(hit => hit.action.value)).toEqual(['rounds4', 'rounds8', 'rounds16'])
     const start = hud.hitRegions.find(hit => hit.action.type === 'start')
-    expect(Math.max(...rooms.map(hit => hit.y + hit.h))).toBeLessThan(Math.min(...matches.map(hit => hit.y)))
     expect(Math.max(...matches.map(hit => hit.y + hit.h))).toBeLessThan(start.y)
   })
 
@@ -163,4 +167,36 @@ describe('native HUD interaction', () => {
       safeArea: { left: 47, right: 797, top: 0, bottom: 369 } })
     expect(hud.safe).toEqual({ left: 47, right: 47, top: 0, bottom: 21 })
   })
+})
+
+
+it('opens the native login target directly from the mode chooser and creates the selected room length', () => {
+  const { hud, onAction } = makeHud()
+  hud.update({ phase: 'lobby', lobbyPage: 'modes' })
+  expect(hud.hitRegions.some(hit => hit.action.type === 'start')).toBe(false)
+  tap(hud, hud.hitRegions.find(hit => hit.action.type === 'login'))
+  expect(onAction).toHaveBeenLastCalledWith({ type: 'login' })
+  hud.update({ phase: 'lobby', lobbyPage: 'online', identity: { nickname: '小明', displayId: 'ABCD' } })
+  tap(hud, hud.hitRegions.find(hit => hit.action.local === 'create-room'))
+  tap(hud, hud.hitRegions.find(hit => hit.action.value === 'rounds16'))
+  tap(hud, hud.hitRegions.find(hit => hit.action.type === 'create-room'))
+  expect(onAction).toHaveBeenLastCalledWith({ type: 'create-room', matchType: 'rounds16' })
+})
+
+it.each([[667, 320], [844, 390], [1128, 532], [1024, 768]])('keeps seats and header controls outside the tile viewport at %s × %s', (width, height) => {
+  const { hud } = makeHud()
+  const menu = { left: width - 130, right: width - 12, top: 10, bottom: 42 }
+  hud.resize({ windowWidth: width, windowHeight: height, safeArea: { left: 40, right: width - 40, top: 0, bottom: height - 20 }, menuButton: menu })
+  const seats = vi.spyOn(hud, 'drawSeat')
+  hud.ctx.fillText.mockClear()
+  hud.update({ ...turn, matchType: 'rounds16', round: 9, online: { roomId: 'ABC234', status: 'connected' } })
+  const b = hud.layout.board
+  const intersects = (x, y, w, h) => x < b.x + b.w && x + w > b.x && y < b.y + b.h && y + h > b.y
+  for (const [, , x, y, w, h] of seats.mock.calls) expect(intersects(x, y, w, h)).toBe(false)
+  for (const hit of hud.hitRegions) {
+    expect(intersects(hit.x, hit.y, hit.w, hit.h)).toBe(false)
+    expect(hit.x < menu.right && hit.x + hit.w > menu.left && hit.y < menu.bottom && hit.y + hit.h > menu.top).toBe(false)
+  }
+  for (const player of players) expect(hud.ctx.fillText.mock.calls.filter(call => call[0] === player.name)).toHaveLength(1)
+  expect(hud.ctx.fillText.mock.calls.some(call => /东风场|半庄场/.test(call[0]))).toBe(false)
 })

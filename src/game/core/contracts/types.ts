@@ -3,7 +3,7 @@ export type Rank = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9
 export type SuitedTile = `${Suit}${Rank}`
 export type HonorTile = 'east' | 'south' | 'west' | 'north' | 'red' | 'green' | 'white'
 export type TileType = SuitedTile | HonorTile
-export type MatchType = 'east' | 'hanchan'
+export type MatchType = 'east' | 'hanchan' | 'rounds4' | 'rounds8' | 'rounds16'
 
 export interface Meld {
   type: 'peng' | 'gang' | 'angang' | 'flower' | 'chi'
