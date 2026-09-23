@@ -199,13 +199,17 @@ export function createMiniGame(options: MiniGameOptions = {}) {
     generation += 1; cancelStart?.(); cancelStart = null
     clearAutoTimer(); clearCountdown(); decisionKey = ''; submittedKey = ''; seconds = 0
     scope?.stop(); scope = null
-    if (online) {
+    const current = port as (ReturnType<typeof useRemoteGame> & { remoteActions?: ReturnType<typeof useRemoteGame>['remoteActions'] }) | undefined
+    // A failed remote-engine construction can leave `online` true while `port`
+    // still points at the local engine. Detect the actual port capability so
+    // cleanup never masks the original connection error with stopPolling.
+    if (current?.remoteActions) {
       const savedSession = disposed ? createRemoteSessionStore().loadSession() : null
-      remote().remoteActions.stopPolling()
-      remote().remoteActions.clearSession()
-      remote().startGame()
+      current.remoteActions.stopPolling()
+      current.remoteActions.clearSession()
+      current.startGame()
       if (savedSession) createRemoteSessionStore().saveSession(savedSession)
-    } else port?.returnToLobby()
+    } else current?.returnToLobby?.()
   }
   function build() {
     const epoch = generation
@@ -297,7 +301,11 @@ export function createMiniGame(options: MiniGameOptions = {}) {
     try {
       if (roomId) await remote().remoteActions.joinRoom(roomId)
       else await remote().remoteActions.createRoom(match, 4, MINI_RULE_VARIANT, false)
-    } catch (error) { backToLobby(); throw error }
+    } catch (error) {
+      const message = remote().sessionError?.value || (error instanceof Error ? error.message : '联机房间连接失败')
+      backToLobby()
+      throw new Error(message)
+    }
     emit()
   }
   async function resumeOnline(profile: typeof identity) {
