@@ -1,5 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createRemoteGameState } from './remoteGameState'
+
+afterEach(() => vi.unstubAllGlobals())
 
 describe('remoteGameState', () => {
   it('建立隔离的会话与对局初始状态', () => {
@@ -26,5 +28,12 @@ describe('remoteGameState', () => {
     const state = createRemoteGameState({ storedSession })
 
     expect(state.storedSession.value).toEqual(storedSession)
+  })
+
+  it('微信小游戏缺少 URLSearchParams 时仍可初始化联机状态', () => {
+    vi.stubGlobal('location', { search: '?auto=1&from=wechat' })
+    vi.stubGlobal('URLSearchParams', undefined)
+
+    expect(createRemoteGameState().autoPlay.value).toBe(true)
   })
 })

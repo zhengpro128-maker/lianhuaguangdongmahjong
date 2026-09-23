@@ -23,7 +23,7 @@ export interface RemoteGameStateOptions {
 
 function autoPlayFromUrl(): boolean {
   return typeof location !== 'undefined'
-    && new URLSearchParams(location.search).get('auto') === '1'
+    && /(?:^|[?&])auto=1(?:&|$)/.test(location.search)
 }
 
 export function createRemoteGameState(options: RemoteGameStateOptions = {}) {
