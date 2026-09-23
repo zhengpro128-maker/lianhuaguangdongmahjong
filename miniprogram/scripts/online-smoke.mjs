@@ -52,7 +52,7 @@ try {
     };
     wx.connectSocket = () => ({ onOpen: fn => setTimeout(fn, 1), onMessage: fn => setTimeout(() => fn({ data: JSON.stringify({ kind: 'rejoin_ok', roomId: 'ABC234', seat: 0, mode: window.createdModes.at(-1), nickname: '微信测试玩家', rejoinCode: 'test-rejoin', rejoin: false }) }), 5), onClose() {}, onError() {}, send() {}, close() {} });
   ` }))
-  await page.route('https://mini.test/avatar.png', route => route.fulfill({ path: new URL('../assets/avatars/lotus.png', import.meta.url).pathname }))
+  await page.route('https://mini.test/avatar.png', route => route.fulfill({ path: new URL('../assets/avatars/lotus.png', import.meta.url).pathname, headers: { 'access-control-allow-origin': '*' } }))
   await page.goto(`http://127.0.0.1:${server.address().port}/?test`)
   await page.waitForFunction(() => window.mini?.table.loaded)
   const tap = async filter => {
@@ -86,6 +86,9 @@ try {
   await tap({ type: 'start' })
   await page.waitForFunction(() => window.mini.snapshot().isUserTurn)
   await page.waitForFunction(() => window.mini.hud.state.isUserTurn && window.mini.hud.handHits.length === 14 && [...window.mini.hud.images.values()].every(image => image.ready || image.failed))
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+  // A cross-origin avatar must not taint the preview HUD and freeze WebGL uploads.
+  assert.equal(await page.evaluate(() => window.mini.hud.canvas.toDataURL().startsWith('data:image/png')), true)
   await page.screenshot({ path: 'docs/evidence/miniprogram/mini-table-safe-area.png' })
   await page.evaluate(() => window.mini.dispose())
   assert.deepEqual(errors, [])
