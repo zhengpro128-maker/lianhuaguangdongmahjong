@@ -76,6 +76,14 @@ describe('WeChat runtime lifecycle and gestures', () => {
     expect(capture.table.render).toHaveBeenCalledTimes(1)
   })
 
+  it('allows a saved online room to be released before logging in again', async () => {
+    app = bootMiniGame(wxApi)
+    await app.dispatch({ type: 'leave-room' })
+    expect(capture.game.leaveOnline).toHaveBeenCalledOnce()
+    expect(wxApi.showToast).toHaveBeenCalledWith({ title: '已退出联机房间', icon: 'success' })
+    expect(wxApi.showModal).not.toHaveBeenCalledWith(expect.objectContaining({ title: '联机提示' }))
+  })
+
   it('routes complete taps and upward drags to the HUD', () => {
     app = bootMiniGame(wxApi)
     callbacks.TouchStart(event(touch(1, 100, 300)))

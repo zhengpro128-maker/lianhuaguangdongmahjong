@@ -149,29 +149,32 @@ export function bootMiniGame(wxApi = globalThis.wx) {
         }
       }
       else {
-        if (!auth.identity) throw new Error('请先点击微信登录，授权头像昵称后再进入联机房间')
-        if (action.type === 'create-room') await game.enterOnline(auth.identity, undefined, settings.matchType)
-        if (action.type === 'join-listed-room') {
-          await game.enterOnline(auth.identity, action.roomId)
-          if (pendingInviteRoom === action.roomId) pendingInviteRoom = ''
-        }
-        if (action.type === 'join-room') {
-          const result = await new Promise(resolve => wxApi.showModal({ title: '加入房间', editable: true,
-            placeholderText: '输入 6 位房间号', success: resolve, fail: () => resolve({ confirm: false }) }))
-          if (result.confirm) {
-            const code = (result.content || '').trim().toUpperCase()
-            if (!/^[A-Z2-9]{6}$/.test(code)) throw new Error('请输入正确的 6 位房间号')
-            await game.enterOnline(auth.identity, code)
-          }
-        }
-        if (action.type === 'resume-room') await game.resumeOnline(auth.identity)
-        if (action.type === 'ready-room') await game.readyOnline()
-        if (action.type === 'start-room') await game.startOnline()
         if (action.type === 'leave-room') {
+          // A saved room can be released before the player logs in again. The
+          // room seat is authenticated by its persisted rejoin code.
           await game.leaveOnline()
           loginStatus = auth.identity ? `已登录：${auth.identity.nickname} · 编号 ${auth.identity.displayId}` : ''
-          await refreshRooms()
+          if (auth.identity) await refreshRooms()
           wxApi.showToast?.({ title: '已退出联机房间', icon: 'success' })
+        } else {
+          if (!auth.identity) throw new Error('请先点击微信登录，授权头像昵称后再进入联机房间')
+          if (action.type === 'create-room') await game.enterOnline(auth.identity, undefined, settings.matchType)
+          if (action.type === 'join-listed-room') {
+            await game.enterOnline(auth.identity, action.roomId)
+            if (pendingInviteRoom === action.roomId) pendingInviteRoom = ''
+          }
+          if (action.type === 'join-room') {
+            const result = await new Promise(resolve => wxApi.showModal({ title: '加入房间', editable: true,
+              placeholderText: '输入 6 位房间号', success: resolve, fail: () => resolve({ confirm: false }) }))
+            if (result.confirm) {
+              const code = (result.content || '').trim().toUpperCase()
+              if (!/^[A-Z2-9]{6}$/.test(code)) throw new Error('请输入正确的 6 位房间号')
+              await game.enterOnline(auth.identity, code)
+            }
+          }
+          if (action.type === 'resume-room') await game.resumeOnline(auth.identity)
+          if (action.type === 'ready-room') await game.readyOnline()
+          if (action.type === 'start-room') await game.startOnline()
         }
       }
     } catch (error) { loginStatus = error?.message || error?.errMsg || '连接失败，请重试'; wxApi.hideLoading?.(); wxApi.showModal?.({ title: '联机提示', content: error?.message || error?.errMsg || '网络连接失败，请重试', showCancel: false }) }
