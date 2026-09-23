@@ -5,6 +5,7 @@ import { createMiniGame } from './game-bridge.ts'
 import { ThreeTable } from './three-table.js'
 import { MiniHud } from './hud.js'
 import { createMiniAudio } from './audio.js'
+import { getJoinableRooms } from '../../src/game/online/api/roomApi.ts'
 
 const SETTINGS_KEY = 'wuhan-mini.settings.v1'
 export function windowInfo(wxApi) {
@@ -22,7 +23,15 @@ export function bootMiniGame(wxApi = globalThis.wx) {
   installMiniGamePlatform(wxApi)
   const auth = createWechatAuth(wxApi)
   installWechatNetwork(wxApi, () => auth.identity?.sessionToken || '')
-  let loginButton = null, onlineBusy = false, loginStatus = ''
+  const sharedRoomId = options => {
+    const value = options?.query?.room || options?.query?.roomId || ''
+    const roomId = String(value).trim().toUpperCase()
+    return /^[A-Z2-9]{6}$/.test(roomId) ? roomId : ''
+  }
+  let pendingInviteRoom = sharedRoomId(wxApi.getLaunchOptionsSync?.())
+  let loginButton = null, onlineBusy = false
+  let loginStatus = pendingInviteRoom ? `好友邀请你加入房间 ${pendingInviteRoom}，请先微信登录` : ''
+  let roomList = [], roomListLoading = false, roomListError = ''
   let saved = {}
   try { saved = wxApi.getStorageSync(SETTINGS_KEY) || {} } catch { /* storage unavailable */ }
   const settings = { ruleVariant: 'wuhan-huanghuang', matchType: saved.matchType === 'hanchan' ? 'hanchan' : 'east' }
@@ -32,6 +41,7 @@ export function bootMiniGame(wxApi = globalThis.wx) {
   let game, hud, table
   let visible = true, disposed = false, dirty = true, overlayDirty = true
   let frame = null, touchStart = null, starting = false, lastFrame = 0, loadError = ''
+  let roomPollTimer = null
   const requestFrame = canvas.requestAnimationFrame?.bind(canvas)
     ?? globalThis.requestAnimationFrame?.bind(globalThis)
     ?? (callback => setTimeout(() => callback(Date.now()), 33))
@@ -45,9 +55,29 @@ export function bootMiniGame(wxApi = globalThis.wx) {
     const state = game.snapshot()
     return { ...state, screen: state.phase === 'lobby' ? 'lobby' : 'game',
       identity: auth.identity ? { nickname: auth.identity.nickname, avatarUrl: auth.identity.avatarUrl, displayId: auth.identity.displayId } : null, onlineBusy, loginStatus, settings, selectedRule: 'wuhan-huanghuang', selectedMatch: settings.matchType,
-      themeName: 'jade', soundEnabled, loading: starting, loadError }
+      themeName: 'jade', soundEnabled, loading: starting, loadError,
+      roomList, roomListLoading, roomListError, invitedRoomId: pendingInviteRoom }
   }
   function invalidate() { dirty = true }
+  async function refreshRooms() {
+    if (disposed || !visible || !auth.identity || roomListLoading || game.snapshot().online?.roomId) return
+    roomListLoading = true; roomListError = ''; invalidate()
+    try {
+      const result = await getJoinableRooms()
+      roomList = (Array.isArray(result?.rooms) ? result.rooms : [])
+        .filter(room => room?.rulesetId === 'wuhan-huanghuang')
+        .slice(0, 4)
+    } catch (error) {
+      roomListError = error?.message || '房间列表加载失败'
+    } finally {
+      roomListLoading = false; invalidate()
+    }
+  }
+  function sharePayload() {
+    const roomId = game.snapshot().online?.roomId
+    return roomId ? { title: `武汉晃晃 · 房间 ${roomId}，点击直接加入`, query: `room=${encodeURIComponent(roomId)}` }
+      : { title: '武汉晃晃 · 四人同桌', query: '' }
+  }
   function draw(time = 0) {
     frame = null
     if (disposed || !visible) return
@@ -107,12 +137,24 @@ export function bootMiniGame(wxApi = globalThis.wx) {
         const user = await auth.authorize(action.profile)
         game.setProfile(user)
         loginStatus = `已登录：${user.nickname} · 编号 ${user.displayId}`
-        wxApi.hideLoading?.()
-        wxApi.showModal?.({ title: '微信登录成功', content: `玩家编号：${user.displayId}\n昵称：${user.nickname}\n${user.avatarUrl ? '已获取头像' : '身份登录已完成。点击大厅的头像昵称按钮可单独申请资料授权。'}`, showCancel: false })
+        const invitedRoom = pendingInviteRoom
+        if (invitedRoom) {
+          pendingInviteRoom = ''
+          await game.enterOnline(auth.identity, invitedRoom)
+          wxApi.showToast?.({ title: `已加入房间 ${invitedRoom}`, icon: 'success' })
+        } else {
+          await refreshRooms()
+          wxApi.hideLoading?.()
+          wxApi.showModal?.({ title: '微信登录成功', content: `玩家编号：${user.displayId}\n昵称：${user.nickname}\n已获取头像，可直接选择大厅房间加入。`, showCancel: false })
+        }
       }
       else {
         if (!auth.identity) throw new Error('请先点击微信登录，授权头像昵称后再进入联机房间')
         if (action.type === 'create-room') await game.enterOnline(auth.identity, undefined, settings.matchType)
+        if (action.type === 'join-listed-room') {
+          await game.enterOnline(auth.identity, action.roomId)
+          if (pendingInviteRoom === action.roomId) pendingInviteRoom = ''
+        }
         if (action.type === 'join-room') {
           const result = await new Promise(resolve => wxApi.showModal({ title: '加入房间', editable: true,
             placeholderText: '输入 6 位房间号', success: resolve, fail: () => resolve({ confirm: false }) }))
@@ -128,6 +170,7 @@ export function bootMiniGame(wxApi = globalThis.wx) {
         if (action.type === 'leave-room') {
           await game.leaveOnline()
           loginStatus = auth.identity ? `已登录：${auth.identity.nickname} · 编号 ${auth.identity.displayId}` : ''
+          await refreshRooms()
           wxApi.showToast?.({ title: '已退出联机房间', icon: 'success' })
         }
       }
@@ -136,8 +179,13 @@ export function bootMiniGame(wxApi = globalThis.wx) {
   }
   async function act(action) {
     if (disposed) return
-    if (['login', 'create-room', 'join-room', 'ready-room', 'start-room', 'leave-room', 'resume-room'].includes(action.type)) return onlineAction(action)
+    if (['login', 'create-room', 'join-room', 'join-listed-room', 'ready-room', 'start-room', 'leave-room', 'resume-room'].includes(action.type)) return onlineAction(action)
     switch (action.type) {
+      case 'refresh-rooms': await refreshRooms(); break
+      case 'share-room':
+        if (wxApi.shareAppMessage) wxApi.shareAppMessage(sharePayload())
+        else wxApi.showModal?.({ title: '分享房间', content: '请点击右上角菜单，将当前房间分享给微信好友。', showCancel: false })
+        break
       case 'start':
         if (starting) return
         starting = true; invalidate()
@@ -214,11 +262,17 @@ export function bootMiniGame(wxApi = globalThis.wx) {
     hud.resize(system); table.resize(system)
     overlayDirty = true; invalidate()
   }
-  const onShow = () => {
+  const onShow = options => {
     if (disposed) return
     loginButton?.show()
     visible = true; lastFrame = 0
     audio.setHidden(false); game.resume?.(); onResize()
+    const invitedRoom = sharedRoomId(options)
+    if (invitedRoom) {
+      pendingInviteRoom = invitedRoom
+      if (auth.identity && !game.snapshot().online?.roomId) void performOnline({ type: 'join-listed-room', roomId: invitedRoom })
+      else if (!auth.identity) loginStatus = `好友邀请你加入房间 ${invitedRoom}，请先微信登录`
+    } else void refreshRooms()
     if (frame === null) frame = requestFrame(draw)
   }
   // Real Mini Games use wx events. DOM events are only a preview fallback.
@@ -231,15 +285,21 @@ export function bootMiniGame(wxApi = globalThis.wx) {
     canvas.addEventListener('touchcancel', onTouchCancel)
   }
   wxApi.onHide?.(onHide); wxApi.onShow?.(onShow); wxApi.onWindowResize?.(onResize)
+  wxApi.showShareMenu?.({ menus: ['shareAppMessage'] })
+  const onShareAppMessage = () => sharePayload()
+  wxApi.onShareAppMessage?.(onShareAppMessage)
   wxApi.setKeepScreenOn?.({ keepScreenOn: true })
+  roomPollTimer = setInterval(() => void refreshRooms(), 5000)
   frame = requestFrame(draw)
   return { canvas, game, hud, table, snapshot, dispatch: act,
     dispose() {
       if (disposed) return
       disposed = true
       loginButton?.destroy(); loginButton = null
+      if (roomPollTimer !== null) clearInterval(roomPollTimer)
       if (frame !== null) cancelFrame(frame)
       wxApi.offHide?.(onHide); wxApi.offShow?.(onShow); wxApi.offWindowResize?.(onResize)
+      wxApi.offShareAppMessage?.(onShareAppMessage)
       if (useWxTouches) {
         wxApi.offTouchStart?.(onTouchStart); wxApi.offTouchEnd?.(onTouchEnd); wxApi.offTouchCancel?.(onTouchCancel)
       } else {

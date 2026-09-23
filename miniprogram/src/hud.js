@@ -178,23 +178,41 @@ export class MiniHud {
     const panelY = contentTop + 3, panelH = Math.min(bodyH - 8, 392)
     this.box(panelX, panelY, panelW, panelH, 'rgba(8,29,20,.85)', 'rgba(185,146,73,.3)', 15)
     const pad = clamp(panelW * .055, 14, 22), innerX = panelX + pad, innerW = panelW - pad * 2
+    const compactLobby = panelH < 270
     const onlineY = Math.max(8, this.safe.top + 3), onlineX = left + 245
     ;[['login', this.state.identity?.nickname || '微信登录'], ['create-room', '创建房间'], ['join-room', '加入房间']].forEach(([type, label], i) => {
       this.button(onlineX + i * 90, onlineY, 84, 32, label, { type }, { small: true, disabled: this.state.onlineBusy })
     })
-    this.text('单机对战', innerX, panelY + 25, 18, PALETTE.accent, 'left', 'bold')
-    this.text('与 AI 同桌', panelX + panelW - pad, panelY + 25, 11, PALETTE.textMuted, 'right')
-    this.text('选择场次', innerX, panelY + 60, 11, PALETTE.textMuted)
+    this.text('联机房间', innerX, panelY + 24, 17, PALETTE.accent, 'left', 'bold')
+    this.button(panelX + panelW - pad - 58, panelY + 7, 58, 28, this.state.roomListLoading ? '刷新中' : '刷新', { type: 'refresh-rooms' }, { small: true, disabled: !this.state.identity || this.state.roomListLoading })
+    const rooms = this.state.roomList || [], listY = panelY + 42, listGap = 7, roomW = (innerW - listGap) / 2
+    if (!this.state.identity) {
+      this.box(innerX, listY, innerW, 56, PALETTE.panelElevated, 'rgba(185,146,73,.2)', 8)
+      this.text(this.state.invitedRoomId ? `好友邀请房间 ${this.state.invitedRoomId}` : '登录后可查看并直接加入房间', innerX + innerW / 2, listY + 21, 12, PALETTE.text, 'center', 'bold')
+      this.text('点击上方“微信登录”完成授权', innerX + innerW / 2, listY + 42, 10, PALETTE.textMuted, 'center')
+    } else if (rooms.length) {
+      rooms.slice(0, 4).forEach((room, index) => {
+        const roomH = compactLobby ? 30 : 36
+        const x = innerX + (index % 2) * (roomW + listGap), y = listY + Math.floor(index / 2) * (roomH + 7)
+        const mode = room.mode === 'hanchan' ? '半庄' : '东风'
+        this.button(x, y, roomW, roomH, compactLobby ? `${room.roomId} · ${room.occupied}/${room.capacity} · ${mode}` : `${room.roomId} · ${mode}`,
+          { type: 'join-listed-room', roomId: room.roomId }, { small: true, subtitle: compactLobby ? undefined : `${room.occupied}/${room.capacity} 人 · 点击加入`, disabled: this.state.onlineBusy })
+      })
+    } else {
+      this.box(innerX, listY, innerW, 56, PALETTE.panelElevated, 'rgba(185,146,73,.2)', 8)
+      this.text(this.state.roomListLoading ? '正在获取房间…' : this.state.roomListError ? '房间列表加载失败' : '暂时没有可加入的房间', innerX + innerW / 2, listY + 23, 12, PALETTE.text, 'center', 'bold')
+      this.text(this.state.roomListError || '你可以创建一个新房间邀请好友', innerX + innerW / 2, listY + 43, 9, this.state.roomListError ? PALETTE.negative : PALETTE.textMuted, 'center', 'normal', innerW - 20)
+    }
+    const localY = panelY + (compactLobby ? 116 : 139)
+    this.text('单机对战', innerX, localY, 13, PALETTE.accent, 'left', 'bold')
+    this.text('与 AI 同桌', panelX + panelW - pad, localY, 10, PALETTE.textMuted, 'right')
     const match = this.state.selectedMatch || this.state.settings?.matchType || 'east', gap = 9
-    this.button(innerX, panelY + 76, (innerW - gap) / 2, 49, '东风场', { type: 'match', value: 'east' }, { active: match === 'east', subtitle: '一场 4 局' })
-    this.button(innerX + (innerW + gap) / 2, panelY + 76, (innerW - gap) / 2, 49, '半庄场', { type: 'match', value: 'hanchan' }, { active: match === 'hanchan', subtitle: '一场 8 局' })
-    this.box(innerX, panelY + 140, innerW, 48, PALETTE.panelElevated, 'rgba(185,146,73,.2)', 8)
-    this.text('武汉晃晃', innerX + 12, panelY + 155, 14, PALETTE.text, 'left', 'bold')
-    this.text('120 张牌 · 翻癞子 · 单家 50 分封顶', innerX + 12, panelY + 174, 10, PALETTE.textMuted, 'left', 'normal', innerW - 24)
-    const startY = Math.max(panelY + 205, panelY + panelH - 78)
-    this.button(innerX, startY, innerW, 52, this.state.loading ? '正在准备牌桌…' : `开始${match === 'hanchan' ? '半庄场' : '东风场'}`, { type: 'start' }, { primary: true, subtitle: '武汉晃晃 · 四人对局', disabled: !!this.state.loading })
-    if (this.state.loadError) this.text(this.state.loadError, innerX, startY + 67, 10, PALETTE.negative, 'left', 'normal', innerW)
-    else this.text('游戏结果禁止用于赌博行为', innerX + innerW / 2, startY + 68, 9, PALETTE.textMuted, 'center')
+    const matchH = compactLobby ? 34 : 38
+    this.button(innerX, localY + 12, (innerW - gap) / 2, matchH, compactLobby ? '东风场 · 4 局' : '东风场', { type: 'match', value: 'east' }, { active: match === 'east', small: true, subtitle: compactLobby ? undefined : '4 局' })
+    this.button(innerX + (innerW + gap) / 2, localY + 12, (innerW - gap) / 2, matchH, compactLobby ? '半庄场 · 8 局' : '半庄场', { type: 'match', value: 'hanchan' }, { active: match === 'hanchan', small: true, subtitle: compactLobby ? undefined : '8 局' })
+    const startH = compactLobby ? 38 : 43, startY = panelY + panelH - startH - 14
+    this.button(innerX, startY, innerW, startH, this.state.loading ? '正在准备牌桌…' : `开始${match === 'hanchan' ? '半庄场' : '东风场'}`, { type: 'start' }, { primary: true, subtitle: '武汉晃晃 · 四人对局', disabled: !!this.state.loading })
+    if (this.state.loadError) this.text(this.state.loadError, innerX, startY - 8, 9, PALETTE.negative, 'left', 'normal', innerW)
   }
 
   drawOnlineRoom() {
@@ -213,9 +231,14 @@ export class MiniHud {
       this.text(seat ? (seat.ready ? '已准备' : '未准备') : '空座由 AI 补位', x + width / 2, h * .31 + 60, 11, PALETTE.textMuted, 'center')
     }
     const y = h - 90, busy = this.state.onlineBusy || room.status !== 'connected'
-    this.button(w / 2 - 210, y, 120, 40, '退出房间', { local: 'leave-online' }, { disabled: this.state.onlineBusy })
-    this.button(w / 2 - 60, y, 120, 40, room.seats[room.mySeat]?.ready ? '取消准备' : '准备', { type: 'ready-room' }, { disabled: busy })
-    if (room.isCreator) this.button(w / 2 + 90, y, 120, 40, '开始对局', { type: 'start-room' }, { primary: true, disabled: busy })
+    const actions = [
+      ['退出房间', { local: 'leave-online' }, { disabled: this.state.onlineBusy }],
+      ['分享邀请', { type: 'share-room' }, { disabled: this.state.onlineBusy }],
+      [room.seats[room.mySeat]?.ready ? '取消准备' : '准备', { type: 'ready-room' }, { disabled: busy }],
+      ...(room.isCreator ? [['开始对局', { type: 'start-room' }, { primary: true, disabled: busy }]] : []),
+    ]
+    const buttonW = 112, buttonGap = 16, totalW = actions.length * buttonW + (actions.length - 1) * buttonGap
+    actions.forEach(([label, action, options], index) => this.button(w / 2 - totalW / 2 + index * (buttonW + buttonGap), y, buttonW, 40, label, action, options))
     if (room.error) this.text(room.error, w / 2, h - 26, 12, PALETTE.negative, 'center')
   }
 
