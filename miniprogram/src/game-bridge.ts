@@ -314,6 +314,26 @@ export function createMiniGame(options: MiniGameOptions = {}) {
     emit()
   }
   async function leaveOnline() {
+    if (!online && createRemoteSessionStore().loadSession()) {
+      // A cold launch starts with the local engine even though the player still
+      // owns a remote seat. Reconnect first so the server can release that seat;
+      // merely deleting local storage would keep create/join blocked.
+      release(); online = true; build()
+      await remote().remoteActions.resumeSession()
+      if (remote().mySeat.value < 0 && remote().roomId.value) {
+        await new Promise<void>((resolve, reject) => {
+          const started = Date.now()
+          const timer = setInterval(() => {
+            const error = remote().sessionError.value
+            if (remote().mySeat.value >= 0 || !remote().roomId.value) {
+              clearInterval(timer); resolve()
+            } else if (error || Date.now() - started >= 5000) {
+              clearInterval(timer); reject(new Error(error || '连接当前房间超时，请检查网络后重试'))
+            }
+          }, 50)
+        })
+      }
+    }
     if (online) await remote().remoteActions.leaveRoom()
     backToLobby()
   }

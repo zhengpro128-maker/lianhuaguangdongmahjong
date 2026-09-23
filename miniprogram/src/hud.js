@@ -173,15 +173,18 @@ export class MiniHud {
     this.image('assets/themes/lobby/v1/jade.png', left, previewY, previewW, previewH)
     ctx.restore(); this.box(left, previewY, previewW, previewH, null, 'rgba(185,146,73,.5)', 12)
     this.text('默认墨玉', left, previewY + previewH + 20, 13, PALETTE.text, 'left', 'bold')
-    if (this.state.canResume) this.button(left, previewY + previewH + 35, previewW, 32, '重进联机房间', { type: 'resume-room' }, { small: true, disabled: this.state.onlineBusy })
+    if (this.state.canResume) this.text('你仍在一个联机房间中', left, previewY + previewH + 40, 10, PALETTE.accentSecondary)
     else this.text('深色玉石 · 克制金属高光', left, previewY + previewH + 40, 10, PALETTE.textMuted)
     const panelY = contentTop + 3, panelH = Math.min(bodyH - 8, 392)
     this.box(panelX, panelY, panelW, panelH, 'rgba(8,29,20,.85)', 'rgba(185,146,73,.3)', 15)
     const pad = clamp(panelW * .055, 14, 22), innerX = panelX + pad, innerW = panelW - pad * 2
     const compactLobby = panelH < 270
     const onlineY = Math.max(8, this.safe.top + 3), onlineX = left + 245
-    ;[['login', this.state.identity?.nickname || '微信登录'], ['create-room', '创建房间'], ['join-room', '加入房间']].forEach(([type, label], i) => {
-      this.button(onlineX + i * 90, onlineY, 84, 32, label, { type }, { small: true, disabled: this.state.onlineBusy })
+    const onlineActions = this.state.canResume
+      ? [['login', this.state.identity?.nickname || '微信登录'], ['resume-room', '重进房间'], ['leave-saved-room', '退出当前房间']]
+      : [['login', this.state.identity?.nickname || '微信登录'], ['create-room', '创建房间'], ['join-room', '加入房间']]
+    onlineActions.forEach(([type, label], i) => {
+      this.button(onlineX + i * 90, onlineY, 84, 32, label, type === 'leave-saved-room' ? { local: 'leave-saved-online' } : { type }, { small: true, disabled: this.state.onlineBusy })
     })
     this.text('联机房间', innerX, panelY + 24, 17, PALETTE.accent, 'left', 'bold')
     this.button(panelX + panelW - pad - 58, panelY + 7, 58, 28, this.state.roomListLoading ? '刷新中' : '刷新', { type: 'refresh-rooms' }, { small: true, disabled: !this.state.identity || this.state.roomListLoading })
@@ -439,9 +442,9 @@ export class MiniHud {
       this.text('当前对局将结束，确定返回大厅？', b.x + b.w / 2, b.y + 88, 14, PALETTE.text, 'center')
       this.button(b.x + 24, b.y + b.h - 66, (b.w - 60) / 2, 42, '继续对局', { local: 'close' })
       this.button(b.x + b.w / 2 + 6, b.y + b.h - 66, (b.w - 60) / 2, 42, '返回大厅', { type: 'lobby' }, { primary: true })
-    } else if (this.modal === 'leave-online') {
+    } else if (this.modal === 'leave-online' || this.modal === 'leave-saved-online') {
       const b = this.modalShell('退出联机', 440, 224)
-      const playing = this.state.phase !== 'lobby'
+      const playing = this.modal === 'leave-online' && this.state.phase !== 'lobby'
       this.text(playing ? '确定退出当前联机对局？' : '确定退出当前联机房间？', b.x + b.w / 2, b.y + 82, 15, PALETTE.text, 'center', 'bold')
       this.text(playing ? '退出后将释放座位，本局由 AI 接管。' : '退出后将释放座位，并返回游戏大厅。', b.x + b.w / 2, b.y + 115, 12, PALETTE.textMuted, 'center')
       this.button(b.x + 24, b.y + b.h - 66, (b.w - 60) / 2, 42, '继续游戏', { local: 'close' })
@@ -538,6 +541,7 @@ export class MiniHud {
         case 'rule-next': this.rulePage++; break
         case 'leave': this.modal = 'leave'; break
         case 'leave-online': this.modal = 'leave-online'; break
+        case 'leave-saved-online': this.modal = 'leave-saved-online'; break
         case 'hint': this.modal = 'hint'; break
         case 'chi': this.modal = 'chi'; break
         case 'hide-result': this.hiddenResult = this.resultKey(); break

@@ -92,6 +92,19 @@ describe('native HUD interaction', () => {
     expect(onAction).toHaveBeenLastCalledWith({ type: 'share-room' })
   })
 
+  it('offers a confirmed exit for a saved online room from the home lobby', () => {
+    const { hud, onAction } = makeHud()
+    hud.update({ ...turn, phase: 'lobby', screen: 'lobby', canResume: true,
+      identity: { nickname: '小明', displayId: '12345678' }, roomList: [], onlineBusy: false })
+    expect(hud.hitRegions.some(hit => hit.action.type === 'create-room')).toBe(false)
+    expect(hud.hitRegions.some(hit => hit.action.type === 'join-room')).toBe(false)
+    expect(hud.hitRegions.some(hit => hit.action.type === 'resume-room')).toBe(true)
+    tap(hud, hud.hitRegions.find(hit => hit.action.local === 'leave-saved-online'))
+    expect(onAction).not.toHaveBeenCalled()
+    tap(hud, hud.hitRegions.find(hit => hit.action.type === 'leave-room'))
+    expect(onAction).toHaveBeenLastCalledWith({ type: 'leave-room' })
+  })
+
   it('keeps room rows and local controls separate on short landscape screens', () => {
     const { hud } = makeHud()
     hud.resize({ windowWidth: 667, windowHeight: 320, pixelRatio: 2 })
