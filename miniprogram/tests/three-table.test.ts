@@ -133,6 +133,22 @@ describe('Mini Game shared table lifecycle', () => {
     expect(table.camera.fov).toBe(39)
   })
 
+  it('keeps WebGL on the full screen when HUD state contains a legacy table layout', () => {
+    const table = tableForUpdate()
+    table.canvas = { width: 844, height: 390 }
+    table.scene = new THREE.Scene()
+    table.renderer = { setPixelRatio: vi.fn(), setSize: vi.fn(), setViewport: vi.fn(),
+      setScissor: vi.fn(), setScissorTest: vi.fn(), setClearColor: vi.fn(), clear: vi.fn(), render: vi.fn() }
+    table.tableTiles.animate = vi.fn()
+    table.resize()
+    table.update({ players: [player()], tableLayout: { board: { x: 220, y: 54, w: 400, h: 220 } } })
+    expect(table.camera.aspect).toBe(844 / 390)
+    table.render()
+    expect(table.renderer.render).toHaveBeenCalledWith(table.scene, table.camera)
+    expect(table.renderer.setScissorTest).not.toHaveBeenCalledWith(true)
+    for (const args of table.renderer.setViewport.mock.calls) expect(args).toEqual([0, 0, 844, 390])
+  })
+
   it('replaces immutable WebGL texture storage when the HUD canvas resizes', () => {
     const table = Object.create(ThreeTable.prototype)
     table.overlayScene = new THREE.Scene()
