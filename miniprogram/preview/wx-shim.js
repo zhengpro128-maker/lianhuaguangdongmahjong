@@ -23,7 +23,7 @@
       }
       return canvas
     },
-    createImage: () => new Image(),
+    createImage() { const image = new Image(); image.crossOrigin = 'anonymous'; return image },
     getWindowInfo: () => ({ windowWidth: innerWidth, windowHeight: innerHeight, pixelRatio: devicePixelRatio,
       safeArea: { left: 0, top: 0, right: innerWidth, bottom: innerHeight, width: innerWidth, height: innerHeight } }),
     getSystemInfoSync() { return this.getWindowInfo() },
