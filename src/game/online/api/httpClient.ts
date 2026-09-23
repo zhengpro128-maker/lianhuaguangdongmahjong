@@ -1,7 +1,14 @@
 // 远程 REST 基础设施：统一服务地址、JSON 编解码与错误模型。
 const PAGE_ORIGIN = typeof location !== 'undefined' ? location.origin : 'http://localhost'
+const configuredApiBase = import.meta.env.VITE_API_BASE || PAGE_ORIGIN
 
-export const API_BASE = import.meta.env.VITE_API_BASE || PAGE_ORIGIN
+// Callers pass API paths with a leading slash. Normalize a configured trailing
+// slash so `https://host/` never turns into `https://host//api/...`.
+export function normalizeApiBase(value: string) {
+  return value.replace(/\/+$/, '')
+}
+
+export const API_BASE = normalizeApiBase(configuredApiBase)
 
 export class RemoteApiError extends Error {
   code: string
