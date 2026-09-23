@@ -109,6 +109,7 @@ export function createRemoteRoomLifecycle({
     if (!state.roomId.value || !state.rejoinCode.value) return
     const session: StoredSession = {
       roomId: state.roomId.value,
+      ...(state.mySeat.value >= 0 ? { seat: state.mySeat.value } : {}),
       rejoinCode: state.rejoinCode.value,
       nickname: state.nickname.value,
       playerId: state.playerId.value,
@@ -165,13 +166,13 @@ export function createRemoteRoomLifecycle({
     state.llmAvailable.value = false
   }
 
-  async function enterRoom(id: string, name: string, mode: MatchType, code: string) {
+  async function enterRoom(id: string, name: string, mode: MatchType, code: string, seat?: number) {
     state.roomId.value = id
     state.matchType.value = mode
     state.rulesetId.value = state.rulesetId.value || 'lotus-classic'
     state.nickname.value = name
     state.rejoinCode.value = code
-    state.mySeat.value = -1
+    state.mySeat.value = Number.isInteger(seat) ? seat! : -1
     state.phase.value = 'lobby'
     state.matchFinished.value = false
     state.players.splice(0, state.players.length)
@@ -186,6 +187,7 @@ export function createRemoteRoomLifecycle({
     if (!session?.rejoinCode) return
     state.sessionError.value = ''
     state.roomId.value = session.roomId
+    state.mySeat.value = Number.isInteger(session.seat) ? session.seat! : -1
     state.rejoinCode.value = session.rejoinCode
     state.nickname.value = session.nickname
     state.playerId.value = session.playerId || state.playerId.value
@@ -213,7 +215,7 @@ export function createRemoteRoomLifecycle({
       state.llmAvailable.value = info.llmAvailable === true
       ensurePlayerId()
       const joined = await api.joinRoom(info.roomId, state.nickname.value, state.playerId.value, getCharacterId())
-      await enterRoom(joined.roomId, joined.nickname, info.mode, joined.rejoinCode)
+      await enterRoom(joined.roomId, joined.nickname, info.mode, joined.rejoinCode, joined.seat)
     } catch (error) {
       state.sessionError.value = readableError(error, '创建房间失败')
       state.sessionStatus.value = 'idle'
@@ -234,6 +236,7 @@ export function createRemoteRoomLifecycle({
         joined.nickname,
         info.mode,
         joined.rejoinCode,
+        joined.seat,
       )
     state.rulesetId.value = info.rulesetId ?? 'lotus-classic'
     } catch (error) {

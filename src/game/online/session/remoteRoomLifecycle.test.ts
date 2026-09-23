@@ -83,7 +83,7 @@ describe('remoteRoomLifecycle', () => {
     expect(harness.state.sessionStatus.value).toBe('connected')
     expect(harness.socket.open).toHaveBeenCalledOnce()
     expect(harness.sessionStore.saveSession).toHaveBeenCalledWith(expect.objectContaining({
-      roomId: 'ABC123', rejoinCode: 'AAAA-BBBB', mode: 'east',
+      roomId: 'ABC123', seat: 2, rejoinCode: 'AAAA-BBBB', mode: 'east',
     }))
     harness.lifecycle.stopPolling()
   })
@@ -127,7 +127,7 @@ describe('remoteRoomLifecycle', () => {
 
   it('resumes a persisted session without rejoining through REST', async () => {
     const saved: StoredSession = {
-      roomId: 'OLD123', rejoinCode: 'OLD-CODE', nickname: '旧玩家', playerId: 'guest-old', mode: 'hanchan',
+      roomId: 'OLD123', seat: 1, rejoinCode: 'OLD-CODE', nickname: '旧玩家', playerId: 'guest-old', mode: 'hanchan',
       rulesetId: 'lotus-legacy',
     }
     const harness = createHarness(saved)
@@ -135,6 +135,7 @@ describe('remoteRoomLifecycle', () => {
     await harness.lifecycle.resumeSession()
 
     expect(harness.state.roomId.value).toBe('OLD123')
+    expect(harness.state.mySeat.value).toBe(1)
     expect(harness.state.matchType.value).toBe('hanchan')
     expect(harness.state.sessionStatus.value).toBe('connected')
     expect(harness.socket.open).toHaveBeenCalledOnce()
