@@ -73,6 +73,39 @@ describe('native HUD interaction', () => {
     expect(onAction).toHaveBeenLastCalledWith({ type: 'leave-room' })
   })
 
+  it('shows joinable rooms in the lobby and exposes room sharing after joining', () => {
+    const { hud, onAction } = makeHud()
+    hud.update({ ...turn, phase: 'lobby', screen: 'lobby', identity: { nickname: '小明', displayId: '12345678' },
+      roomList: [
+        { roomId: 'ABC234', mode: 'east', rulesetId: 'wuhan-huanghuang', occupied: 2, capacity: 4 },
+        { roomId: 'DEF567', mode: 'hanchan', rulesetId: 'wuhan-huanghuang', occupied: 1, capacity: 4 },
+      ], onlineBusy: false })
+    const listed = hud.hitRegions.find(hit => hit.action.type === 'join-listed-room' && hit.action.roomId === 'ABC234')
+    expect(listed).toBeTruthy()
+    tap(hud, listed)
+    expect(onAction).toHaveBeenLastCalledWith({ type: 'join-listed-room', roomId: 'ABC234' })
+
+    const online = { roomId: 'ABC234', status: 'connected', mySeat: 0, isCreator: true,
+      seats: players.map((player, seat) => ({ seat, nickname: player.name, ready: seat === 0 })) }
+    hud.update({ ...turn, phase: 'lobby', screen: 'lobby', online, onlineBusy: false })
+    tap(hud, hud.hitRegions.find(hit => hit.action.type === 'share-room'))
+    expect(onAction).toHaveBeenLastCalledWith({ type: 'share-room' })
+  })
+
+  it('keeps room rows and local controls separate on short landscape screens', () => {
+    const { hud } = makeHud()
+    hud.resize({ windowWidth: 667, windowHeight: 320, pixelRatio: 2 })
+    const roomList = ['ABC234', 'DEF567', 'GHJ789', 'KLM234'].map((roomId, index) => ({
+      roomId, mode: index % 2 ? 'hanchan' : 'east', rulesetId: 'wuhan-huanghuang', occupied: index + 1, capacity: 4,
+    }))
+    hud.update({ ...turn, phase: 'lobby', screen: 'lobby', identity: { nickname: '小明', displayId: '12345678' }, roomList })
+    const rooms = hud.hitRegions.filter(hit => hit.action.type === 'join-listed-room')
+    const matches = hud.hitRegions.filter(hit => hit.action.type === 'match')
+    const start = hud.hitRegions.find(hit => hit.action.type === 'start')
+    expect(Math.max(...rooms.map(hit => hit.y + hit.h))).toBeLessThan(Math.min(...matches.map(hit => hit.y)))
+    expect(Math.max(...matches.map(hit => hit.y + hit.h))).toBeLessThan(start.y)
+  })
+
   it('presents multiple chi combinations before submitting the selected index', () => {
     const { hud, onAction } = makeHud()
     const chiOptions = [{ tiles: ['m1', 'm2', 'm3'] }, { tiles: ['m2', 'm3', 'm4'] }]

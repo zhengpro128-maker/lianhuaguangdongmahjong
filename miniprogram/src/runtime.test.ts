@@ -8,6 +8,7 @@ vi.mock('./game-bridge.ts', () => ({ createMiniGame: (options: any) => {
   const state = { phase: 'lobby', autoPlay: false }
   capture.game = { snapshot: vi.fn(() => ({ ...state })), start: vi.fn(async () => { state.phase = 'dealing'; options.onChange() }),
     setProfile: vi.fn(), selectTile: vi.fn(), discard: vi.fn(), action: vi.fn(), nextRound: vi.fn(),
+    enterOnline: vi.fn(async (_identity, roomId = 'NEW234') => { Object.assign(state, { phase: 'lobby', online: { roomId } }); options.onChange() }),
     leaveOnline: vi.fn(async () => { state.phase = 'lobby'; options.onChange() }),
     backToLobby: vi.fn(() => { state.phase = 'lobby'; options.onChange() }),
     setAutoPlay: vi.fn((value: boolean) => { state.autoPlay = value }), pause: vi.fn(), resume: vi.fn(),
@@ -40,8 +41,9 @@ beforeEach(() => {
   capture.ready = null; capture.order = []; callbacks = {}; frames = new Map()
   let frameId = 0
   wxApi = { getWindowInfo: () => ({ windowWidth: 844, windowHeight: 390, pixelRatio: 2 }),
+    getLaunchOptionsSync: vi.fn(() => ({ query: {} })),
     getStorageSync: vi.fn(), setStorageSync: vi.fn(), createImage: vi.fn(), showModal: vi.fn(), showLoading: vi.fn(),
-    hideLoading: vi.fn(), showToast: vi.fn(), setKeepScreenOn: vi.fn(),
+    hideLoading: vi.fn(), showToast: vi.fn(), showShareMenu: vi.fn(), shareAppMessage: vi.fn(), setKeepScreenOn: vi.fn(),
     createCanvas: vi.fn(() => {
       capture.order.push('canvas')
       return { requestAnimationFrame: vi.fn(callback => { frames.set(++frameId, callback); return frameId }),
@@ -51,6 +53,8 @@ beforeEach(() => {
     wxApi[`on${event}`] = vi.fn(callback => { callbacks[event] = callback })
     wxApi[`off${event}`] = vi.fn()
   }
+  wxApi.onShareAppMessage = vi.fn(callback => { callbacks.ShareAppMessage = callback })
+  wxApi.offShareAppMessage = vi.fn()
 })
 afterEach(() => { app?.dispose(); app = null; vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.restoreAllMocks() })
 function touch(identifier: number, x: number, y: number) { return { identifier, clientX: x, clientY: y } }
@@ -157,6 +161,8 @@ describe('WeChat runtime lifecycle and gestures', () => {
 
 it('creates the native authorization button before the first tap and completes profile plus identity together', async () => {
   vi.stubEnv('VITE_API_BASE', 'https://example.com')
+  vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200,
+    json: async () => ({ rooms: [{ roomId: 'ABC234', mode: 'east', rulesetId: 'wuhan-huanghuang', capacity: 4, occupied: 2 }] }) })))
   let tap: any
   const native = { style: {}, show: vi.fn(), hide: vi.fn(), destroy: vi.fn(), onTap: (fn: any) => { tap = fn } }
   wxApi.createUserInfoButton = vi.fn(() => native)
@@ -175,9 +181,32 @@ it('creates the native authorization button before the first tap and completes p
   await tap({ userInfo: { nickName: '小明', avatarUrl: 'https://example.com/avatar.png' } })
   expect(wxApi.login).toHaveBeenCalledTimes(1)
   expect(app.snapshot().identity).toMatchObject({ nickname: '小明', avatarUrl: 'https://example.com/avatar.png' })
+  expect(app.snapshot().roomList).toEqual([expect.objectContaining({ roomId: 'ABC234', occupied: 2 })])
   expect(capture.game.setProfile).toHaveBeenCalled()
+  await app.dispatch({ type: 'join-listed-room', roomId: 'ABC234' })
+  expect(capture.game.enterOnline).toHaveBeenLastCalledWith(expect.objectContaining({ nickname: '小明' }), 'ABC234')
+  await app.dispatch({ type: 'share-room' })
+  expect(wxApi.shareAppMessage).toHaveBeenLastCalledWith(expect.objectContaining({ query: 'room=ABC234' }))
+  expect(callbacks.ShareAppMessage()).toMatchObject({ query: 'room=ABC234' })
   await app.dispatch({ type: 'leave-room' })
   expect(capture.game.leaveOnline).toHaveBeenCalledOnce()
   expect(wxApi.showLoading).toHaveBeenLastCalledWith({ title: '正在退出…', mask: true })
   expect(wxApi.showToast).toHaveBeenLastCalledWith({ title: '已退出联机房间', icon: 'success' })
+})
+
+it('joins the shared room immediately after real WeChat authorization', async () => {
+  vi.stubEnv('VITE_API_BASE', 'https://example.com')
+  wxApi.getLaunchOptionsSync = vi.fn(() => ({ query: { room: 'ABC234' } }))
+  let tap: any
+  wxApi.createUserInfoButton = vi.fn(() => ({ style: {}, show: vi.fn(), hide: vi.fn(), destroy: vi.fn(), onTap: (fn: any) => { tap = fn } }))
+  wxApi.login = vi.fn(({ success }) => success({ code: 'shared-code' }))
+  wxApi.request = vi.fn(({ success }) => success({ statusCode: 200, data: { sessionToken: 'session',
+    account: { id: 'openid', displayName: '好友', avatarUrl: 'https://example.com/friend.png' } } }))
+  app = bootMiniGame(wxApi)
+  paint()
+  expect(app.snapshot().invitedRoomId).toBe('ABC234')
+  await tap({ userInfo: { nickName: '好友', avatarUrl: 'https://example.com/friend.png' } })
+  expect(capture.game.enterOnline).toHaveBeenCalledWith(expect.objectContaining({ nickname: '好友' }), 'ABC234')
+  expect(app.snapshot().invitedRoomId).toBe('')
+  expect(wxApi.showToast).toHaveBeenCalledWith({ title: '已加入房间 ABC234', icon: 'success' })
 })
