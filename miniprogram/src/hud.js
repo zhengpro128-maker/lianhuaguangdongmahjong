@@ -251,37 +251,32 @@ export class MiniHud {
 
   drawTable() {
     const s = this.state, w = this.width, h = this.height
-    const { left, right, top, rail, board } = this.layout
+    const { left, right, top, toolbar, seats } = this.layout
     const online = !!s.online?.roomId
-    this.box(0, 0, w, board.y, '#071a11', null, 0)
-    this.box(0, board.y, board.x, h - board.y, '#071a11', null, 0)
-    this.box(board.x + board.w, board.y, w - board.x - board.w, h - board.y, '#071a11', null, 0)
-    this.button(left, top, rail, 30, online ? '退出联机' : '返回大厅', { local: online ? 'leave-online' : 'leave' }, { small: true })
-    this.text(`${miniMatchRounds(s.matchType)} 局 · 第 ${Math.min(s.round || 1, miniMatchRounds(s.matchType))} 局`, board.x, top + 20, 12, PALETTE.text, 'left', 'bold')
-    const toolbarY = Math.max(top + 48, (this.menuButton?.bottom || 0) + 8)
-    const controlW = (rail - 6) / 2
-    this.button(w - right - rail, toolbarY, controlW, 28, '规则', { local: 'rules' }, { small: true })
-    this.button(w - right - controlW, toolbarY, controlW, 28, s.soundEnabled === false ? '静音' : '声音', { type: 'sound' }, { small: true })
+    const topGradient = this.ctx.createLinearGradient(0, 0, 0, top + 38)
+    topGradient.addColorStop(0, 'rgba(3,14,9,.8)'); topGradient.addColorStop(1, 'rgba(3,14,9,0)')
+    this.ctx.fillStyle = topGradient; this.ctx.fillRect(0, 0, w, top + 38)
+    this.button(left, top + 3, 76, 30, online ? '退出联机' : '返回大厅', { local: online ? 'leave-online' : 'leave' }, { small: true })
+    this.text(`${miniMatchRounds(s.matchType)} 局 · 第 ${Math.min(s.round || 1, miniMatchRounds(s.matchType))} 局`, left + 88, top + 18, 12, PALETTE.text, 'left', 'bold')
+    const controlW = (toolbar.w - 6) / 2
+    this.button(toolbar.x, toolbar.y, controlW, 28, '规则', { local: 'rules' }, { small: true })
+    this.button(toolbar.x + controlW + 6, toolbar.y, controlW, 28, s.soundEnabled === false ? '静音' : '声音', { type: 'sound' }, { small: true })
     const players = s.players || [], own = s.user || players[0], ownSeat = own?.seat ?? 0
     players.forEach((player, index) => {
       const rel = (index - ownSeat + 4) % 4
-      const cardW = rel === 2 ? 124 : rail, cardH = 48
-      const sideY = Math.max(toolbarY + 108, board.y + board.h * .48 - cardH / 2)
-      const position = rel === 0 ? [left, h - this.safe.bottom - 62]
-        : rel === 1 ? [w - right - cardW, sideY]
-          : rel === 2 ? [w / 2 - cardW / 2, top]
-            : [left, sideY]
-      this.drawSeat(player, index, position[0], position[1], cardW, cardH, rel === 0)
+      const card = seats[rel]
+      this.drawSeat(player, index, card.x, card.y, card.w, card.h, rel === 0)
     })
     const capabilities = s.capabilities?.lotusTable || {}, joker = s.jokerTiles || capabilities.jokerTiles || [], flip = s.flipTile || capabilities.flipTile
-    const indicatorX = w - right - rail, indicatorY = toolbarY + 36
-    this.box(indicatorX, indicatorY, rail, 58, 'rgba(5,24,15,.85)', 'rgba(185,146,73,.38)', 8)
-    this.text('翻牌', indicatorX + 10, indicatorY + 12, 9, PALETTE.textMuted)
-    this.text('癞子', indicatorX + rail / 2 + 5, indicatorY + 12, 9, PALETTE.accent)
-    if (flip) this.drawTile(flip, indicatorX + 10, indicatorY + 23, 22, 29)
-    else this.text('—', indicatorX + 20, indicatorY + 36, 13, PALETTE.textMuted)
-    joker.forEach((tile, index) => this.drawTile(tile, indicatorX + rail / 2 + 5 + index * 23, indicatorY + 23, 22, 29, { joker: true }))
-    this.box(board.x, board.y + board.h, board.w, h - board.y - board.h, '#071a11', null, 0)
+    const indicator = this.layout.indicator, compactIndicator = indicator.h < 50
+    const tileW = compactIndicator ? 16 : 22, tileH = compactIndicator ? 21 : 29
+    const tileY = indicator.y + (compactIndicator ? 15 : 23), labelY = indicator.y + (compactIndicator ? 8 : 12)
+    this.box(indicator.x, indicator.y, indicator.w, indicator.h, 'rgba(5,24,15,.85)', 'rgba(185,146,73,.38)', 8)
+    this.text('翻牌', indicator.x + 7, labelY, 9, PALETTE.textMuted)
+    this.text('癞子', indicator.x + indicator.w / 2 + 5, labelY, 9, PALETTE.accent)
+    if (flip) this.drawTile(flip, indicator.x + 10, tileY, tileW, tileH)
+    else this.text('—', indicator.x + 18, tileY + tileH / 2, 13, PALETTE.textMuted)
+    joker.forEach((tile, index) => this.drawTile(tile, indicator.x + indicator.w / 2 + 5 + index * (tileW + 1), tileY, tileW, tileH, { joker: true }))
     this.drawHand(own)
     this.drawActions()
     this.drawActionCue()
@@ -291,26 +286,30 @@ export class MiniHud {
     let status = s.autoPlay ? '托管中，自动完成出牌与响应' : s.actionPrompt ? '请选择吃、碰、杠、胡或过' : s.isUserTurn ? (s.selectedIndex >= 0 ? '再次点击或上滑出牌 · 红中 / 癞子直接出牌开杠' : '轮到你出牌 · 点击选中，再点或上滑打出') : '等待其他玩家出牌'
     if (s.phase === 'opening' || s.phase === 'dealing') status = ({ dice: '庄家掷骰', flip: '翻牌确定癞子', deal: '正在发牌', start: '准备开局' })[s.openingStage] || '正在发牌'
     if (s.online && s.online.status !== 'connected') status = '连接中断，正在自动重连…'
-    this.text(status, w / 2, board.y + board.h + 13, 10, PALETTE.textMuted, 'center', 'normal', w - 225)
-    if (s.announcement?.text && !this.hasResult()) this.wrapped(s.announcement.text, left, board.y + 18, rail, 11, 18, PALETTE.accent, 3)
+    const statusY = own?.hand?.length ? handY - (s.selectedIndex >= 0 ? 28 : 12) : h - this.safe.bottom - 10
+    this.text(status, this.layout.hand.x + this.layout.hand.w / 2, statusY, 10, PALETTE.textMuted, 'center', 'normal', this.layout.hand.w)
+    if (s.announcement?.text && !this.hasResult()) this.wrapped(s.announcement.text, left, top + 53, 96, 11, 18, PALETTE.accent, 3)
     if (this.hasResult() && this.hiddenResult === this.resultKey()) this.button(w / 2 - 60, handY - 61, 120, 33, '查看结算', { local: 'result' }, { primary: true, small: true })
   }
 
   drawSeat(player, index, x, y, w, h, self) {
-    const active = this.state.currentPlayer === index, avatar = Math.min(h - 12, 36)
+    const active = this.state.currentPlayer === index, stacked = w < 80
+    const avatar = stacked ? 24 : Math.min(h - 12, 32)
+    const avatarX = stacked ? x + (w - avatar) / 2 : x + 6, avatarY = y + (stacked ? 4 : 6)
     this.box(x, y, w, h, active ? 'rgba(26,66,45,.96)' : 'rgba(6,27,17,.9)', active ? PALETTE.accent : 'rgba(185,146,73,.4)', 9)
-    this.ctx.save(); rounded(this.ctx, x + 6, y + 6, avatar, avatar, 6); this.ctx.clip()
-    this.box(x + 6, y + 6, avatar, avatar, PALETTE.surface)
-    this.image(player.avatar || `assets/avatars/${AVATARS[index % 4]}.png`, x + 6, y + 6, avatar, avatar)
+    this.ctx.save(); rounded(this.ctx, avatarX, avatarY, avatar, avatar, 6); this.ctx.clip()
+    this.box(avatarX, avatarY, avatar, avatar, PALETTE.surface)
+    this.image(player.avatar || `assets/avatars/${AVATARS[index % 4]}.png`, avatarX, avatarY, avatar, avatar)
     this.ctx.restore()
-    const textX = x + avatar + 12
+    const textX = stacked ? x + w / 2 : x + avatar + 12, align = stacked ? 'center' : 'left'
     const name = player.name || (self ? '你' : WIND[(index - (this.state.dealer || 0) + 4) % 4])
-    this.ctx.font = 'bold 11px \"PingFang SC\", sans-serif'
-    const nameWidth = w - avatar - 16
+    const fontSize = stacked ? 10 : 11
+    this.ctx.font = `bold ${fontSize}px \"PingFang SC\", sans-serif`
+    const nameWidth = stacked ? w - 8 : w - avatar - 16
     let label = name
     while (label.length > 1 && this.ctx.measureText(label).width > nameWidth) label = label.slice(0, -2) + '…'
-    this.text(label, textX, y + 17, 11, PALETTE.text, 'left', 'bold', nameWidth)
-    this.text(player.score ?? 1000, textX, y + 34, 12, PALETTE.accent, 'left', 'bold', w - avatar - 16)
+    this.text(label, textX, y + (stacked ? 35 : h / 2 - 7), fontSize, PALETTE.text, align, 'bold', nameWidth)
+    this.text(player.score ?? 1000, textX, y + (stacked ? 48 : h / 2 + 9), stacked ? 10 : 12, PALETTE.accent, align, 'bold', nameWidth)
     if (index === this.state.dealer) { this.box(x + 2, y + 2, 16, 14, PALETTE.accent, null, 4); this.text('庄', x + 10, y + 9, 9, '#24301d', 'center', 'bold') }
     if (active && this.state.turnSeconds > 0) this.text(this.state.turnSeconds, x + w - 8, y + h - 10, 10, PALETTE.accent, 'right', 'bold')
     const delta = this.state.scoreFlowEvent?.deltas?.find(item => item.playerIndex === index)?.amount
@@ -340,11 +339,11 @@ export class MiniHud {
   drawHand(player) {
     if (!player) return
     const s = this.state, hand = player.hand || [], w = this.width, h = this.height
-    const available = this.layout.board.w
+    const available = this.layout.hand.w
     const gap = 2, drawnGap = player.drawnTileIndex >= 0 ? 9 : 0
     const tileW = clamp((available - Math.max(0, hand.length - 1) * gap - drawnGap) / Math.max(14, hand.length), 18, 54)
     const tileH = tileW * 1.37, rowW = hand.length * (tileW + gap) - gap + drawnGap
-    const startX = this.layout.board.x + (available - rowW) / 2, y = h - Math.max(14, this.safe.bottom + 9) - tileH
+    const startX = this.layout.hand.x + (available - rowW) / 2, y = h - Math.max(14, this.safe.bottom + 9) - tileH
     this.handY = y
     const jokerTiles = s.jokerTiles || s.capabilities?.lotusTable?.jokerTiles || []
     let offset = 0
@@ -366,13 +365,13 @@ export class MiniHud {
     const chiActions = actions.filter(action => action.type === 'chi')
     if (chiActions.length > 1) actions = actions.filter(action => action.type !== 'chi').concat({ id: 'chi', type: 'chi', label: '吃' })
     if (!actions.length) return
-    const xEnd = this.layout.board.x + this.layout.board.w, gap = 8
-    const bw = 64, bh = 42, perRow = Math.max(1, Math.floor((this.width - 230) / (bw + gap)))
+    const xEnd = Math.min(this.layout.hand.x + this.layout.hand.w, this.layout.toolbar.x - 8), gap = 8
+    const bw = 64, bh = 42, perRow = Math.max(1, Math.floor((xEnd - this.layout.hand.x) / (bw + gap)))
     actions.forEach((action, index) => {
       const column = index % perRow, row = Math.floor(index / perRow)
       const rowCount = Math.min(perRow, actions.length - row * perRow)
       const x = xEnd - rowCount * (bw + gap) + column * (bw + gap)
-      const y = this.handY - 68 - row * (bh + 7)
+      const y = this.handY - 82 - row * (bh + 7)
       const id = action.id || action.type, label = action.label || ({ hu: '胡', peng: '碰', gang: '杠', chi: '吃', pass: '过', windKong: '风杠' })[id] || id
       if (id === 'chi' && chiActions.length > 1) {
         this.button(x, y, bw, bh, label, { local: 'chi' }, { primary: true })
@@ -387,9 +386,13 @@ export class MiniHud {
     if (!event || this.hasResult()) return
     const presentation = resolveTableActionPresentation(event.type)
     if (!presentation) return
-    const { left, rail, board } = this.layout
-    this.box(left, board.y + 72, rail, 26, PALETTE.panelElevated, PALETTE.border, 6)
-    this.text(presentation.label, left + rail / 2, board.y + 85, 16, PALETTE.accent, 'center', 'bold', rail - 12)
+    const ownSeat = this.state.user?.seat ?? 0
+    const rel = (event.actorIndex - ownSeat + 4) % 4
+    const seat = this.layout.seats[rel] || this.layout.seats[0]
+    const y = rel === 0 ? seat.y - 18 : seat.y + seat.h + 15
+    this.ctx.save(); this.ctx.shadowColor = '#071a11'; this.ctx.shadowBlur = 6
+    this.text(presentation.label, seat.x + seat.w / 2, y, 20, PALETTE.accent, 'center', 'bold', seat.w)
+    this.ctx.restore()
   }
 
   hasResult() { return !!this.state.result && ['settled', 'finished'].includes(this.state.phase) || !!this.state.matchFinished }

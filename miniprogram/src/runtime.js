@@ -56,7 +56,7 @@ export function bootMiniGame(wxApi = globalThis.wx) {
     const state = game.snapshot()
     return { ...state, screen: state.phase === 'lobby' ? 'lobby' : 'game',
       identity: auth.identity ? { nickname: auth.identity.nickname, avatarUrl: auth.identity.avatarUrl, displayId: auth.identity.displayId } : null, onlineBusy, loginStatus, settings, selectedRule: 'wuhan-huanghuang', selectedMatch: settings.matchType,
-      tableLayout: hud?.layout, lobbyPage, themeName: 'jade', soundEnabled, loading: starting, loadError,
+      lobbyPage, themeName: 'jade', soundEnabled, loading: starting, loadError,
       roomList, roomListLoading, roomListError, invitedRoomId: pendingInviteRoom }
   }
   function invalidate() { dirty = true }

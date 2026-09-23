@@ -15,6 +15,7 @@ const players = Array.from({ length: 4 }, (_, seat) => ({ seat, name: `玩家${s
 const turn = { phase: 'discard', screen: 'game', isUserTurn: true, selectedIndex: -1, user: players[0], players,
   dealer: 0, currentPlayer: 0, jokerTiles: ['white'], actions: [{ id: 'discard', type: 'discard', label: '出牌' }] }
 const tap = (hud, hit) => hud.handleTouch(hit.x + hit.w / 2, hit.y + hit.h / 2)
+const intersects = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y
 
 describe('native HUD interaction', () => {
   it('scales pixels while hit testing uses logical coordinates, and requires selection before a second tap discards', () => {
@@ -183,20 +184,76 @@ it('opens the native login target directly from the mode chooser and creates the
   expect(onAction).toHaveBeenLastCalledWith({ type: 'create-room', matchType: 'rounds16' })
 })
 
-it.each([[667, 320], [844, 390], [1128, 532], [1024, 768]])('keeps seats and header controls outside the tile viewport at %s × %s', (width, height) => {
+it.each([[667, 320], [844, 390], [1128, 532], [1024, 768]])('keeps compact seats, controls, capsule and hands separate at %s × %s', (width, height) => {
   const { hud } = makeHud()
   const menu = { left: width - 130, right: width - 12, top: 10, bottom: 42 }
   hud.resize({ windowWidth: width, windowHeight: height, safeArea: { left: 40, right: width - 40, top: 0, bottom: height - 20 }, menuButton: menu })
   const seats = vi.spyOn(hud, 'drawSeat')
+  const text = vi.spyOn(hud, 'text')
   hud.ctx.fillText.mockClear()
   hud.update({ ...turn, matchType: 'rounds16', round: 9, online: { roomId: 'ABC234', status: 'connected' } })
-  const b = hud.layout.board
-  const intersects = (x, y, w, h) => x < b.x + b.w && x + w > b.x && y < b.y + b.h && y + h > b.y
-  for (const [, , x, y, w, h] of seats.mock.calls) expect(intersects(x, y, w, h)).toBe(false)
-  for (const hit of hud.hitRegions) {
-    expect(intersects(hit.x, hit.y, hit.w, hit.h)).toBe(false)
-    expect(hit.x < menu.right && hit.x + hit.w > menu.left && hit.y < menu.bottom && hit.y + hit.h > menu.top).toBe(false)
+  expect(hud.layout.board).toBeUndefined()
+  const capsule = { x: menu.left, y: menu.top, w: menu.right - menu.left, h: menu.bottom - menu.top }
+  const assertUnobstructed = () => {
+    const cards = seats.mock.calls.map(([player, , x, y, w, h]) => ({ x, y, w, h, label: `seat ${player.name}` }))
+    expect(cards).toHaveLength(4)
+    const controls = hud.hitRegions.filter(hit => !['select', 'discard'].includes(hit.action.type))
+    const roundLabels = text.mock.calls.filter(([label]) => /^\d+ 局/.test(String(label))).map(([label, x, y, size, , align, , maxWidth]) => {
+      const w = Math.min(hud.ctx.measureText(String(label)).width, maxWidth || Infinity)
+      return { x: align === 'center' ? x - w / 2 : align === 'right' ? x - w : x, y: y - size / 2, w, h: size }
+    })
+    expect(roundLabels).toHaveLength(1)
+    const overlays = [...cards, ...controls, ...roundLabels, { ...hud.layout.indicator, label: 'flipped tile and joker' }]
+    for (const item of overlays) {
+      expect(item.x).toBeGreaterThanOrEqual(0)
+      expect(item.y).toBeGreaterThanOrEqual(0)
+      expect(item.x + item.w).toBeLessThanOrEqual(width)
+      expect(item.y + item.h).toBeLessThanOrEqual(height)
+      expect(intersects(item, capsule)).toBe(false)
+      for (const tile of hud.handHits) expect(intersects(item, tile), `${JSON.stringify(item)} overlaps hand tile ${tile.index}`).toBe(false)
+    }
+    for (let i = 0; i < overlays.length; i++) {
+      for (let j = i + 1; j < overlays.length; j++) {
+        expect(intersects(overlays[i], overlays[j]), `${JSON.stringify(overlays[i])} overlaps ${JSON.stringify(overlays[j])}`).toBe(false)
+      }
+    }
   }
+  assertUnobstructed()
   for (const player of players) expect(hud.ctx.fillText.mock.calls.filter(call => call[0] === player.name)).toHaveLength(1)
   expect(hud.ctx.fillText.mock.calls.some(call => /东风场|半庄场/.test(call[0]))).toBe(false)
+  seats.mockClear()
+  text.mockClear()
+  hud.update({ ...turn, phase: 'prompt', selectedIndex: 13, actionPrompt: {},
+    actions: ['hu', 'peng', 'gang', 'chi', 'pass'].map(type => ({ id: type, type })) })
+  expect(hud.hitRegions.filter(hit => hit.action.type === 'action')).toHaveLength(5)
+  assertUnobstructed()
+})
+
+it.each([[667, 320], [844, 390]])('anchors each actor cue to its visible seat without obscuring controls at %s × %s', (width, height) => {
+  const { hud } = makeHud()
+  const menu = { left: width - 130, right: width - 12, top: 10, bottom: 42 }
+  hud.resize({ windowWidth: width, windowHeight: height,
+    safeArea: { left: 40, right: width - 40, top: 0, bottom: height - 20 }, menuButton: menu })
+  const seats = vi.spyOn(hud, 'drawSeat'), text = vi.spyOn(hud, 'text')
+  for (const ownSeat of [0, 2]) {
+    for (const actorIndex of [0, 1, 2, 3]) {
+      seats.mockClear(); text.mockClear()
+      hud.update({ ...turn, user: { ...players[ownSeat], hand: players[0].hand },
+        tableActionEvent: { id: 1, type: 'peng', actorIndex, sourceIndex: (actorIndex + 1) % 4, tile: 'm1', meldIndex: 0 } })
+      const cueCalls = text.mock.calls.filter(([label]) => label === '碰')
+      expect(cueCalls).toHaveLength(1)
+      const [, x, y, size] = cueCalls[0]
+      const actorCard = seats.mock.calls.find(([, index]) => index === actorIndex)
+      const [, , cardX, cardY, cardW, cardH] = actorCard
+      expect(x).toBe(cardX + cardW / 2)
+      if (actorIndex === ownSeat) expect(y + size / 2).toBeLessThanOrEqual(cardY)
+      else expect(y - size / 2).toBeGreaterThanOrEqual(cardY + cardH)
+      const cue = { x: x - size / 2, y: y - size / 2, w: size, h: size }
+      const cards = seats.mock.calls.map(([, , x, y, w, h]) => ({ x, y, w, h }))
+      const controls = hud.hitRegions.filter(hit => !['select', 'discard'].includes(hit.action.type))
+      for (const item of [...cards, ...controls, hud.layout.indicator, ...hud.handHits]) {
+        expect(intersects(cue, item), `actor ${actorIndex}, user ${ownSeat}: cue ${JSON.stringify(cue)} overlaps ${JSON.stringify(item)}`).toBe(false)
+      }
+    }
+  }
 })
