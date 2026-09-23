@@ -1,4 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest'
+import { normalizeApiBase } from '../../src/game/online/api/httpClient'
 import { createWechatAuth } from './wechat-auth'
 afterEach(() => vi.unstubAllEnvs())
 it('retains server identity and exposes a stable display number after login', async () => {
@@ -20,6 +21,11 @@ it('does not silently authenticate a failed server exchange', async () => {
     request: ({ success }) => success({ statusCode: 401, data: { detail: { code: 'WECHAT_LOGIN_FAILED' } } }) })
   await expect(auth.authorize({ nickName: '小明', avatarUrl: 'https://example.com/a.png' })).rejects.toThrow('WECHAT_LOGIN_FAILED')
   expect(auth.identity).toBeNull()
+})
+
+it('removes trailing slashes from a configured API base', () => {
+  expect(normalizeApiBase('https://example.com/')).toBe('https://example.com')
+  expect(normalizeApiBase('https://example.com///')).toBe('https://example.com')
 })
 
 it('does not call login or establish an identity without authorized profile data', async () => {
