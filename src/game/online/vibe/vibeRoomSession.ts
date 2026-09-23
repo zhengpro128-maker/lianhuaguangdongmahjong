@@ -87,6 +87,8 @@ export function createVibeRoomSession({ state, onStart, onClosed, onSeatToken, l
     state.sessionError.value = ''
     state.sessionStatus.value = 'creating'
     try {
+      // Fixed-round Mini Games use the bundled WebSocket client, not this SDK.
+      if (mode !== 'east' && mode !== 'hanchan') throw new Error('P2P 房间不支持该局数模式')
       const created = await createVibeRoom({ mode, rulesetId, capacity, tableThemeName })
       room = created
       state.isHost.value = true
