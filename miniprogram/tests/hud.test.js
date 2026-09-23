@@ -54,6 +54,25 @@ describe('native HUD interaction', () => {
     expect(onAction).toHaveBeenCalledWith({ type: 'lobby' })
   })
 
+  it('offers a confirmed manual exit from both the online room and an active online match', () => {
+    const { hud, onAction } = makeHud()
+    const online = { roomId: 'ABC123', status: 'connected', mySeat: 0, isCreator: true,
+      seats: players.map((player, seat) => ({ seat, nickname: player.name, ready: seat === 0 })) }
+    hud.update({ ...turn, phase: 'lobby', screen: 'lobby', online, onlineBusy: false })
+    expect(hud.hitRegions.filter(hit => hit.action.local === 'leave-online')).toHaveLength(2)
+    tap(hud, hud.hitRegions.find(hit => hit.action.local === 'leave-online'))
+    expect(onAction).not.toHaveBeenCalled()
+    tap(hud, hud.hitRegions.find(hit => hit.action.type === 'leave-room'))
+    expect(onAction).toHaveBeenLastCalledWith({ type: 'leave-room' })
+
+    onAction.mockClear()
+    hud.update({ ...turn, online })
+    tap(hud, hud.hitRegions.find(hit => hit.action.local === 'leave-online'))
+    expect(onAction).not.toHaveBeenCalled()
+    tap(hud, hud.hitRegions.find(hit => hit.action.type === 'leave-room'))
+    expect(onAction).toHaveBeenLastCalledWith({ type: 'leave-room' })
+  })
+
   it('presents multiple chi combinations before submitting the selected index', () => {
     const { hud, onAction } = makeHud()
     const chiOptions = [{ tiles: ['m1', 'm2', 'm3'] }, { tiles: ['m2', 'm3', 'm4'] }]

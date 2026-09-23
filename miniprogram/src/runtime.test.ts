@@ -8,6 +8,7 @@ vi.mock('./game-bridge.ts', () => ({ createMiniGame: (options: any) => {
   const state = { phase: 'lobby', autoPlay: false }
   capture.game = { snapshot: vi.fn(() => ({ ...state })), start: vi.fn(async () => { state.phase = 'dealing'; options.onChange() }),
     setProfile: vi.fn(), selectTile: vi.fn(), discard: vi.fn(), action: vi.fn(), nextRound: vi.fn(),
+    leaveOnline: vi.fn(async () => { state.phase = 'lobby'; options.onChange() }),
     backToLobby: vi.fn(() => { state.phase = 'lobby'; options.onChange() }),
     setAutoPlay: vi.fn((value: boolean) => { state.autoPlay = value }), pause: vi.fn(), resume: vi.fn(),
     clearSelection: vi.fn(), hint: vi.fn(), dispose: vi.fn() }
@@ -39,7 +40,8 @@ beforeEach(() => {
   capture.ready = null; capture.order = []; callbacks = {}; frames = new Map()
   let frameId = 0
   wxApi = { getWindowInfo: () => ({ windowWidth: 844, windowHeight: 390, pixelRatio: 2 }),
-    getStorageSync: vi.fn(), setStorageSync: vi.fn(), createImage: vi.fn(), showModal: vi.fn(), setKeepScreenOn: vi.fn(),
+    getStorageSync: vi.fn(), setStorageSync: vi.fn(), createImage: vi.fn(), showModal: vi.fn(), showLoading: vi.fn(),
+    hideLoading: vi.fn(), showToast: vi.fn(), setKeepScreenOn: vi.fn(),
     createCanvas: vi.fn(() => {
       capture.order.push('canvas')
       return { requestAnimationFrame: vi.fn(callback => { frames.set(++frameId, callback); return frameId }),
@@ -174,4 +176,8 @@ it('creates the native authorization button before the first tap and completes p
   expect(wxApi.login).toHaveBeenCalledTimes(1)
   expect(app.snapshot().identity).toMatchObject({ nickname: '小明', avatarUrl: 'https://example.com/avatar.png' })
   expect(capture.game.setProfile).toHaveBeenCalled()
+  await app.dispatch({ type: 'leave-room' })
+  expect(capture.game.leaveOnline).toHaveBeenCalledOnce()
+  expect(wxApi.showLoading).toHaveBeenLastCalledWith({ title: '正在退出…', mask: true })
+  expect(wxApi.showToast).toHaveBeenLastCalledWith({ title: '已退出联机房间', icon: 'success' })
 })
