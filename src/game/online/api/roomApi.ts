@@ -91,11 +91,12 @@ export interface RoomMeta {
   llmProviders?: Array<LlmProviderInfo>
 }
 
-/** 大厅可直接加入的房间摘要；不含座位身份和任何重连凭据。 */
+/** 公开房间摘要；包括大厅空位房间和正在进行中的对局，不含座位身份或重连凭据。 */
 export interface JoinableRoom {
   roomId: string
   mode: MatchType
   rulesetId?: RuleVariant
+  status: 'lobby' | 'playing'
   capacity: number
   occupied: number
 }

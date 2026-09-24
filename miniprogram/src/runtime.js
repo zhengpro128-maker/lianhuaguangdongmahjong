@@ -190,6 +190,20 @@ export function bootMiniGame(wxApi = globalThis.wx) {
         if (lobbyPage === 'online') await refreshRooms()
         break
       case 'refresh-rooms': await refreshRooms(); break
+      case 'copy-room-id': {
+        const roomId = String(action.roomId || '')
+        if (!roomId) break
+        if (typeof wxApi.setClipboardData !== 'function') {
+          wxApi.showToast?.({ title: '当前微信版本不支持复制', icon: 'none' })
+          break
+        }
+        wxApi.setClipboardData({
+          data: roomId,
+          success: () => wxApi.showToast?.({ title: `已复制房间号 ${roomId}`, icon: 'success' }),
+          fail: () => wxApi.showToast?.({ title: '复制失败，请重试', icon: 'none' }),
+        })
+        break
+      }
       case 'share-room':
         if (wxApi.shareAppMessage) wxApi.shareAppMessage(sharePayload())
         else wxApi.showModal?.({ title: '分享房间', content: '请点击右上角菜单，将当前房间分享给微信好友。', showCancel: false })

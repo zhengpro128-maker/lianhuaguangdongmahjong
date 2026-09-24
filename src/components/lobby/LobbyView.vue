@@ -215,18 +215,18 @@ function toggleWakuDemoAuth() {
               {{ sessionStatus === 'joining' ? '加入中…' : '加入房间' }}
             </button>
           </div>
-          <section v-if="!roomId" class="joinable-room-list" aria-label="可加入房间">
+          <section v-if="!roomId" class="joinable-room-list" aria-label="公开房间">
             <div class="joinable-room-list-heading">
-              <b>可加入房间</b><small>{{ joinableRooms.length ? `当前 ${joinableRooms.length} 个` : '暂无空位房间' }}</small>
+              <b>公开房间</b><small>{{ joinableRooms.length ? `当前 ${joinableRooms.length} 个` : '暂无公开房间' }}</small>
             </div>
             <div v-if="joinableRooms.length" class="joinable-room-items">
               <article v-for="room in joinableRooms" :key="room.roomId">
-                <span><strong>{{ room.mode === 'east' ? '东风场' : '半庄场' }}</strong><small>房间 {{ room.roomId }} · {{ room.occupied }}/{{ room.capacity }} 人</small></span>
+                <span><strong>{{ room.mode === 'east' ? '东风场' : '半庄场' }} · {{ room.status === 'playing' ? '进行中' : '等待中' }}</strong><small>房间 {{ room.roomId }} · {{ room.occupied }}/{{ room.capacity }} 人</small></span>
                 <button
                   data-action-role="secondary"
-                  :disabled="wakuAuthLoading || !wakuAuthenticated || !nicknameInput.trim() || sessionStatus === 'joining'"
+                  :disabled="room.status === 'playing' || wakuAuthLoading || !wakuAuthenticated || !nicknameInput.trim() || sessionStatus === 'joining'"
                   @click="$emit('joinAvailableRoom', room.roomId)"
-                >加入</button>
+                >{{ room.status === 'playing' ? '进行中' : '加入' }}</button>
               </article>
             </div>
           </section>
