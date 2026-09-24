@@ -172,6 +172,12 @@ export function createWuhanSettlement(options: Options) {
       settlementKongs(winnerIndex, joker, Boolean(endOptions.kongBloom)),
       !endOptions.selfDraw && !endOptions.robbedKong,
       Boolean(endOptions.kongBloom),
+      state.players.flatMap((player, playerIndex) => playerIndex === winnerIndex ? [] : [
+        wuhanKongMultiplier(wuhanKongKinds(player.melds, joker)) * (
+          !endOptions.selfDraw && !endOptions.robbedKong && playerIndex === endOptions.sourceFrom
+            ? wuhanDiscarderMultiplier(kinds, true) : 1
+        ),
+      ]),
     )
   }
 
