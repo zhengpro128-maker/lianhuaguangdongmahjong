@@ -210,16 +210,23 @@ export class MiniHud {
     const buttonW = (innerW - 10) / 2, actionY = y + 80
     this.button(x, actionY, buttonW, 36, s.canResume ? '重进房间' : '创建房间', s.canResume ? { type: 'resume-room' } : { local: 'create-room' }, { primary: true, small: true, disabled: s.onlineBusy })
     this.button(x + buttonW + 10, actionY, buttonW, 36, s.canResume ? '退出当前房间' : '加入房间', s.canResume ? { local: 'leave-saved-online' } : { type: 'join-room' }, { small: true, disabled: s.onlineBusy })
-    this.text('可加入的房间', x, y + 143, 12, PALETTE.accent, 'left', 'bold')
+    this.text('公开房间', x, y + 143, 12, PALETTE.accent, 'left', 'bold')
     this.button(x + innerW - 54, y + 129, 54, 26, s.roomListLoading ? '刷新中' : '刷新', { type: 'refresh-rooms' }, { small: true, disabled: s.roomListLoading || s.onlineBusy })
     const rooms = s.roomList || [], listY = y + 168
     const rowH = Math.min(42, (bodyH - 186) / 2)
     if (rooms.length) rooms.slice(0, 4).forEach((room, i) => {
-      this.button(x + (i % 2) * (buttonW + 10), listY + Math.floor(i / 2) * (rowH + 8), buttonW, rowH,
-        `${room.roomId} · ${miniMatchRounds(room.mode)} 局 · ${room.occupied}/${room.capacity}人`,
-        { type: 'join-listed-room', roomId: room.roomId }, { small: true, disabled: s.onlineBusy })
+      const cardX = x + (i % 2) * (buttonW + 10)
+      const cardY = listY + Math.floor(i / 2) * (rowH + 8)
+      const roomIdW = Math.min(94, buttonW * .44)
+      const details = `${miniMatchRounds(room.mode)}局 · ${room.occupied}/${room.capacity}人`
+      this.button(cardX, cardY, roomIdW, rowH, room.roomId,
+        { type: 'copy-room-id', roomId: room.roomId }, { small: true, active: true, subtitle: '点击复制' })
+      this.button(cardX + roomIdW + 6, cardY, buttonW - roomIdW - 6, rowH,
+        room.status === 'playing' ? '进行中' : '加入',
+        { type: 'join-listed-room', roomId: room.roomId },
+        { small: true, disabled: s.onlineBusy || room.status === 'playing', subtitle: details })
     })
-    else this.wrapped(s.roomListError || (s.roomListLoading ? '正在获取房间…' : '暂无房间，创建一桌邀请好友吧'), x, listY + 14, innerW, 12, 19, PALETTE.textMuted, 2)
+    else this.wrapped(s.roomListError || (s.roomListLoading ? '正在获取房间…' : '暂无公开房间，创建一桌邀请好友吧'), x, listY + 14, innerW, 12, 19, PALETTE.textMuted, 2)
   }
 
   drawOnlineRoom() {
