@@ -3,7 +3,7 @@ import type { TableActionType, TileType } from '../../core/contracts/types'
 import { removeLastDiscard } from '../../core/rules/actions'
 import { createSettlementTimeline } from '../../shared/settlement/settlementTimeline'
 import { capWuhanPayment, wuhanKongKinds, wuhanKongLabel, wuhanKongMultiplier, wuhanSettlementKongKinds } from './ruleProfile'
-import { evaluateWuhanWin, isWuhanHardWin, isWuhanStandardWin, withWuhanWinScenes, wuhanDiscarderMultiplier, wuhanGetsSelfDrawBonus, wuhanMeetsMinimum, wuhanPatternPoints, wuhanWinPayment, WUHAN_RULESET } from './rules'
+import { evaluateWuhanWin, isWuhanHardWin, isWuhanSevenPairs, isWuhanStandardWin, withWuhanWinScenes, wuhanDiscarderMultiplier, wuhanGetsSelfDrawBonus, wuhanMeetsMinimum, wuhanPatternPoints, wuhanWinPayment, WUHAN_RULESET } from './rules'
 import type { WuhanEndGameOptions, WuhanGameState } from './wuhanState'
 import type { RuleSet } from '../../core/rules/ruleset'
 
@@ -151,12 +151,9 @@ export function createWuhanSettlement(options: Options) {
     const exposedTiles = exposedMelds.flatMap(meld => meld.tiles)
     const ordinaryJokers = endOptions.winTile === state.jokerTiles.value[0] && !endOptions.selfDraw ? [endOptions.winTile] : []
     const joker = state.jokerTiles.value[0]
-    // `isWinningHand` intentionally omits 屁胡 when there are two or more
-    // jokers. A 杠上开花 is nevertheless a valid 大胡 scene in that case,
-    // provided the underlying four-meld-and-a-pair shape is complete.
-    // Check the shape first, then apply the Wuhan-specific pattern/minimum
-    // rules below so the scene is not discarded before it can be evaluated.
-    if (!isWuhanStandardWin(hand, exposed, joker, ordinaryJokers)) return false
+    // 杠上开花可让双癞子的普通牌型成立；七对则是独立于普通牌型的胡法。
+    if (!isWuhanStandardWin(hand, exposed, joker, ordinaryJokers)
+      && !isWuhanSevenPairs(hand, exposed, joker, ordinaryJokers)) return false
     const menQianQing = winner.melds.every(meld => meld.type === 'angang' || meld.type === 'flower')
     const selfDrawStyle = Boolean(endOptions.selfDraw || endOptions.robbedKong)
     const baseKinds = evaluateWuhanWin(hand, { exposed, exposedTiles, exposedMelds, joker, ordinaryJokers, menQianQing, selfDraw: selfDrawStyle })
