@@ -197,12 +197,14 @@ export function wuhanGetsSelfDrawBonus(kinds: readonly WuhanWinKind[]) {
 export function wuhanMeetsMinimum(
   kinds: readonly WuhanWinKind[], selfDraw: boolean, hard: boolean,
   kongs: readonly WuhanKongKind[], discardWin = false, kongBloom = false,
+  payerMultipliers?: readonly number[],
 ) {
-  // 起胡门槛按本次胡牌的总收分算，而不是按单家付款额算：
-  // 自摸三家各付一份（屁胡 3 分 × 三家，硬胡再翻倍即共 18 分）。
-  const perPayer = wuhanRawWinPoints(kinds, selfDraw, hard, kongs, discardWin, kongBloom)
-  // 点炮三家都付款：七对、清一色、碰碰胡的放炮者付 1.2 倍，其它点炮付 2 倍。
-  const total = selfDraw ? perPayer * 3 : perPayer * (2 + wuhanDiscarderMultiplier(kinds, discardWin))
+  const perPayer = capWuhanPayment(wuhanRawWinPoints(kinds, selfDraw, hard, kongs, discardWin, kongBloom))
+  // 逐家计算并封顶，与实际结算一致。调用方传入的倍率已包含放炮及付款者杠番。
+  const multipliers = payerMultipliers ?? (selfDraw
+    ? [1, 1, 1]
+    : [wuhanDiscarderMultiplier(kinds, discardWin), 1, 1])
+  const total = multipliers.reduce((sum, multiplier) => sum + capWuhanPayment(perPayer * multiplier), 0)
   return total >= WUHAN_MIN_WIN_POINTS
 }
 

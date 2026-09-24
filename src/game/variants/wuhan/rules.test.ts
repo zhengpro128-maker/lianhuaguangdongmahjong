@@ -43,6 +43,7 @@ describe('武汉晃晃胡牌', () => {
     expect(wuhanMeetsMinimum(['屁胡'], true, false, [])).toBe(true)
     expect(wuhanMeetsMinimum(['屁胡'], true, true, [])).toBe(true)
     expect(wuhanMeetsMinimum(['屁胡'], false, true, [])).toBe(false)
+    expect(wuhanMeetsMinimum(['屁胡'], false, true, [], true, false, [2, 1, 16])).toBe(true)
     expect(wuhanMeetsMinimum(['屁胡'], true, false, ['concealed'])).toBe(true)
     expect(wuhanRawWinPoints(['屁胡', '门前清'], true, false, [])).toBe(6)
     expect(wuhanMeetsMinimum(['屁胡', '门前清'], true, false, [])).toBe(true)

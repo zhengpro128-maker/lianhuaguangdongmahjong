@@ -21,6 +21,31 @@ describe('武汉晃晃点炮胡', () => {
     state.players[0].hand.push('m1')
     expect(settlement.isLegalWin(0, { selfDraw: true })).toBe(true)
   })
+
+  it('付款者杠番使硬屁胡达到起胡分数时允许先胡', () => {
+    const state = createWuhanGameState()
+    const hand: TileType[] = ['m1', 'm2', 'm3', 'm5', 'm6', 's2', 's2']
+    const winner = player(0, hand)
+    winner.melds.push(
+      { type: 'chi', tile: 's3', tiles: ['s3', 's4', 's5'] },
+      { type: 'peng', tile: 'green', tiles: ['green', 'green', 'green'] },
+    )
+    const ponger = player(3, ['m4', 'm4'])
+    const specialKong = (tile: TileType, kind: 'red' | 'joker') => ({
+      type: 'flower' as const, tile, tiles: [tile], specialKong: kind,
+    })
+    state.players.push(winner, player(1), player(2), ponger)
+    state.jokerTiles.value = ['m7']
+    const settlement = createWuhanSettlement({
+      state, clearTimers: () => {}, later: () => 0, playSound: () => {},
+      showTableAction: () => {},
+      structuralMeldCount: (index) => state.players[index].melds.filter(meld => meld.type !== 'flower').length,
+      getRoundLabel: () => '',
+    })
+    expect(settlement.isLegalWin(0, { winTile: 'm4', sourceFrom: 1 })).toBe(false)
+    ponger.melds.push(specialKong('red', 'red'), specialKong('red', 'red'), specialKong('m7', 'joker'))
+    expect(settlement.isLegalWin(0, { winTile: 'm4', sourceFrom: 1 })).toBe(true)
+  })
   it('发财作为癞子时也可以胡他家弃牌', () => {
     const state = createWuhanGameState()
     const fullHand: TileType[] = ['m1', 'm1', 'm1', 'm2', 'm2', 'm2', 'p3', 'p3', 'p3', 's4', 's4', 'green', 's9', 's9']
