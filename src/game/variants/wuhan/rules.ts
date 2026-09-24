@@ -49,6 +49,18 @@ export function isWuhanStandardWin(
     || usable.some(tile => (counts.get(tile) ?? 0) >= 1 && jokers > 0 && melds(take(counts, tile, 1), jokers - 1, 4 - exposed))
 }
 
+export function isWuhanSevenPairs(
+  tiles: readonly TileType[], exposed = 0, joker?: TileType, ordinaryJokers: readonly TileType[] = [],
+): boolean {
+  if (exposed || tiles.length !== 14 || tiles.includes('red')) return false
+  const { wild, natural } = splitJokers(tiles, joker, ordinaryJokers)
+  const values = [...count(natural).values()]
+  const singles = values.filter(amount => amount % 2 === 1).length
+  const remainingWild = wild - singles
+  return remainingWild >= 0 && remainingWild % 2 === 0
+    && values.reduce((total, amount) => total + Math.floor(amount / 2), 0) + singles + remainingWild / 2 === 7
+}
+
 /**
  * 只有一张癞子时，若把它按自身牌面而非万能牌仍能组成完整牌型，即为硬胡。
  * 两张及以上癞子不适用此例外，始终按软胡处理。
@@ -58,7 +70,9 @@ export function isWuhanHardWin(tiles: readonly TileType[], exposed = 0, joker?: 
   if (jokerCount > 1) return false
   // 单张癞子不能继续作为万能牌参与硬胡判定；把它放回真实牌面后仍可胡，
   // 才说明本手牌不依赖替牌。ordinaryJokers 会让标准胡牌求解器保留该牌面。
-  return isWuhanStandardWin(tiles, exposed, joker, jokerCount === 1 && joker ? [joker] : [])
+  const ordinaryJokers = jokerCount === 1 && joker ? [joker] : []
+  return isWuhanStandardWin(tiles, exposed, joker, ordinaryJokers)
+    || isWuhanSevenPairs(tiles, exposed, joker, ordinaryJokers)
 }
 
 export type WuhanWinKind = '屁胡' | '碰碰胡' | '清一色' | '门前清' | '全求人' | '七对' | '龙七对' | '双龙七对' | '杠上开花' | '抢杠胡'
@@ -112,18 +126,10 @@ export function evaluateWuhanWin(tiles: readonly TileType[], context: WuhanWinCo
     })
     if (canPengPeng) kinds.push('碰碰胡')
   }
-  if (!exposed && tiles.length === 14) {
+  if (isWuhanSevenPairs(tiles, exposed, joker, context.ordinaryJokers)) {
     const values = [...count(natural).values()]
-    const singles = values.filter((amount) => amount % 2 === 1).length
-    const naturalPairs = values.reduce((total, amount) => total + Math.floor(amount / 2), 0)
-    const remainingWild = wild - singles
-    const pairs = remainingWild >= 0 && remainingWild % 2 === 0
-      ? naturalPairs + singles + remainingWild / 2
-      : 0
-    if (pairs === 7) {
-      const quads = values.filter((amount) => amount === 4).length
-      kinds.push(quads > 1 ? '双龙七对' : quads ? '龙七对' : '七对')
-    }
+    const quads = values.filter((amount) => amount === 4).length
+    kinds.push(quads > 1 ? '双龙七对' : quads ? '龙七对' : '七对')
   }
   const sevenPairs = kinds.some(kind => kind === '七对' || kind === '龙七对' || kind === '双龙七对')
   // 七对按专属 10 分结算，不再与门前清叠加；其它大牌可与门前清相乘。

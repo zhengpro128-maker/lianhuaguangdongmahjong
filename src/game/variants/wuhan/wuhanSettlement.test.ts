@@ -8,6 +8,19 @@ function player(seat: number, hand: TileType[] = []): GamePlayer {
 }
 
 describe('武汉晃晃点炮胡', () => {
+  it('六对加癞子可自摸或接普通弃牌成七对', () => {
+    const state = createWuhanGameState()
+    const waiting: TileType[] = ['m5', 'm5', 'p5', 'p5', 'p7', 'p8', 'p8', 'p9', 'p9', 's7', 's7', 's8', 's8']
+    state.players.push(player(0, waiting), player(1), player(2), player(3))
+    state.jokerTiles.value = ['p7']
+    const settlement = createWuhanSettlement({
+      state, clearTimers: () => {}, later: () => 0, playSound: () => {},
+      showTableAction: () => {}, structuralMeldCount: () => 0, getRoundLabel: () => '',
+    })
+    expect(settlement.isLegalWin(0, { winTile: 'm1', sourceFrom: 1 })).toBe(true)
+    state.players[0].hand.push('m1')
+    expect(settlement.isLegalWin(0, { selfDraw: true })).toBe(true)
+  })
   it('发财作为癞子时也可以胡他家弃牌', () => {
     const state = createWuhanGameState()
     const fullHand: TileType[] = ['m1', 'm1', 'm1', 'm2', 'm2', 'm2', 'p3', 'p3', 'p3', 's4', 's4', 'green', 's9', 's9']

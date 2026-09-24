@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { TileType } from '../../core/contracts/types'
-import { evaluateWuhanWin, isWuhanHardWin, isWuhanStandardWin, withWuhanWinScenes, wuhanDiscarderMultiplier, wuhanGetsSelfDrawBonus, wuhanMeetsMinimum, wuhanPatternPoints, wuhanRawWinPoints, wuhanWinPayment, WUHAN_RULESET } from './rules'
+import { evaluateWuhanWin, isWuhanHardWin, isWuhanSevenPairs, isWuhanStandardWin, withWuhanWinScenes, wuhanDiscarderMultiplier, wuhanGetsSelfDrawBonus, wuhanMeetsMinimum, wuhanPatternPoints, wuhanRawWinPoints, wuhanWinPayment, WUHAN_RULESET } from './rules'
 
 describe('武汉晃晃胡牌', () => {
   const standard = ['m1','m2','m3','m4','m5','m6','p2','p3','p4','s7','s8','s9','green','green'] as const
@@ -26,6 +26,16 @@ describe('武汉晃晃胡牌', () => {
   it('uses jokers to complete odd tiles before counting seven pairs', () => {
     const invalid = ['m1','m1','m2','m2','m3','m3','p1','p1','p2','p2','s1','s2','s3','white'] as const
     expect(evaluateWuhanWin(invalid, { joker: 'white' })).not.toContain('七对')
+  })
+  it('accepts the screenshot six pairs and one joker as seven pairs after a draw', () => {
+    const waiting: TileType[] = ['m5', 'm5', 'p5', 'p5', 'p7', 'p8', 'p8', 'p9', 'p9', 's7', 's7', 's8', 's8']
+    const won: TileType[] = [...waiting, 'm1']
+    expect(isWuhanStandardWin(won, 0, 'p7')).toBe(false)
+    expect(isWuhanSevenPairs(won, 0, 'p7')).toBe(true)
+    expect(evaluateWuhanWin(won, { joker: 'p7' })).toContain('七对')
+    expect(WUHAN_RULESET.win.isWinningHand(won, 0, { jokers: ['p7'] })).toBe(true)
+    expect(WUHAN_RULESET.win.waitingTiles(waiting, 0, { jokers: ['p7'] })).toContain('m1')
+    expect(wuhanMeetsMinimum(['七对'], true, false, [])).toBe(true)
   })
   it('按新规则计算起胡、门前清、自摸和点炮', () => {
     expect(wuhanRawWinPoints(['屁胡'], true, false, [])).toBe(3)
