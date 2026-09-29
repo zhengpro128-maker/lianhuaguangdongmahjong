@@ -43,9 +43,20 @@ it.each(['rounds4', 'rounds8', 'rounds16'] as const)('uses %s in native authenti
   expect(game.snapshot().players[1].hand).toEqual([])
   expect(game.discard(0)).toBe(true)
   expect(send).toHaveBeenCalledWith(expect.objectContaining({ data: JSON.stringify({ type: 'discard', handIndex: 0 }) }))
+  expect(game.sendSocial({ category: 'prop', value: 'tomato', targetSeat: 1 })).toBe(true)
+  expect(send).toHaveBeenLastCalledWith(expect.objectContaining({ data: JSON.stringify({ category: 'prop', value: 'tomato', targetSeat: 3, type: 'room_social' }) }))
+  expect(game.snapshot().socialEvents).toHaveLength(0) // Only server echoes are displayed.
+  const social = { kind: 'room_social', id: 'social-1', seat: 3, category: 'prop', value: 'coffee', targetSeat: 2 }
+  receive(social); receive(social)
+  expect(game.snapshot().socialEvents).toHaveLength(1)
+  expect(game.snapshot().socialEvents[0]).toMatchObject({ seat: 1, targetSeat: 0, value: 'coffee' })
+  expect(() => game.sendSocial({ category: 'text', value: '你好' })).toThrow('发送太快')
+  handlers.error({ errMsg: 'connection lost' })
+  expect(() => game.sendSocial({ category: 'emoji', value: 'smile' })).toThrow('检查连接')
   await game.leaveOnline()
   expect(close).toHaveBeenCalled()
   expect(game.snapshot().gameMode).toBe('local')
+  expect(game.snapshot().socialEvents).toEqual([])
 })
 
 it('converts native socket errors into a close event so shared reconnect can run', () => {

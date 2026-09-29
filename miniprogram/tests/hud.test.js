@@ -197,7 +197,7 @@ it.each([[667, 320], [844, 390], [1128, 532], [1024, 768]])('keeps compact seats
   const assertUnobstructed = () => {
     const cards = seats.mock.calls.map(([player, , x, y, w, h]) => ({ x, y, w, h, label: `seat ${player.name}` }))
     expect(cards).toHaveLength(4)
-    const controls = hud.hitRegions.filter(hit => !['select', 'discard'].includes(hit.action.type))
+    const controls = hud.hitRegions.filter(hit => !hit.seatHit && !['select', 'discard'].includes(hit.action.type))
     const roundLabels = text.mock.calls.filter(([label]) => /^\d+ 局/.test(String(label))).map(([label, x, y, size, , align, , maxWidth]) => {
       const w = Math.min(hud.ctx.measureText(String(label)).width, maxWidth || Infinity)
       return { x: align === 'center' ? x - w / 2 : align === 'right' ? x - w : x, y: y - size / 2, w, h: size }
@@ -250,10 +250,48 @@ it.each([[667, 320], [844, 390]])('anchors each actor cue to its visible seat wi
       else expect(y - size / 2).toBeGreaterThanOrEqual(cardY + cardH)
       const cue = { x: x - size / 2, y: y - size / 2, w: size, h: size }
       const cards = seats.mock.calls.map(([, , x, y, w, h]) => ({ x, y, w, h }))
-      const controls = hud.hitRegions.filter(hit => !['select', 'discard'].includes(hit.action.type))
+      const controls = hud.hitRegions.filter(hit => !hit.seatHit && !['select', 'discard'].includes(hit.action.type))
       for (const item of [...cards, ...controls, hud.layout.indicator, ...hud.handHits]) {
         expect(intersects(cue, item), `actor ${actorIndex}, user ${ownSeat}: cue ${JSON.stringify(cue)} overlaps ${JSON.stringify(item)}`).toBe(false)
       }
     }
   }
+})
+
+
+it.each([[667, 320], [844, 390]])('offers chat tabs and target props without leaking taps to the hand at %s × %s', (width, height) => {
+  const { hud, onAction } = makeHud()
+  hud.resize({ windowWidth: width, windowHeight: height })
+  hud.update(turn)
+  tap(hud, hud.hits.find(hit => hit.action.local === 'social' && !hit.seatHit))
+  expect(hud.handHits).toEqual([])
+  hud.handleTouch(1, 1)
+  expect(onAction).not.toHaveBeenCalled()
+  expect(hud.hits.filter(hit => hit.action.type === 'social-send')).toHaveLength(6)
+  tap(hud, hud.hits.find(hit => hit.action.local === 'social-tab' && hit.action.value === 'emoji'))
+  tap(hud, hud.hits.find(hit => hit.action.type === 'social-send'))
+  expect(onAction).toHaveBeenLastCalledWith({ type: 'social-send', payload: { category: 'emoji', value: 'smile' } })
+  tap(hud, hud.hits.find(hit => hit.action.local === 'social-target' && hit.action.seat === 2))
+  const props = hud.hits.filter(hit => hit.action.type === 'social-send')
+  expect(props).toHaveLength(3)
+  for (const hit of hud.hits) {
+    expect(hit.y + hit.h).toBeLessThanOrEqual(height)
+    expect(hit.x + hit.w).toBeLessThanOrEqual(width)
+  }
+  tap(hud, props[2])
+  expect(onAction).toHaveBeenLastCalledWith({ type: 'social-send', payload: { category: 'prop', value: 'hammer', targetSeat: 2 } })
+})
+
+it('expires speech/prop effects and allows muting while retaining message history', () => {
+  const { hud } = makeHud(), receivedAt = Date.now()
+  hud.update({ ...turn, socialEvents: [
+    { kind: 'room_social', id: 'text', seat: 1, category: 'text', value: '你好', receivedAt },
+    { kind: 'room_social', id: 'prop', seat: 2, category: 'prop', value: 'tomato', targetSeat: 0, receivedAt },
+  ] })
+  expect(hud.socialAnimating).toBe(true)
+  hud.drawSocialEffects(receivedAt + 4600)
+  expect(hud.socialAnimating).toBe(false)
+  hud.socialMuted = true; hud.drawSocialEffects(receivedAt)
+  expect(hud.socialAnimating).toBe(false)
+  expect(hud.state.socialEvents).toHaveLength(2)
 })

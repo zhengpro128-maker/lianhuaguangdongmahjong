@@ -1,3 +1,4 @@
+import { SOCIAL_PHRASES, SOCIAL_EMOJIS, SOCIAL_PROPS, socialLabel } from '../../src/game/shared/roomSocial'
 import { MINI_MATCH_OPTIONS, miniMatchRounds } from './match-options'
 import { miniTableLayout } from './table-layout'
 import { THEME_PRESENTATIONS } from '../../src/theme/themePresentation.ts'
@@ -44,6 +45,8 @@ export class MiniHud {
     this.createImage = createImage; this.onAction = onAction; this.onInvalidate = onInvalidate
     this.images = new Map(); this.hits = []; this.handHits = []; this.state = { phase: 'lobby' }
     this.width = 844; this.height = 390; this.dpr = 1; this.safe = { left: 0, right: 0, top: 0, bottom: 0 }
+    this.socialTab = 'phrase'; this.socialMuted = false; this.socialTarget = 1; this.socialHistoryPage = 0
+    this.socialAnimating = false
     this.modal = null; this.rulePage = 0; this.hiddenResult = null; this.disposed = false
   }
 
@@ -145,6 +148,7 @@ export class MiniHud {
     if (this.width < this.height) { this.drawOrientation(); this.onInvalidate(); return }
     if (this.state.screen === 'lobby' || this.state.phase === 'lobby') this.drawLobby()
     else this.drawTable()
+    this.drawSocialEffects()
     if (this.modal) this.drawModal()
     else if (this.hasResult() && this.hiddenResult !== this.resultKey()) this.drawSettlement()
     this.onInvalidate()
@@ -284,6 +288,7 @@ export class MiniHud {
     if (flip) this.drawTile(flip, indicator.x + 10, tileY, tileW, tileH)
     else this.text('—', indicator.x + 18, tileY + tileH / 2, 13, PALETTE.textMuted)
     joker.forEach((tile, index) => this.drawTile(tile, indicator.x + indicator.w / 2 + 5 + index * (tileW + 1), tileY, tileW, tileH, { joker: true }))
+    this.button(left, top + 43, 71, 31, '聊天', { local: 'social' }, { small: true })
     this.drawHand(own)
     this.drawActions()
     this.drawActionCue()
@@ -295,11 +300,12 @@ export class MiniHud {
     if (s.online && s.online.status !== 'connected') status = '连接中断，正在自动重连…'
     const statusY = own?.hand?.length ? handY - (s.selectedIndex >= 0 ? 28 : 12) : h - this.safe.bottom - 10
     this.text(status, this.layout.hand.x + this.layout.hand.w / 2, statusY, 10, PALETTE.textMuted, 'center', 'normal', this.layout.hand.w)
-    if (s.announcement?.text && !this.hasResult()) this.wrapped(s.announcement.text, left, top + 53, 96, 11, 18, PALETTE.accent, 3)
+    if (s.announcement?.text && !this.hasResult()) this.wrapped(s.announcement.text, left, top + 91, 96, 11, 18, PALETTE.accent, 3)
     if (this.hasResult() && this.hiddenResult === this.resultKey()) this.button(w / 2 - 60, handY - 61, 120, 33, '查看结算', { local: 'result' }, { primary: true, small: true })
   }
 
   drawSeat(player, index, x, y, w, h, self) {
+    this.hits.push({ x, y, w, h, seatHit: true, action: self ? { local: 'social' } : { local: 'social-target', seat: index } })
     const active = this.state.currentPlayer === index, stacked = w < 80
     const avatar = stacked ? 24 : Math.min(h - 12, 32)
     const avatarX = stacked ? x + (w - avatar) / 2 : x + 6, avatarY = y + (stacked ? 4 : 6)
@@ -402,6 +408,89 @@ export class MiniHud {
     this.ctx.restore()
   }
 
+  drawSocialPanel() {
+    const b = this.modalShell('牌桌聊天', 548, 310), pad = 20
+    const disabled = this.state.online && this.state.online.status !== 'connected'
+    const tabs = [['phrase', '短语'], ['emoji', '表情'], ['history', '消息']]
+    tabs.forEach(([value, label], i) => this.button(b.x + pad + i * 77, b.y + 53, 69, 29, label,
+      { local: 'social-tab', value }, { small: true, active: this.socialTab === value }))
+    this.button(b.x + b.w - 151, b.y + 53, 131, 29, this.socialMuted ? '互动已屏蔽' : '屏蔽互动', { local: 'social-mute' }, { small: true, active: this.socialMuted })
+    const contentY = b.y + 94, contentH = b.h - 164
+    if (this.socialTab === 'history') {
+      const history = this.state.socialEvents || [], pages = Math.max(1, Math.ceil(history.length / 3))
+      this.socialHistoryPage = clamp(this.socialHistoryPage, 0, pages - 1)
+      const end = history.length - this.socialHistoryPage * 3, rows = history.slice(Math.max(0, end - 3), end)
+      if (!rows.length) this.text('还没有消息，和同桌打个招呼吧', b.x + pad, contentY + 20, 13, PALETTE.textMuted)
+      rows.forEach((event, i) => {
+        const actor = this.state.players?.[event.seat]?.name || '玩家'
+        const target = event.category === 'prop' ? ` → ${this.state.players?.[event.targetSeat]?.name || '玩家'}` : ''
+        this.wrapped(`${actor}${target}：${socialLabel(event)}`, b.x + pad, contentY + 6 + i * 37, b.w - 40, 11, 15, PALETTE.text, 2)
+      })
+      this.button(b.x + pad, b.y + b.h - 94, 70, 25, '更早', { local: 'social-page', step: 1 }, { small: true, disabled: this.socialHistoryPage >= pages - 1 })
+      this.button(b.x + 98, b.y + b.h - 94, 70, 25, '更新', { local: 'social-page', step: -1 }, { small: true, disabled: this.socialHistoryPage === 0 })
+    } else {
+      const items = this.socialTab === 'emoji' ? SOCIAL_EMOJIS : SOCIAL_PHRASES
+      const cw = (b.w - pad * 2 - 10) / 2, rh = (contentH - 14) / 3
+      items.forEach((item, i) => this.button(b.x + pad + i % 2 * (cw + 10), contentY + Math.floor(i / 2) * (rh + 7), cw, rh,
+        item.icon ? `${item.icon} ${item.label}` : item.label, { type: 'social-send', payload: { category: this.socialTab, value: item.id } }, { small: true, disabled }))
+    }
+    this.button(b.x + pad, b.y + b.h - 53, b.w - pad * 2, 34, disabled ? '重连后可发送' : '输入消息 · 最多 60 字', { type: 'social-text' }, { small: true, primary: true, disabled })
+    this.text(this.state.gameMode === 'online' ? '同桌可见 · 每 2 秒可发送一次' : '单机体验 · 点击其他玩家头像可使用道具', b.x + b.w / 2, b.y + b.h - 9, 9, PALETTE.textMuted, 'center')
+  }
+
+  drawSocialTarget() {
+    const name = this.state.players?.[this.socialTarget]?.name || '玩家'
+    const b = this.modalShell(`与 ${name} 互动`, 460, 220)
+    const gap = 12, cw = (b.w - 40 - gap * 2) / 3
+    SOCIAL_PROPS.forEach((item, i) => this.button(b.x + 20 + i * (cw + gap), b.y + 75, cw, 76, item.icon,
+      { type: 'social-send', payload: { category: 'prop', value: item.id, targetSeat: this.socialTarget } },
+      { subtitle: item.label, disabled: this.state.online && this.state.online.status !== 'connected' }))
+    this.text('点击道具发送 · 同桌可见', b.x + b.w / 2, b.y + b.h - 28, 12, PALETTE.textMuted, 'center')
+  }
+
+  drawSocialEffects(now = Date.now()) {
+    this.socialAnimating = false
+    if (this.socialMuted || this.state.phase === 'lobby' || !this.layout) return
+    const events = (this.state.socialEvents || []).filter(event => now - event.receivedAt < (event.category === 'prop' ? 1800 : 4500))
+    this.socialAnimating = events.length > 0
+    const ownSeat = this.state.user?.seat ?? 0
+    const anchor = seat => this.layout.seats[(seat - ownSeat + 4) % 4]
+    // One speech bubble per seat; new messages replace old ones without stacking over the hand.
+    for (const seat of [0, 1, 2, 3]) {
+      const event = events.filter(item => item.seat === seat && item.category !== 'prop').at(-1)
+      if (!event) continue
+      const card = anchor(seat), bw = Math.min(192, this.width * .3), bh = 53
+      const x = clamp(card.x + card.w / 2 - bw / 2, this.layout.left, this.width - this.layout.right - bw)
+      const y = seat === ownSeat ? card.y - bh - 45 : clamp(card.y + card.h + 7, 5, this.height - bh - 95)
+      this.box(x, y, bw, bh, '#f3ecda', PALETTE.accent, 10)
+      const label = Array.from(socialLabel(event)), preview = label.length > 26 ? label.slice(0, 25).join('') + '…' : label.join('')
+      this.wrapped(preview, x + 10, y + 14, bw - 20, 12, 16, '#244331', 2)
+    }
+    for (const event of events.filter(item => item.category === 'prop').slice(-4)) {
+      const from = anchor(event.seat), to = anchor(event.targetSeat)
+      if (!from || !to) continue
+      const age = now - event.receivedAt, t = clamp(age / 700, 0, 1)
+      const x = from.x + from.w / 2 + (to.x + to.w / 2 - from.x - from.w / 2) * t
+      const y = from.y + from.h / 2 + (to.y + to.h / 2 - from.y - from.h / 2) * t - Math.sin(t * Math.PI) * 75
+      const prop = SOCIAL_PROPS.find(item => item.id === event.value)
+      this.ctx.save(); this.ctx.translate(x, y)
+      this.ctx.globalAlpha = age > 1400 ? (1800 - age) / 400 : 1
+      const impact = clamp((age - 700) / 650, 0, 1)
+      const angle = event.value === 'coffee' ? -impact * .9 : event.value === 'hammer' ? Math.sin(impact * Math.PI * 3) * .8 : t * Math.PI * 2
+      this.ctx.rotate(angle)
+      if (!prop.asset || !this.image(prop.asset, -22, -22, 44, 44, 'contain')) this.text(prop.icon, 0, 0, 36, PALETTE.text, 'center')
+      this.ctx.restore()
+      if (age >= 700) {
+        const color = event.value === 'tomato' ? '#e65b43' : event.value === 'coffee' ? '#a16f42' : '#f4cf71'
+        for (let i = 0; i < 7; i++) {
+          const angle = i / 7 * Math.PI * 2, radius = 13 + impact * 30
+          this.box(x + Math.cos(angle) * radius, y + Math.sin(angle) * radius + (event.value === 'coffee' ? impact * 24 : 0), 5, 8, color, null, 3)
+        }
+        this.text(prop.label, clamp(x, 45, this.width - 45), clamp(y + 38, 20, this.height - 18), 12, PALETTE.accent, 'center', 'bold')
+      }
+    }
+  }
+
   hasResult() { return !!this.state.result && ['settled', 'finished'].includes(this.state.phase) || !!this.state.matchFinished }
   resultKey() { return this.state.result?.presentationKey || `${this.state.roundLabel}/${this.state.result?.winnerIndex}/${this.state.matchFinished}` }
 
@@ -418,6 +507,8 @@ export class MiniHud {
   }
 
   drawModal() {
+    if (this.modal === 'social') return this.drawSocialPanel()
+    if (this.modal === 'social-target') return this.drawSocialTarget()
     if (this.modal === 'create-room') {
       const b = this.modalShell('创建联机房间', 460, 245)
       this.text('选择局数 · 连庄计入局数', b.x + 24, b.y + 70, 13, PALETTE.textMuted)
@@ -535,6 +626,11 @@ export class MiniHud {
     }
     if (action.local) {
       switch (action.local) {
+        case 'social': this.modal = 'social'; break
+        case 'social-tab': this.socialTab = action.value; this.socialHistoryPage = 0; break
+        case 'social-page': this.socialHistoryPage += action.step; break
+        case 'social-mute': this.socialMuted = !this.socialMuted; break
+        case 'social-target': this.socialTarget = action.seat; this.modal = 'social-target'; break
         case 'create-room': this.roomMatch = this.state.selectedMatch || 'rounds4'; this.modal = 'create-room'; break
         case 'room-match': this.roomMatch = action.value; break
         case 'close': this.modal = null; break

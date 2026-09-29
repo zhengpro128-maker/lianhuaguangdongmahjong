@@ -1,4 +1,5 @@
-import { effectScope, isRef, watchEffect, type EffectScope } from 'vue'
+import { validSocialPayload, SOCIAL_COOLDOWN_MS, type SocialPayload, type SocialEvent, type DisplaySocialEvent } from '../../src/game/shared/roomSocial'
+import { effectScope, isRef, ref, watchEffect, type EffectScope } from 'vue'
 import { GAME_PORT_STATE_KEYS, type GamePort } from '../../src/game/core/contracts/gamePort'
 import type { MatchType, TileType } from '../../src/game/core/contracts/types'
 import { tileFaceFile, tileName } from '../../src/game/core/rules/tiles'
@@ -22,6 +23,8 @@ export interface MiniAction {
 type Value<T> = T extends { value: infer V } ? V : T
 type PortState = { [K in typeof GAME_PORT_STATE_KEYS[number]]: Value<GamePort[K]> }
 export type MiniGameSnapshot = PortState & {
+  socialSession: number
+  socialEvents: DisplaySocialEvent[]
   ruleVariant: typeof MINI_RULE_VARIANT
   rulesetId: typeof MINI_RULE_VARIANT
   gameMode: 'local' | 'online'
@@ -71,6 +74,13 @@ export function createMiniGame(options: MiniGameOptions = {}) {
   installMiniGamePlatform()
   let port: ReturnType<typeof useWuhanGame> | ReturnType<typeof useRemoteGame>
   const remote = () => port as ReturnType<typeof useRemoteGame>
+  const socialEvents = ref<DisplaySocialEvent[]>([])
+  let lastSocialSent = -Infinity, socialSequence = 0
+  function receiveSocial(event: SocialEvent) {
+    if (disposed || socialEvents.value.some(item => item.id === event.id)) return
+    socialEvents.value = [...socialEvents.value.slice(-29), { ...event, receivedAt: Date.now() }]
+    emit()
+  }
   let online = false
   let identity = { nickname: '微信玩家', avatarUrl: '' }
   let scope: EffectScope | null = null
@@ -112,7 +122,7 @@ export function createMiniGame(options: MiniGameOptions = {}) {
       state.user = state.players[0]
     }
     const table = port.capabilities.value.lotusTable
-    return { ...state, ruleVariant: MINI_RULE_VARIANT, rulesetId: MINI_RULE_VARIANT, gameMode: online ? 'online' : 'local',
+    return { ...state, socialSession: generation, socialEvents: copy(socialEvents.value), ruleVariant: MINI_RULE_VARIANT, rulesetId: MINI_RULE_VARIANT, gameMode: online ? 'online' : 'local',
       canResume: !!createRemoteSessionStore().loadSession(),
       online: online ? { roomId: remote().roomId.value, seats: copy(remote().roomSeats.value), isCreator: remote().isCreator.value,
         mySeat: remote().mySeat.value, error: remote().sessionError.value, status: remote().wsStatus.value } : null,
@@ -197,6 +207,7 @@ export function createMiniGame(options: MiniGameOptions = {}) {
   }
 
   function release() {
+    socialEvents.value = []; lastSocialSent = -Infinity
     generation += 1; cancelStart?.(); cancelStart = null
     clearAutoTimer(); clearCountdown(); decisionKey = ''; submittedKey = ''; seconds = 0
     scope?.stop(); scope = null
@@ -216,7 +227,7 @@ export function createMiniGame(options: MiniGameOptions = {}) {
     const epoch = generation
     scope = effectScope(true)
     scope.run(() => {
-      port = online ? useRemoteGame({ playSound: options.playSound, playSoundAndWait: options.playSoundAndWait, getThemeName: () => 'jade', waitForTableReady: async () => { await options.waitForTableReady?.() } }) : useWuhanGame({
+      port = online ? useRemoteGame({ onSocialEvent: event => { if (epoch === generation) receiveSocial(event) }, onSocialError: code => options.onError?.(new Error(code === 'SOCIAL_RATE_LIMIT' ? '发送太快了，请稍后再试' : '消息未发送，请重试')), playSound: options.playSound, playSoundAndWait: options.playSoundAndWait, getThemeName: () => 'jade', waitForTableReady: async () => { await options.waitForTableReady?.() } }) : useWuhanGame({
         // Countdown ownership stays here so hiding WeChat cannot discard the user's hand.
         countdownEnabled: false, getThemeName: () => 'jade',
         playSound: (name, volume, done) => {
@@ -338,8 +349,20 @@ export function createMiniGame(options: MiniGameOptions = {}) {
     if (online) await remote().remoteActions.leaveRoom()
     backToLobby()
   }
+  function sendSocial(payload: SocialPayload) {
+    if (disposed || paused || disconnected()) throw new Error('当前无法发送，请检查连接')
+    if (!validSocialPayload(payload)) throw new Error('请输入 1–60 字的消息，或选择有效的表情和道具')
+    if (!port.players.length) throw new Error('请进入牌桌后再发送')
+    if (payload.category === 'prop' && (payload.targetSeat === 0 || !port.players[payload.targetSeat])) throw new Error('请选择其他玩家')
+    if (Date.now() - lastSocialSent < SOCIAL_COOLDOWN_MS) throw new Error('发送太快了，请稍等两秒')
+    if (online) {
+      if (!remote().sendSocial(payload)) throw new Error('消息未发送，请检查连接')
+    } else receiveSocial({ ...payload, kind: 'room_social', id: `local-${++socialSequence}`, seat: 0 })
+    lastSocialSent = Date.now()
+    return true
+  }
   build()
-  return { setProfile: (profile: typeof identity) => { identity = { nickname: profile.nickname, avatarUrl: profile.avatarUrl }; emit() }, enterOnline, resumeOnline, leaveOnline, readyOnline: () => remote().remoteActions.toggleReady(),
+  return { sendSocial, setProfile: (profile: typeof identity) => { identity = { nickname: profile.nickname, avatarUrl: profile.avatarUrl }; emit() }, enterOnline, resumeOnline, leaveOnline, readyOnline: () => remote().remoteActions.toggleReady(),
     startOnline: () => remote().remoteActions.startMatch(), start, snapshot, selectTile, select: selectTile, discard, action, nextRound, backToLobby,
     setAutoPlay, pause, resume, clearSelection, hint, dispose, tileName, tileAssetPath }
 }
