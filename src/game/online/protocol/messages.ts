@@ -1,3 +1,4 @@
+import type { SocialEvent } from '../../shared/roomSocial'
 import type { RoundResult } from '../../core/contracts/gamePort'
 import type {
   MatchType,
@@ -42,6 +43,7 @@ export type ServerRequest =
   | { kind: 'rob_kong_request'; ctx: { tile: TileType; from: number; hand: TileType[]; exposedMelds: number } }
 
 export type ServerMessage =
+  | SocialEvent
   | ServerSnapshot
   | ServerRequest
   | RoundStartMessage

@@ -1,3 +1,4 @@
+import { validSocialPayload, type SocialPayload, type SocialEvent } from '../shared/roomSocial'
 // 远程对局 composable —— 与 useGame 返回完全兼容的接口，但状态由服务端快照驱动
 //
 // 职责划分：
@@ -49,6 +50,8 @@ interface UseRemoteGameOptions {
   playSound?: (name: string, volume?: number, onFinish?: () => void) => unknown
   playSoundAndWait?: (name: string, volume?: number) => Promise<void>
   waitForTableReady?: () => Promise<void>
+  onSocialEvent?: (event: SocialEvent) => void
+  onSocialError?: (code: string) => void
   onLlmMessage?: (seat: number, text: string) => void
   onLlmStatus?: (seat: number, active: boolean, text?: string) => void
   playLlmAudio?: (url: string, seat: number, messageId: number, priority?: 'normal' | 'important') => void
@@ -61,6 +64,8 @@ export function useRemoteGame({
   playSound = () => {},
   playSoundAndWait = async () => {},
   waitForTableReady,
+  onSocialEvent = () => {},
+  onSocialError = () => {},
   onLlmMessage = () => {},
   onLlmStatus = () => {},
   playLlmAudio = () => {},
@@ -376,7 +381,19 @@ export function useRemoteGame({
 
   // ── 消息分发 ───────────────────────────────────────────
 
+  function sendSocial(payload: SocialPayload) {
+    if (!validSocialPayload(payload) || mySeat.value < 0 || !roomId.value) return false
+    if (payload.category === 'prop' && payload.targetSeat === 0) return false
+    return roomSocket.send({ ...payload, type: 'room_social',
+      ...(payload.category === 'prop' ? { targetSeat: (payload.targetSeat + mySeat.value) % 4 } : {}) })
+  }
+
   const serverMessageRouter = createServerMessageRouter({
+    room_social: (event) => {
+      if (mySeat.value < 0) return
+      onSocialEvent({ ...event, seat: toLocal(event.seat),
+        ...(event.category === 'prop' ? { targetSeat: toLocal(event.targetSeat) } : {}) })
+    },
     rejoin_ok: (msg) => {
       fallbackSettlementSequence += 1
       roomId.value = msg.roomId
@@ -509,7 +526,7 @@ export function useRemoteGame({
     },
     room_closed: () => { void roomLifecycle.leaveRoom() },
     pong: () => {},
-    error: (msg) => handleError(msg.code),
+    error: (msg) => { if (msg.code.startsWith('SOCIAL_')) onSocialError(msg.code); else handleError(msg.code) },
   })
 
   function handleMessage(raw: unknown) {
@@ -558,7 +575,7 @@ export function useRemoteGame({
     signalQuality,   // 0-3 信号质量（越大连接越好）
     storedSession,   // 上次未完成对局（「继续对局」入口；null = 无）
     autoPlay, toggleAutoPlay,   // 自动打牌开关（多窗口联机测试/观战）
-    remoteActions: roomLifecycle,
+    remoteActions: roomLifecycle, sendSocial,
     // 游戏状态（useGame 兼容接口）
     phase, players, wall, wallHeadDrawn, wallCount, currentPlayer, selectedIndex, turnSeconds, lastDiscard,
     actionPrompt, announcement, tableActionEvent, scoreFlowEvent, result, winEffect,

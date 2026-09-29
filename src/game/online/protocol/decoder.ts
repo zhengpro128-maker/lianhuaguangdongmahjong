@@ -1,3 +1,4 @@
+import { validSocialEvent } from '../../shared/roomSocial'
 import type { GamePhase, RoundResult } from '../../core/contracts/gamePort'
 import type { TileType, WinPresentation } from '../../core/contracts/types'
 import type { ServerMeldDto, ServerPlayerDto } from './dto'
@@ -173,6 +174,7 @@ export function decodeServerMessage(raw: unknown): ServerMessage | null {
   if (!isObject(raw) || !isString(raw.kind)) return null
   const valid = (() => {
     switch (raw.kind) {
+      case 'room_social': return validSocialEvent(raw)
       case 'state_snapshot': return isSnapshot(raw)
       case 'round_start':
         return isBoolean(raw.matchStarted) && isNumber(raw.round) && isNumber(raw.dealer)

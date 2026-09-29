@@ -89,6 +89,7 @@ export function bootMiniGame(wxApi = globalThis.wx) {
         table.update(state); hud.update(state)
         overlayDirty = true; dirty = false
       }
+      if (hud.socialAnimating) hud.render()
       syncLoginButton()
       if (overlayDirty) { table.markOverlayDirty(); overlayDirty = false }
       table.render(time); lastFrame = time
@@ -184,6 +185,20 @@ export function bootMiniGame(wxApi = globalThis.wx) {
     if (disposed) return
     if (['login', 'create-room', 'join-room', 'join-listed-room', 'ready-room', 'start-room', 'leave-room', 'resume-room'].includes(action.type)) return onlineAction(action)
     switch (action.type) {
+      case 'social-send':
+        try { game.sendSocial(action.payload) }
+        catch (error) { wxApi.showToast?.({ title: error.message || '发送失败', icon: 'none' }) }
+        break
+      case 'social-text': {
+        if (!wxApi.showModal) { wxApi.showToast?.({ title: '当前环境不支持输入', icon: 'none' }); break }
+        const session = game.snapshot().socialSession
+        const result = await new Promise(resolve => wxApi.showModal({ title: '发送消息', editable: true,
+          placeholderText: '输入 1–60 字的消息', confirmText: '发送', success: resolve, fail: () => resolve({ confirm: false }) }))
+        if (disposed || !result.confirm || session !== game.snapshot().socialSession) break
+        try { game.sendSocial({ category: 'text', value: (result.content || '').trim() }) }
+        catch (error) { wxApi.showToast?.({ title: error.message || '发送失败', icon: 'none' }) }
+        break
+      }
       case 'lobby-page':
         if (action.value === 'online' && !auth.identity) return onlineAction({ type: 'login' })
         lobbyPage = ['local', 'online'].includes(action.value) ? action.value : 'modes'
@@ -237,7 +252,7 @@ export function bootMiniGame(wxApi = globalThis.wx) {
     }
     invalidate()
   }
-  game = createMiniGame({ onChange: invalidate, playSound: audio.playSound,
+  game = createMiniGame({ onChange: invalidate, onError: error => wxApi.showToast?.({ title: error.message || '发送失败', icon: 'none' }), playSound: audio.playSound,
     playSoundAndWait: audio.playSoundAndWait, getThemeName: () => 'jade', waitForTableReady: () => table.ready, countdownEnabled: false })
   hud = new MiniHud({ createCanvas: () => wxApi.createCanvas(), createImage: () => wxApi.createImage(),
     onAction: act, onInvalidate: () => { overlayDirty = true } })

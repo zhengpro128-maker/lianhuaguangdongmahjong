@@ -31,7 +31,11 @@
     setStorageSync: (key, value) => localStorage.setItem(key, JSON.stringify(value)),
     removeStorageSync: key => localStorage.removeItem(key),
     setKeepScreenOn() {},
-    showModal: ({ title, content }) => console.error(title, content),
+    showModal: ({ title, content, editable, placeholderText, success }) => {
+      if (editable) { const value = window.prompt(`${title}\n${placeholderText || ''}`, ''); success?.({ confirm: value !== null, content: value || '' }) }
+      else { console.info(title, content); success?.({ confirm: true }) }
+    },
+    showToast: ({ title }) => console.info(title),
     createInnerAudioContext() {
       const audio = new Audio()
       const listeners = {}
