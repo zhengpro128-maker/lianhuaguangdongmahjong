@@ -2,6 +2,7 @@ import { defaultAvatarForSeat } from '../../core/presentation/avatar'
 import type { LastDiscard, RoundResult } from '../../core/contracts/gamePort'
 import type { GamePlayer, Meld, ScoreDelta, TableActionEvent, WinPresentation } from '../../core/contracts/types'
 import type { LocalSnapshot, ServerMeldDto, ServerPlayerDto, ServerSnapshot } from './dto'
+import type { MatchRoundRecord } from '../../shared/roundHistory'
 
 export function toLocalSeat(serverSeat: number, localServerSeat: number): number {
   return ((serverSeat - localServerSeat + 4) % 4 + 4) % 4
@@ -61,6 +62,23 @@ export function mapRoundResultToLocal(
       playerIndex: toLocalSeat(change.playerIndex, localServerSeat),
     })),
   }
+}
+
+export function mapRoundHistoryToLocal(
+  records: MatchRoundRecord[],
+  localServerSeat: number,
+): MatchRoundRecord[] {
+  return records.map((record) => {
+    const mapped = mapRoundResultToLocal(record, localServerSeat)!
+    return {
+      ...mapped,
+      id: record.id,
+      round: record.round,
+      dealer: toLocalSeat(record.dealer, localServerSeat),
+      honba: record.honba,
+      scoreChanges: [...mapped.scoreChanges!].sort((a, b) => a.playerIndex - b.playerIndex),
+    }
+  })
 }
 
 export function mapWinPresentationToLocal(
@@ -124,6 +142,9 @@ export function mapServerSnapshotToLocal(
       : -1,
     players: mapPlayersToLocal(snapshot.players, localServerSeat),
     result: mapRoundResultToLocal(snapshot.result, localServerSeat),
+    ...(snapshot.roundHistory !== undefined
+      ? { roundHistory: mapRoundHistoryToLocal(snapshot.roundHistory, localServerSeat) }
+      : {}),
     lastDiscard: mapLastDiscardToLocal(snapshot.lastDiscard, localServerSeat),
     winPresentation: mapWinPresentationToLocal(snapshot.winPresentation, localServerSeat),
     winningPlayerIndex: snapshot.winningPlayerIndex >= 0

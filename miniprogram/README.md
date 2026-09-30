@@ -25,6 +25,7 @@ pnpm build:mini
 - 显示听牌提示、癞子、庄家、当前出牌者、剩余牌数、四家分数与结算明细。
 - 托管可切换；音效和场次选择保存在微信本地存储。离开当前对局需在游戏内确认。
 - 单机和联机牌桌均可发送文字、快捷短语、表情；点击其他玩家头像可扔番茄、倒咖啡、砸锤子，带飞行/倾倒/挥击、头像反馈与音效。联机由服务器广播给同桌所有玩家，部署要求与使用说明见 [牌桌互动](../docs/miniprogram-social.md)。
+- 联机牌桌右上角「战绩」可按局查看本场历史，显示真实头像昵称、四家整局净输赢、结束积分和大胡特殊牌型。换局、终局和断线重连保留历史；使用与后端更新说明见 [本场战绩](../docs/miniprogram-round-history.md)。
 
 ## 微信登录与联机
 
@@ -67,6 +68,7 @@ pnpm typecheck:mini
 pnpm test:mini:e2e  # 同一份小游戏 UMD 包的浏览器宿主测试
 node miniprogram/scripts/social-online-smoke.mjs # 四客户端联机互动、座位与反馈
 MINI_SOCIAL_CONCURRENT=1 node miniprogram/scripts/social-online-smoke.mjs # 三人同时攻击同一目标
+node miniprogram/scripts/round-history-smoke.mjs # 四客户端本场战绩、16局分页、断线补齐
 pnpm preview:mini  # http://127.0.0.1:4176
 ```
 

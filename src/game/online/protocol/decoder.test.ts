@@ -1,7 +1,58 @@
 import { describe, expect, it } from 'vitest'
 import { decodeServerMessage } from './decoder'
 
+function historyRecord() {
+  return {
+    id: 'ROOM01:1:0', round: 1, dealer: 0, honba: 0,
+    winnerIndex: 2, winner: 'P2', winType: 'self-draw',
+    scoreChanges: Array.from({ length: 4 }, (_, playerIndex) => ({
+      playerIndex, name: `P${playerIndex}`, avatar: '',
+      score: playerIndex === 2 ? 1300 : 900, delta: playerIndex === 2 ? 300 : -100,
+    })),
+  }
+}
+
+function historySnapshot(overrides: Record<string, unknown> = {}) {
+  return {
+    kind: 'state_snapshot', roomId: 'ROOM01', mode: 'east', phase: 'drawing',
+    round: 2, dealer: 1, honba: 0, wallCount: 80, wall: [], headDrawn: 52,
+    currentPlayer: 1, seat: 0, players: [], flipTile: null, flipStack: null,
+    openingStack: null, result: null, announcement: null, matchFinished: false,
+    lastDiscard: null, winPresentation: null, winningPlayerIndex: -1, ...overrides,
+  }
+}
+
 describe('decodeServerMessage', () => {
+  it('accepts legacy snapshots, empty history and settled records after the live result is cleared', () => {
+    for (const message of [historySnapshot(), historySnapshot({ roundHistory: [] }),
+      historySnapshot({ roundHistory: [historyRecord()] })]) {
+      expect(decodeServerMessage(message)).toBe(message)
+    }
+    const draw = { ...historyRecord(), id: 'ROOM01:2:0', round: 2, draw: true, winnerIndex: undefined }
+    expect(decodeServerMessage(historySnapshot({ roundHistory: [draw] }))).toBeTruthy()
+  })
+
+  it('rejects malformed history metadata, duplicate records and incomplete or repeated player scores', () => {
+    const record = historyRecord()
+    const invalidRecords = [
+      { ...record, id: '' }, { ...record, id: 1 },
+      { ...record, round: 0 }, { ...record, round: 1.5 },
+      { ...record, dealer: 4 }, { ...record, honba: -1 }, { ...record, honba: .5 },
+      { ...record, winnerIndex: 4 }, { ...record, winnerIndex: undefined },
+      { ...record, winType: 'unknown' },
+      { ...record, scoreChanges: undefined }, { ...record, scoreChanges: null },
+      { ...record, scoreChanges: record.scoreChanges.slice(0, 3) },
+      { ...record, scoreChanges: record.scoreChanges.map((change) => ({ ...change, playerIndex: 0 })) },
+      { ...record, scoreChanges: record.scoreChanges.map((change, index) => index === 0 ? { ...change, delta: '100' } : change) },
+      { ...record, scoreChanges: record.scoreChanges.map((change, index) => index === 0 ? { ...change, score: Infinity } : change) },
+    ]
+    for (const invalid of invalidRecords) {
+      expect(decodeServerMessage(historySnapshot({ roundHistory: [invalid] })), JSON.stringify(invalid)).toBeNull()
+    }
+    expect(decodeServerMessage(historySnapshot({ roundHistory: [record, { ...record }] }))).toBeNull()
+    expect(decodeServerMessage(historySnapshot({ roundHistory: null }))).toBeNull()
+  })
+
   it('accepts a structurally valid protocol message', () => {
     const message = { kind: 'announcement', text: '杠', tone: 'gold', id: 7 }
     expect(decodeServerMessage(message)).toBe(message)

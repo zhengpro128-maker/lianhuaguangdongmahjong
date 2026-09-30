@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { GamePlayer, TableActionEvent } from '../../core/contracts/types'
 import type { ServerSnapshot } from './dto'
+import type { MatchRoundRecord } from '../../shared/roundHistory'
 import {
+  mapRoundHistoryToLocal,
   mapScoreDeltasToLocal,
   mapServerSnapshotToLocal,
   mapTableActionToLocal,
@@ -147,6 +149,53 @@ describe('protocol seat mapper', () => {
 })
 
 describe('protocol event mapper', () => {
+  it.each([0, 1, 2, 3])('rotates history for viewer %i while preserving recorded player identities', (mySeat) => {
+    const record: MatchRoundRecord = {
+      id: 'ROOM01:7:2', round: 7, honba: 2, dealer: 1,
+      winnerIndex: 3, winner: '旧玩家3', discarderIndex: 1,
+      robbedKongPlayerIndex: 1, tenpai: [0, 2],
+      payerPayments: [10, 20, 30, 40],
+      scoreChanges: Array.from({ length: 4 }, (_, playerIndex) => ({
+        playerIndex, name: `旧玩家${playerIndex}`, avatar: `/history/${playerIndex}.png`,
+        score: 1000 + playerIndex, delta: playerIndex === 3 ? 300 : -100,
+      })),
+    }
+    const original = structuredClone(record)
+    const rotate = (seat: number) => (seat - mySeat + 4) % 4
+    const [mapped] = mapRoundHistoryToLocal([record], mySeat)
+    expect(mapped).toMatchObject({
+      id: record.id, round: 7, honba: 2, dealer: rotate(1),
+      winnerIndex: rotate(3), winner: '旧玩家3', discarderIndex: rotate(1),
+      robbedKongPlayerIndex: rotate(1), tenpai: [rotate(0), rotate(2)],
+    })
+    expect(mapped.scoreChanges.map((change) => change.playerIndex)).toEqual([0, 1, 2, 3])
+    for (let localSeat = 0; localSeat < 4; localSeat++) {
+      const serverSeat = (localSeat + mySeat) % 4
+      expect(mapped.scoreChanges[localSeat]).toMatchObject({
+        name: `旧玩家${serverSeat}`, avatar: `/history/${serverSeat}.png`, score: 1000 + serverSeat,
+      })
+      expect(mapped.payerPayments?.[localSeat]).toBe(original.payerPayments![serverSeat])
+    }
+    expect(record).toEqual(original)
+  })
+
+  it('preserves draw sentinels and supplies historical fallback avatars without changing identities', () => {
+    const record: MatchRoundRecord = {
+      id: 'ROOM01:8:0', round: 8, dealer: 0, honba: 0, draw: true,
+      winnerIndex: -1, tenpai: [1],
+      scoreChanges: Array.from({ length: 4 }, (_, playerIndex) => ({
+        playerIndex, name: `旧玩家${playerIndex}`, avatar: '', score: 1000, delta: 0,
+      })),
+    }
+    const [mapped] = mapRoundHistoryToLocal([record], 2)
+    expect(mapped.winnerIndex).toBe(-1)
+    expect(mapped.tenpai).toEqual([3])
+    expect(mapped.scoreChanges[2]).toMatchObject({ playerIndex: 2, name: '旧玩家0' })
+    expect(mapped.scoreChanges[2].avatar).toContain('lotus')
+    expect(mapped.scoreChanges[2].fallbackAvatar).toContain('lotus')
+    expect(record.scoreChanges[0].avatar).toBe('')
+  })
+
   it('maps table actions and score flows with the same seat rotation', () => {
     const event: TableActionEvent = {
       id: 1,

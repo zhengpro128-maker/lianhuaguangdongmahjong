@@ -1,6 +1,7 @@
 import type { Announcement, GamePhase, LastDiscard, RoundResult } from '../../core/contracts/gamePort'
 import type { GamePlayer, MatchType, Meld, TileType, WinPresentation } from '../../core/contracts/types'
 import type { RuleVariant } from '../../core/rules/ruleVariants'
+import type { MatchRoundRecord } from '../../shared/roundHistory'
 
 export interface ServerMeldDto extends Omit<Meld, 'from' | 'added' | 'pending'> {
   from?: number | null
@@ -40,6 +41,8 @@ export interface ServerSnapshot {
   players: ServerPlayerDto[]
   seat: number
   result: RoundResult | null
+  /** Omitted by older servers; includes all publicly settled hands in this match. */
+  roundHistory?: MatchRoundRecord[]
   announcement: Announcement | null
   matchFinished: boolean
   lastDiscard: LastDiscard | null

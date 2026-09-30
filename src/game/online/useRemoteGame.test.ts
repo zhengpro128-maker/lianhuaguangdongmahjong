@@ -3,6 +3,7 @@ import { useRemoteGame } from './useRemoteGame'
 import type { GamePlayer, TileType } from '../core/contracts/types'
 import type { ServerPlayerDto } from './protocol/dto'
 import { AnimeFixedTtsExecutor } from '../llm/animeFixedTtsExecutor'
+import type { MatchRoundRecord } from '../shared/roundHistory'
 
 // ─── Mock WebSocket / fetch / window ──────────────────────
 
@@ -163,6 +164,112 @@ async function connectGame(options: Parameters<typeof useRemoteGame>[0] = {}) {
   })
   return game
 }
+
+function makeRoundRecord(round = 1): MatchRoundRecord {
+  return {
+    id: `ABC123:${round}:0`, round, dealer: 1, honba: 0,
+    winnerIndex: 2, winner: '历史本家', winType: 'self-draw',
+    scoreChanges: SERVER_PLAYERS.map((player) => ({
+      playerIndex: player.seat, name: `历史${player.name}`,
+      avatar: `https://example.com/history/${player.seat}.png`,
+      score: player.seat === 2 ? 1300 : 900, delta: player.seat === 2 ? 300 : -100,
+    })),
+  }
+}
+
+describe('useRemoteGame authoritative round history', () => {
+  it('distinguishes old backends from an available empty history without accepting corrupt records', async () => {
+    const game = await connectGame()
+    mockSocket!.receive(makeSnapshot())
+    expect(game.roundHistoryAvailable.value).toBe(false)
+    expect(game.roundHistory.value).toEqual([])
+    mockSocket!.receive(makeSnapshot({ roundHistory: [] }))
+    expect(game.roundHistoryAvailable.value).toBe(true)
+    mockSocket!.receive(makeSnapshot({ roundHistory: [makeRoundRecord()] }))
+    mockSocket!.receive(makeSnapshot({ roundHistory: [{ ...makeRoundRecord(), scoreChanges: [] }] }))
+    expect(game.roundHistory.value.map((record) => record.id)).toEqual(['ABC123:1:0'])
+  })
+
+  it('updates history through the settlement gate, replaces duplicate snapshots and keeps past player identities next hand', async () => {
+    const game = await connectGame()
+    const first = makeRoundRecord()
+    const settled = makeSnapshot({
+      phase: 'settled', result: first, roundHistory: [first],
+      winPresentation: { winnerIndex: 2, tile: 'm1', sourceIndex: -1, robbedKong: false,
+        robbedKongPlayerIndex: -1, robbedKongMeldIndex: -1 },
+      winningPlayerIndex: 2,
+    })
+    mockSocket!.receive(settled)
+    expect(game.phase.value).toBe('win-effect')
+    expect(game.roundHistory.value[0]).toMatchObject({ winnerIndex: 0, dealer: 3 })
+    mockSocket!.receive(settled)
+    expect(game.roundHistory.value).toHaveLength(1)
+
+    const second = { ...makeRoundRecord(2), draw: true, winnerIndex: -1 }
+    mockSocket!.receive(makeSnapshot({ round: 3, result: null, roundHistory: [first, second],
+      players: SERVER_PLAYERS.map((player) => ({ ...player, name: `新${player.name}`, avatar: 'https://example.com/new.png' })),
+    }))
+    // Table snapshots wait for the win presentation; public history does not.
+    expect(game.phase.value).toBe('win-effect')
+    expect(game.roundHistory.value).toHaveLength(2)
+    expect(game.roundHistory.value[0].scoreChanges[0]).toMatchObject({
+      name: '历史本家', avatar: 'https://example.com/history/2.png',
+    })
+    await vi.advanceTimersByTimeAsync(6100)
+    game.nextRound()
+    mockSocket!.receive({ kind: 'round_start', matchStarted: false, round: 3, dealer: 1, honba: 0, dice: [2, 2] })
+    expect(game.result.value).toBeNull()
+    expect(game.roundHistory.value).toHaveLength(2)
+  })
+
+  it('preserves history through match completion and clears it only when the game is reset', async () => {
+    const game = await connectGame()
+    const record = makeRoundRecord()
+    mockSocket!.receive(makeSnapshot({ roundHistory: [record] }))
+    mockSocket!.receive({ kind: 'match_finished', roomId: 'ABC123', mode: 'east', finalScores: [] })
+    expect(game.phase.value).toBe('finished')
+    expect(game.result.value).toBeNull()
+    expect(game.roundHistory.value).toHaveLength(1)
+    mockSocket!.receive(makeSnapshot({ phase: 'finished', matchFinished: true, roundHistory: [record] }))
+    expect(game.roundHistory.value).toHaveLength(1)
+    game.startGame()
+    expect(game.roundHistoryAvailable.value).toBe(false)
+    expect(game.roundHistory.value).toEqual([])
+  })
+
+  it('keeps previous hands on round_start and starts a fresh history for a new match', async () => {
+    const game = await connectGame()
+    mockSocket!.receive(makeSnapshot({ roundHistory: [makeRoundRecord()] }))
+    mockSocket!.receive({ kind: 'round_start', matchStarted: false, round: 2, dealer: 1, honba: 0, dice: [2, 5] })
+    expect(game.roundHistory.value).toHaveLength(1)
+    expect(game.roundHistoryAvailable.value).toBe(true)
+    mockSocket!.receive({ kind: 'round_start', matchStarted: true, round: 1, dealer: 0, honba: 0, dice: [2, 5] })
+    expect(game.roundHistory.value).toEqual([])
+    expect(game.roundHistoryAvailable.value).toBe(true)
+  })
+
+  it('restores server history after reconnect and clears old records when the room changes', async () => {
+    const game = await connectGame()
+    const record = makeRoundRecord()
+    mockSocket!.receive(makeSnapshot({ roundHistory: [record] }))
+    const disconnectedSocket = mockSocket!
+    disconnectedSocket.close()
+    expect(game.wsStatus.value).toBe('reconnecting')
+    expect(game.roundHistory.value).toHaveLength(1)
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(mockSocket).not.toBe(disconnectedSocket)
+    mockSocket!.open()
+    const rejoin = { kind: 'rejoin_ok', seat: 2, rejoin: true, roomId: 'ABC123', mode: 'east',
+      nickname: '测试', rejoinCode: 'AAAA-BBBB' }
+    mockSocket!.receive(rejoin)
+    expect(game.roundHistory.value).toHaveLength(1)
+    mockSocket!.receive(makeSnapshot({ roundHistory: [record, makeRoundRecord(2)] }))
+    expect(game.roundHistory.value.map((item) => item.id)).toEqual(['ABC123:1:0', 'ABC123:2:0'])
+    mockSocket!.receive({ ...rejoin, roomId: 'NEW123', rejoinCode: 'CCCC-DDDD' })
+    expect(game.roundHistory.value).toEqual([])
+    expect(game.roundHistoryAvailable.value).toBe(false)
+  })
+})
 
 // ─── 测试用例 ─────────────────────────────────────────────
 

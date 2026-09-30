@@ -3,6 +3,7 @@ import type { GamePhase, RoundResult } from '../../core/contracts/gamePort'
 import type { TileType, WinPresentation } from '../../core/contracts/types'
 import type { ServerMeldDto, ServerPlayerDto } from './dto'
 import type { ServerMessage } from './messages'
+import type { MatchRoundRecord } from '../../shared/roundHistory'
 
 type JsonObject = Record<string, unknown>
 
@@ -118,6 +119,27 @@ function isRoundResult(value: unknown): value is RoundResult {
     )))
 }
 
+function isRoundHistory(value: unknown): value is MatchRoundRecord[] {
+  if (!Array.isArray(value)) return false
+  const ids = new Set<string>()
+  return value.every((record) => {
+    if (!isObject(record) || !isRoundResult(record)
+      || !isString(record.id) || !record.id.trim() || ids.has(record.id)
+      || !isIntegerBetween(record.round, 1, Number.MAX_SAFE_INTEGER)
+      || !isIntegerBetween(record.dealer, 0, 3)
+      || !isIntegerBetween(record.honba, 0, Number.MAX_SAFE_INTEGER)
+      || !Array.isArray(record.scoreChanges) || record.scoreChanges.length !== 4
+      || !record.scoreChanges.every((change) => isObject(change) && isIntegerBetween(change.playerIndex, 0, 3))
+      || new Set(record.scoreChanges.map((change) => change.playerIndex)).size !== 4
+      || (record.draw ? !isOptional(record.winnerIndex, (seat) => isIntegerBetween(seat, -1, 3))
+        : !isIntegerBetween(record.winnerIndex, 0, 3))
+      || !isOptional(record.winType, (kind): kind is RoundResult['winType'] => typeof kind === 'string'
+        && ['self-draw', 'discard', 'robbed-kong', 'tianhu', 'dihu'].includes(kind))) return false
+    ids.add(record.id)
+    return true
+  })
+}
+
 function isAnnouncement(value: unknown): value is JsonObject {
   return isObject(value) && isString(value.text) && isString(value.tone) && isNumber(value.id)
 }
@@ -161,6 +183,7 @@ function isSnapshot(message: JsonObject): boolean {
     && isNumber(message.headDrawn) && isNumber(message.currentPlayer)
     && isArrayOf(message.players, isPlayer) && isNumber(message.seat)
     && isNullable(message.result, isRoundResult)
+    && isOptional(message.roundHistory, isRoundHistory)
     && isNullable(message.announcement, isAnnouncement)
     && isBoolean(message.matchFinished)
     // 终局一致性：phase=finished 当且仅当 matchFinished=true（房主/后端同源发送）。

@@ -15,6 +15,7 @@ import { computed, getCurrentInstance, onBeforeUnmount, ref } from 'vue'
 import { API_BASE } from './api/httpClient'
 import { defineGamePort } from '../core/contracts/gamePort'
 import type { RoundResult } from '../core/contracts/gamePort'
+import type { MatchRoundRecord } from '../shared/roundHistory'
 import { tileName } from '../core/rules/tiles'
 import type { MatchType, TableActionEvent, TileType, WinPresentation } from '../core/contracts/types'
 import { LOTUS_RULESET } from '../variants/lotus/lotusRules'
@@ -36,6 +37,7 @@ import { createRemoteMatchLifecycle } from './orchestration/remoteMatchLifecycle
 import {
   mapPlayersToLocal,
   mapRoundResultToLocal,
+  mapRoundHistoryToLocal,
   mapWinPresentationToLocal,
   toLocalSeat,
 } from './protocol/mapper'
@@ -92,6 +94,8 @@ export function useRemoteGame({
   } = state
   // 房间权威主题：房主改主题广播全房，非房主只读（本地 tableThemeName 随它同步）。
   const roomTableThemeName = ref<TableThemeName>('jade')
+  const roundHistory = ref<MatchRoundRecord[]>([])
+  const roundHistoryAvailable = ref(false)
   const presentedWinActions = new Set<string>()
   let fallbackActionSequence = 0
   let fallbackSettlementSequence = 0
@@ -396,6 +400,10 @@ export function useRemoteGame({
     },
     rejoin_ok: (msg) => {
       fallbackSettlementSequence += 1
+      if (roomId.value !== msg.roomId) {
+        roundHistory.value = []
+        roundHistoryAvailable.value = false
+      }
       roomId.value = msg.roomId
       mySeat.value = msg.seat
       nickname.value = msg.nickname
@@ -428,11 +436,17 @@ export function useRemoteGame({
       sessionError.value = msg.code
       roomLifecycle.clearSession()
     },
-    state_snapshot: (msg) => snapshotReconciler.apply(msg),
+    state_snapshot: (msg) => {
+      // History is already public and does not wait for the table's animation barrier.
+      roundHistoryAvailable.value = msg.roundHistory !== undefined
+      roundHistory.value = mapRoundHistoryToLocal(msg.roundHistory ?? [], mySeatLocal.value)
+      snapshotReconciler.apply(msg)
+    },
     table_theme: (msg) => {
       roomTableThemeName.value = msg.theme
     },
     round_start: (msg) => {
+      if (msg.matchStarted) roundHistory.value = []
       fallbackSettlementSequence += 1
       animeFixedTts?.reset()
       presentedWinActions.clear()
@@ -541,6 +555,8 @@ export function useRemoteGame({
   // ── 重置 ───────────────────────────────────────────────
 
   function resetAll() {
+    roundHistory.value = []
+    roundHistoryAvailable.value = false
     fallbackSettlementSequence += 1
     presentedWinActions.clear()
     matchLifecycle.resetAll()
@@ -575,7 +591,7 @@ export function useRemoteGame({
     signalQuality,   // 0-3 信号质量（越大连接越好）
     storedSession,   // 上次未完成对局（「继续对局」入口；null = 无）
     autoPlay, toggleAutoPlay,   // 自动打牌开关（多窗口联机测试/观战）
-    remoteActions: roomLifecycle, sendSocial,
+    remoteActions: roomLifecycle, sendSocial, roundHistory, roundHistoryAvailable,
     // 游戏状态（useGame 兼容接口）
     phase, players, wall, wallHeadDrawn, wallCount, currentPlayer, selectedIndex, turnSeconds, lastDiscard,
     actionPrompt, announcement, tableActionEvent, scoreFlowEvent, result, winEffect,

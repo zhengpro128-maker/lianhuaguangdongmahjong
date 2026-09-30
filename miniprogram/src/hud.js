@@ -2,6 +2,7 @@ import { activeSocialProps, socialAvatarBounds, socialSeatReaction, drawSocialAv
 import { SOCIAL_PHRASES, SOCIAL_EMOJIS, SOCIAL_PROPS, socialLabel } from '../../src/game/shared/roomSocial'
 import { MINI_MATCH_OPTIONS, miniMatchRounds } from './match-options'
 import { miniTableLayout } from './table-layout'
+import { drawRoundHistory, drawRoundHistoryEntry, roundHistoryLayout, roundHistoryView } from './round-history.js'
 import { THEME_PRESENTATIONS } from '../../src/theme/themePresentation.ts'
 import { resolveTableActionPresentation, resolveRoundResultPresentation } from '../../src/theme/themeEventPresentation.ts'
 
@@ -48,6 +49,7 @@ export class MiniHud {
     this.width = 844; this.height = 390; this.dpr = 1; this.safe = { left: 0, right: 0, top: 0, bottom: 0 }
     this.socialTab = 'phrase'; this.socialMuted = false; this.socialTarget = 1; this.socialHistoryPage = 0
     this.socialAnimating = false; this.socialNow = Date.now()
+    this.historySelectedId = null; this.historyPage = null
     this.modal = null; this.rulePage = 0; this.hiddenResult = null; this.disposed = false
   }
 
@@ -81,7 +83,9 @@ export class MiniHud {
   update(state) {
     const previousPhase = this.state.phase
     this.state = state
-    if (previousPhase !== state.phase && state.phase === 'lobby') { this.modal = null; this.hiddenResult = null }
+    if (previousPhase !== state.phase && state.phase === 'lobby') {
+      this.modal = null; this.hiddenResult = null; this.historySelectedId = null; this.historyPage = null
+    }
     this.render()
   }
 
@@ -300,6 +304,9 @@ export class MiniHud {
     const controlW = (toolbar.w - 6) / 2
     this.button(toolbar.x, toolbar.y, controlW, 28, '规则', { local: 'rules' }, { small: true })
     this.soundButton(toolbar.x + controlW + 6, toolbar.y, controlW, 28, true)
+    if (online && (!this.hasResult() || this.hiddenResult === this.resultKey())) {
+      drawRoundHistoryEntry(this, PALETTE, toolbar.x - 78, toolbar.y)
+    }
     const players = s.players || [], own = s.user || players[0], ownSeat = own?.seat ?? 0
     players.forEach((player, index) => {
       const rel = (index - ownSeat + 4) % 4
@@ -523,6 +530,7 @@ export class MiniHud {
   }
 
   drawModal() {
+    if (this.modal === 'round-history') return drawRoundHistory(this, PALETTE)
     if (this.modal === 'social') return this.drawSocialPanel()
     if (this.modal === 'social-target') return this.drawSocialTarget()
     if (this.modal === 'create-room') {
@@ -647,6 +655,22 @@ export class MiniHud {
     }
     if (action.local) {
       switch (action.local) {
+        case 'round-history': this.modal = 'round-history'; this.historyPage = null; break
+        case 'history-select': this.historySelectedId = action.id; break
+        case 'history-page': {
+          const size = roundHistoryLayout(this.width, this.height, this.safe).list.pageSize
+          const view = roundHistoryView(this.state.roundHistory, this.historySelectedId, this.historyPage, size)
+          this.historyPage = clamp(view.page + action.step, 0, view.pages - 1)
+          this.historySelectedId = view.items[this.historyPage * size]?.id ?? null
+          break
+        }
+        case 'history-step': {
+          const size = roundHistoryLayout(this.width, this.height, this.safe).list.pageSize
+          const view = roundHistoryView(this.state.roundHistory, this.historySelectedId, this.historyPage, size)
+          const index = clamp(view.selectedIndex + action.step, 0, view.items.length - 1)
+          this.historySelectedId = view.items[index]?.id ?? null; this.historyPage = Math.floor(index / size)
+          break
+        }
         case 'social': this.modal = 'social'; break
         case 'social-tab': this.socialTab = action.value; this.socialHistoryPage = 0; break
         case 'social-page': this.socialHistoryPage += action.step; break
