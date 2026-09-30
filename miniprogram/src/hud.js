@@ -141,6 +141,32 @@ export class MiniHud {
     if (!disabled) this.hits.push({ x, y, w, h, action })
   }
 
+  soundButton(x, y, w, h, compact = false) {
+    const enabled = this.state.soundEnabled !== false
+    const color = enabled ? '#1a2418' : PALETTE.textMuted
+    this.box(x, y + 2, w, h, 'rgba(0,0,0,.2)', null, 8)
+    this.box(x, y, w, h, enabled ? PALETTE.accent : PALETTE.panel,
+      enabled ? PALETTE.border : 'rgba(185,146,73,.35)', 8)
+    const ctx = this.ctx, cx = x + (compact ? 10 : 13), cy = y + h / 2
+    ctx.save(); ctx.fillStyle = color; ctx.strokeStyle = color; ctx.lineWidth = 1.5
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round'
+    ctx.beginPath(); ctx.moveTo(cx - 6, cy - 2.5); ctx.lineTo(cx - 3.5, cy - 2.5)
+    ctx.lineTo(cx, cy - 5.5); ctx.lineTo(cx, cy + 5.5)
+    ctx.lineTo(cx - 3.5, cy + 2.5); ctx.lineTo(cx - 6, cy + 2.5); ctx.closePath(); ctx.fill()
+    if (enabled) {
+      for (const radius of [3.5, 6]) {
+        ctx.beginPath(); ctx.arc(cx, cy, radius, -Math.PI / 3, Math.PI / 3); ctx.stroke()
+      }
+    } else {
+      ctx.beginPath(); ctx.moveTo(cx - 6, cy - 6); ctx.lineTo(cx + 6, cy + 6); ctx.stroke()
+    }
+    ctx.restore()
+    const textLeft = x + (compact ? 20 : 25), textWidth = w - (textLeft - x) - 4
+    this.text(compact ? (enabled ? '声音' : '静音') : (enabled ? '声音：开' : '声音：关'),
+      textLeft + textWidth / 2, cy, compact ? 10 : 11, color, 'center', 'bold', textWidth)
+    this.hits.push({ x, y, w, h, action: { type: 'sound' } })
+  }
+
   render(now = Date.now()) {
     if (this.disposed) return
     this.socialNow = now
@@ -177,7 +203,7 @@ export class MiniHud {
     bg.addColorStop(0, '#193f2e'); bg.addColorStop(1, '#07110d'); ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h)
     this.text('武汉晃晃', left, top + 17, 16, PALETTE.accent, 'left', 'bold')
     this.button(left + 96, top, 58, 32, '规则', { local: 'rules' }, { small: true })
-    this.button(left + 163, top, 76, 32, s.soundEnabled === false ? '声音：关' : '声音：开', { type: 'sound' }, { small: true })
+    this.soundButton(left + 163, top, 76, 32)
     const contentTop = Math.max(top + 55, (this.menuButton?.bottom || 0) + 15)
     const bodyH = h - contentTop - Math.max(24, this.safe.bottom + 12)
     const leftW = (w - left - right) * .32, panelX = left + leftW + 24, panelW = w - panelX - right
@@ -273,7 +299,7 @@ export class MiniHud {
     this.text(`${miniMatchRounds(s.matchType)} 局 · 第 ${Math.min(s.round || 1, miniMatchRounds(s.matchType))} 局`, left + 88, top + 18, 12, PALETTE.text, 'left', 'bold')
     const controlW = (toolbar.w - 6) / 2
     this.button(toolbar.x, toolbar.y, controlW, 28, '规则', { local: 'rules' }, { small: true })
-    this.button(toolbar.x + controlW + 6, toolbar.y, controlW, 28, s.soundEnabled === false ? '静音' : '声音', { type: 'sound' }, { small: true })
+    this.soundButton(toolbar.x + controlW + 6, toolbar.y, controlW, 28, true)
     const players = s.players || [], own = s.user || players[0], ownSeat = own?.seat ?? 0
     players.forEach((player, index) => {
       const rel = (index - ownSeat + 4) % 4
@@ -587,7 +613,12 @@ export class MiniHud {
       this.text(entry.rank || index + 1, b.x + 38, y + (rowH - 5) / 2, 17, PALETTE.accent, 'center', 'bold')
       const avatarSize = Math.min(34, rowH - 11)
       this.ctx.save(); rounded(this.ctx, b.x + 57, y + 4, avatarSize, avatarSize, 5); this.ctx.clip()
-      this.image(`assets/avatars/${AVATARS[seat % 4]}.png`, b.x + 57, y + 4, avatarSize, avatarSize); this.ctx.restore()
+      const fallbackAvatar = `assets/avatars/${AVATARS[seat % 4]}.png`
+      const avatar = s.players?.[seat]?.avatar || entry.avatar || fallbackAvatar
+      if (!this.image(avatar, b.x + 57, y + 4, avatarSize, avatarSize)) {
+        this.image(fallbackAvatar, b.x + 57, y + 4, avatarSize, avatarSize)
+      }
+      this.ctx.restore()
       const payerDetails = !finished ? (result.payerKongDetails?.[seat] || []).map(detail => `${detail.label} ×${detail.multiplier}`) : []
       if (!finished && seat === result.discarderIndex && result.discarderMultiplier) payerDetails.unshift(`点炮 ×${result.discarderMultiplier}`)
       this.text(`${entry.name || s.players?.[seat]?.name || '玩家'}${seat === 0 ? '（你）' : ''}`, b.x + 102, y + (payerDetails.length ? 13 : (rowH - 5) / 2), 12, PALETTE.text, 'left', 'bold', b.w * .36)

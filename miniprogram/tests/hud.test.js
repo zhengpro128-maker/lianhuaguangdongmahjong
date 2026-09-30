@@ -146,6 +146,39 @@ describe('native HUD interaction', () => {
     expect(onAction).toHaveBeenCalledTimes(1)
     expect(onAction).toHaveBeenCalledWith({ type: 'next' })
   })
+
+  it.each([false, true])('uses the table avatars in settlement after ranking reorders the players (final: %s)', finished => {
+    const { hud } = makeHud()
+    const avatars = ['https://example.com/wechat-me.png', 'https://example.com/wechat-friend.png',
+      'assets/avatars/shisan.png', 'assets/avatars/young-master.png']
+    const tablePlayers = players.map((player, seat) => ({ ...player, avatar: avatars[seat] }))
+    const entries = [2, 0, 3, 1].map((seat, index) => ({ playerIndex: seat, rank: index + 1,
+      name: players[seat].name, avatar: 'avatars/lotus.svg', score: 1000, delta: 0 }))
+    hud.update({ ...turn, players: tablePlayers, phase: finished ? 'finished' : 'settled',
+      matchFinished: finished, standings: entries, result: { draw: true, scoreChanges: entries } })
+    for (const entry of hud.images.values()) entry.ready = true
+    hud.ctx.drawImage = vi.fn()
+    hud.drawSettlement()
+    expect(hud.ctx.drawImage.mock.calls.map(([image]) => image.src)).toEqual([avatars[2], avatars[0], avatars[3], avatars[1]])
+  })
+
+  it('keeps the result avatar when the table profile is absent and falls back while an external image cannot load', () => {
+    const { hud } = makeHud()
+    const avatar = 'https://example.com/wechat-friend.png'
+    hud.update({ ...turn, players: [], phase: 'settled', result: { draw: true,
+      scoreChanges: [{ playerIndex: 1, name: '好友', avatar, score: 1000, delta: 0 }] } })
+    const fallback = hud.images.get('assets/avatars/ah-lok.png')
+    fallback.ready = true
+    hud.ctx.drawImage = vi.fn()
+    hud.images.get(avatar).image.onerror()
+    hud.drawSettlement()
+    expect(hud.ctx.drawImage.mock.calls.map(([image]) => image.src)).toEqual(['assets/avatars/ah-lok.png'])
+
+    hud.images.get(avatar).image.onload()
+    hud.ctx.drawImage.mockClear()
+    hud.drawSettlement()
+    expect(hud.ctx.drawImage.mock.calls.map(([image]) => image.src)).toEqual([avatar])
+  })
 })
 
  describe('rotated device safe areas', () => {
