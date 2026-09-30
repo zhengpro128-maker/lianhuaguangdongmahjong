@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import { createHash } from 'node:crypto'
 import sharp from 'sharp'
+import { writeSocialAudioAssets } from './social-audio.mjs'
 
 const miniRoot = fileURLToPath(new URL('../', import.meta.url))
 const publicRoot = path.resolve(miniRoot, '../public')
@@ -30,5 +31,10 @@ for (const name of ['audio', 'mute', 'manual']) await asset(`img/${name}.png`, `
 for (const file of (await readdir(path.join(publicRoot, 'audio'))).filter(f => f.endsWith('.mp3')).sort()) {
   await asset(`audio/${file}`, `audio/${file}`)
 }
+for (const { file, pcm } of await writeSocialAudioAssets(path.join(miniRoot, 'assets/audio'))) {
+  records.push({ source: 'miniprogram/scripts/social-audio.mjs', target: `assets/audio/${file}`,
+    sourceSha256: createHash('sha256').update(await readFile(new URL('./social-audio.mjs', import.meta.url))).digest('hex'),
+    bytes: pcm.length })
+}
 await writeFile(path.join(miniRoot, 'assets/manifest.json'), `${JSON.stringify({ records }, null, 2)}\n`)
-console.log(`Prepared ${records.length} original web assets (${(records.reduce((n, r) => n + r.bytes, 0) / 1024).toFixed(0)} KiB).`)
+console.log(`Prepared ${records.length} web and original generated assets (${(records.reduce((n, r) => n + r.bytes, 0) / 1024).toFixed(0)} KiB).`)

@@ -1,3 +1,4 @@
+import { activeSocialProps, socialAvatarBounds, socialSeatReaction, drawSocialAvatarStain, drawSocialPropIcon, drawSocialPropEffects } from './social-effects.js'
 import { SOCIAL_PHRASES, SOCIAL_EMOJIS, SOCIAL_PROPS, socialLabel } from '../../src/game/shared/roomSocial'
 import { MINI_MATCH_OPTIONS, miniMatchRounds } from './match-options'
 import { miniTableLayout } from './table-layout'
@@ -46,7 +47,7 @@ export class MiniHud {
     this.images = new Map(); this.hits = []; this.handHits = []; this.state = { phase: 'lobby' }
     this.width = 844; this.height = 390; this.dpr = 1; this.safe = { left: 0, right: 0, top: 0, bottom: 0 }
     this.socialTab = 'phrase'; this.socialMuted = false; this.socialTarget = 1; this.socialHistoryPage = 0
-    this.socialAnimating = false
+    this.socialAnimating = false; this.socialNow = Date.now()
     this.modal = null; this.rulePage = 0; this.hiddenResult = null; this.disposed = false
   }
 
@@ -140,15 +141,16 @@ export class MiniHud {
     if (!disabled) this.hits.push({ x, y, w, h, action })
   }
 
-  render() {
+  render(now = Date.now()) {
     if (this.disposed) return
+    this.socialNow = now
     const ctx = this.ctx
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0); ctx.clearRect(0, 0, this.width, this.height)
     this.hits = []; this.handHits = []
     if (this.width < this.height) { this.drawOrientation(); this.onInvalidate(); return }
     if (this.state.screen === 'lobby' || this.state.phase === 'lobby') this.drawLobby()
     else this.drawTable()
-    this.drawSocialEffects()
+    this.drawSocialEffects(now)
     if (this.modal) this.drawModal()
     else if (this.hasResult() && this.hiddenResult !== this.resultKey()) this.drawSettlement()
     this.onInvalidate()
@@ -307,12 +309,16 @@ export class MiniHud {
   drawSeat(player, index, x, y, w, h, self) {
     this.hits.push({ x, y, w, h, seatHit: true, action: self ? { local: 'social' } : { local: 'social-target', seat: index } })
     const active = this.state.currentPlayer === index, stacked = w < 80
-    const avatar = stacked ? 24 : Math.min(h - 12, 32)
-    const avatarX = stacked ? x + (w - avatar) / 2 : x + 6, avatarY = y + (stacked ? 4 : 6)
+    const avatarRect = socialAvatarBounds({ x, y, w, h }), avatar = avatarRect.w
+    const avatarX = avatarRect.x, avatarY = avatarRect.y
+    const reaction = this.socialMuted ? { x: 0, y: 0, rotation: 0, sx: 1, sy: 1 } : socialSeatReaction(this.state.socialEvents, index, this.socialNow)
+    this.ctx.save(); this.ctx.translate(x + w / 2 + reaction.x, y + h / 2 + reaction.y)
+    this.ctx.rotate(reaction.rotation); this.ctx.scale(reaction.sx, reaction.sy); this.ctx.translate(-x - w / 2, -y - h / 2)
     this.box(x, y, w, h, active ? 'rgba(26,66,45,.96)' : 'rgba(6,27,17,.9)', active ? PALETTE.accent : 'rgba(185,146,73,.4)', 9)
     this.ctx.save(); rounded(this.ctx, avatarX, avatarY, avatar, avatar, 6); this.ctx.clip()
     this.box(avatarX, avatarY, avatar, avatar, PALETTE.surface)
     this.image(player.avatar || `assets/avatars/${AVATARS[index % 4]}.png`, avatarX, avatarY, avatar, avatar)
+    if (!this.socialMuted) drawSocialAvatarStain(this.ctx, this.state.socialEvents, index, avatarRect, this.socialNow)
     this.ctx.restore()
     const textX = stacked ? x + w / 2 : x + avatar + 12, align = stacked ? 'center' : 'left'
     const name = player.name || (self ? '你' : WIND[(index - (this.state.dealer || 0) + 4) % 4])
@@ -327,6 +333,7 @@ export class MiniHud {
     if (active && this.state.turnSeconds > 0) this.text(this.state.turnSeconds, x + w - 8, y + h - 10, 10, PALETTE.accent, 'right', 'bold')
     const delta = this.state.scoreFlowEvent?.deltas?.find(item => item.playerIndex === index)?.amount
     if (delta) this.text(`${delta > 0 ? '+' : ''}${delta}`, x + w / 2, y - 18, 20, delta > 0 ? PALETTE.positive : PALETTE.negative, 'center', 'bold')
+    this.ctx.restore()
   }
 
   drawTile(tile, x, y, w, h, { selected = false, joker = false, special = false, muted = false } = {}) {
@@ -442,17 +449,22 @@ export class MiniHud {
     const name = this.state.players?.[this.socialTarget]?.name || '玩家'
     const b = this.modalShell(`与 ${name} 互动`, 460, 220)
     const gap = 12, cw = (b.w - 40 - gap * 2) / 3
-    SOCIAL_PROPS.forEach((item, i) => this.button(b.x + 20 + i * (cw + gap), b.y + 75, cw, 76, item.icon,
-      { type: 'social-send', payload: { category: 'prop', value: item.id, targetSeat: this.socialTarget } },
-      { subtitle: item.label, disabled: this.state.online && this.state.online.status !== 'connected' }))
+    SOCIAL_PROPS.forEach((item, i) => {
+      const x = b.x + 20 + i * (cw + gap)
+      this.button(x, b.y + 64, cw, 100, '',
+        { type: 'social-send', payload: { category: 'prop', value: item.id, targetSeat: this.socialTarget } },
+        { subtitle: item.label, disabled: this.state.online && this.state.online.status !== 'connected' })
+      drawSocialPropIcon(this.ctx, item.id, x + cw / 2, b.y + (item.id === 'hammer' ? 88 : 99), item.id === 'hammer' ? .42 : .65, item.id === 'hammer' ? -.2 : -.08)
+    })
     this.text('点击道具发送 · 同桌可见', b.x + b.w / 2, b.y + b.h - 28, 12, PALETTE.textMuted, 'center')
   }
 
   drawSocialEffects(now = Date.now()) {
     this.socialAnimating = false
     if (this.socialMuted || this.state.phase === 'lobby' || !this.layout) return
-    const events = (this.state.socialEvents || []).filter(event => now - event.receivedAt < (event.category === 'prop' ? 1800 : 4500))
-    this.socialAnimating = events.length > 0
+    const props = activeSocialProps(this.state.socialEvents, now)
+    const events = (this.state.socialEvents || []).filter(event => event.category !== 'prop' && now >= event.receivedAt && now - event.receivedAt < 4500)
+    this.socialAnimating = props.length > 0 || events.length > 0
     const ownSeat = this.state.user?.seat ?? 0
     const anchor = seat => this.layout.seats[(seat - ownSeat + 4) % 4]
     // One speech bubble per seat; new messages replace old ones without stacking over the hand.
@@ -466,29 +478,7 @@ export class MiniHud {
       const label = Array.from(socialLabel(event)), preview = label.length > 26 ? label.slice(0, 25).join('') + '…' : label.join('')
       this.wrapped(preview, x + 10, y + 14, bw - 20, 12, 16, '#244331', 2)
     }
-    for (const event of events.filter(item => item.category === 'prop').slice(-4)) {
-      const from = anchor(event.seat), to = anchor(event.targetSeat)
-      if (!from || !to) continue
-      const age = now - event.receivedAt, t = clamp(age / 700, 0, 1)
-      const x = from.x + from.w / 2 + (to.x + to.w / 2 - from.x - from.w / 2) * t
-      const y = from.y + from.h / 2 + (to.y + to.h / 2 - from.y - from.h / 2) * t - Math.sin(t * Math.PI) * 75
-      const prop = SOCIAL_PROPS.find(item => item.id === event.value)
-      this.ctx.save(); this.ctx.translate(x, y)
-      this.ctx.globalAlpha = age > 1400 ? (1800 - age) / 400 : 1
-      const impact = clamp((age - 700) / 650, 0, 1)
-      const angle = event.value === 'coffee' ? -impact * .9 : event.value === 'hammer' ? Math.sin(impact * Math.PI * 3) * .8 : t * Math.PI * 2
-      this.ctx.rotate(angle)
-      if (!prop.asset || !this.image(prop.asset, -22, -22, 44, 44, 'contain')) this.text(prop.icon, 0, 0, 36, PALETTE.text, 'center')
-      this.ctx.restore()
-      if (age >= 700) {
-        const color = event.value === 'tomato' ? '#e65b43' : event.value === 'coffee' ? '#a16f42' : '#f4cf71'
-        for (let i = 0; i < 7; i++) {
-          const angle = i / 7 * Math.PI * 2, radius = 13 + impact * 30
-          this.box(x + Math.cos(angle) * radius, y + Math.sin(angle) * radius + (event.value === 'coffee' ? impact * 24 : 0), 5, 8, color, null, 3)
-        }
-        this.text(prop.label, clamp(x, 45, this.width - 45), clamp(y + 38, 20, this.height - 18), 12, PALETTE.accent, 'center', 'bold')
-      }
-    }
+    drawSocialPropEffects(this.ctx, props, anchor, this.width, this.height, now)
   }
 
   hasResult() { return !!this.state.result && ['settled', 'finished'].includes(this.state.phase) || !!this.state.matchFinished }
