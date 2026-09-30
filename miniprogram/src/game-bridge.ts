@@ -9,6 +9,7 @@ import { chooseFallbackDiscardIndex, decideClaim, decideTurn } from '../../src/g
 import { createRemoteSessionStore } from '../../src/game/online/session/remoteSessionStore'
 import { useRemoteGame } from '../../src/game/online/useRemoteGame'
 import { normalizeMiniMatch } from './match-options'
+import type { MatchRoundRecord } from '../../src/game/shared/roundHistory'
 import { installMiniGamePlatform } from './platform'
 
 export const MINI_RULE_VARIANT = 'wuhan-huanghuang' as const
@@ -25,6 +26,8 @@ type PortState = { [K in typeof GAME_PORT_STATE_KEYS[number]]: Value<GamePort[K]
 export type MiniGameSnapshot = PortState & {
   socialSession: number
   socialEvents: DisplaySocialEvent[]
+  roundHistory: MatchRoundRecord[]
+  roundHistoryAvailable: boolean
   ruleVariant: typeof MINI_RULE_VARIANT
   rulesetId: typeof MINI_RULE_VARIANT
   gameMode: 'local' | 'online'
@@ -67,6 +70,12 @@ function copy<T>(value: T): T {
 export function tileAssetPath(tile: TileType): string | null {
   const file = tileFaceFile(tile)
   return file ? `assets/tiles/${file}` : null
+}
+
+function miniAvatar(avatar: string | undefined, fallback: string | undefined, seat: number): string {
+  if (avatar?.startsWith('https://') || avatar?.startsWith('assets/avatars/')) return avatar
+  const known = (avatar || fallback || '').match(/\/(lotus|ah-lok|shisan|young-master)\.(?:svg|png)$/)?.[1]
+  return `assets/avatars/${known || ['lotus', 'ah-lok', 'shisan', 'young-master'][seat]}.png`
 }
 
 /** The mini game uses the actual browser Wuhan engine, including AI, scoring and match progression. */
@@ -123,6 +132,13 @@ export function createMiniGame(options: MiniGameOptions = {}) {
     }
     const table = port.capabilities.value.lotusTable
     return { ...state, socialSession: generation, socialEvents: copy(socialEvents.value), ruleVariant: MINI_RULE_VARIANT, rulesetId: MINI_RULE_VARIANT, gameMode: online ? 'online' : 'local',
+      roundHistoryAvailable: online && remote().roundHistoryAvailable.value,
+      roundHistory: online ? copy(remote().roundHistory.value).map((record) => ({ ...record,
+        scoreChanges: record.scoreChanges.map((change) => ({ ...change,
+          avatar: miniAvatar(change.avatar, change.fallbackAvatar, change.playerIndex),
+          fallbackAvatar: miniAvatar(change.fallbackAvatar, undefined, change.playerIndex),
+        })),
+      })) : [],
       canResume: !!createRemoteSessionStore().loadSession(),
       online: online ? { roomId: remote().roomId.value, seats: copy(remote().roomSeats.value), isCreator: remote().isCreator.value,
         mySeat: remote().mySeat.value, error: remote().sessionError.value, status: remote().wsStatus.value } : null,
