@@ -31,6 +31,19 @@ export function activeSocialProps(events, now) {
     && now >= e.receivedAt && now - e.receivedAt < SOCIAL_PROP_TIMINGS[e.value].end).slice(-4)
 }
 
+// A burst keeps its placement until it ends, even when a shorter prop expires.
+// The relative sender/target difference is identical in every viewer's seats.
+export function socialPropLane(event, events) {
+  const grouped = (events || []).some(other => other.id !== event.id && other.category === 'prop'
+    && other.targetSeat === event.targetSeat && Math.abs(other.receivedAt - event.receivedAt) <= 250)
+  return grouped ? ((event.seat - event.targetSeat + 4) % 4) - 2 : 0
+}
+function eventSeed(event) {
+  let hash = 2166136261
+  for (const char of String(event.id || event.value)) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619) >>> 0
+  return hash / 0xffffffff * TAU
+}
+
 export function socialAvatarBounds(card) {
   const stacked = card.w < 80, size = stacked ? 24 : Math.min(card.h - 12, 32)
   return { x: stacked ? card.x + (card.w - size) / 2 : card.x + 6,
@@ -161,8 +174,8 @@ export function drawSocialAvatarStain(ctx, events, seat, rect, now) {
     if (age < t.hit) continue
     const grow = out(range(age, t.hit, t.hit + 170)), fade = 1 - range(age, t.end - 650, t.end)
     ctx.save(); ctx.globalAlpha *= fade * .67
-    const x = rect.x + rect.w * .48, y = rect.y + rect.h * .45
-    splat(ctx, x, y, rect.w * .37 * grow, event.value === 'tomato' ? '#e94629' : '#754528', 2)
+    const x = rect.x + rect.w * (.48 + socialPropLane(event, events) * .08), y = rect.y + rect.h * .45
+    splat(ctx, x, y, rect.w * .37 * grow, event.value === 'tomato' ? '#e94629' : '#754528', eventSeed(event))
     ctx.globalAlpha *= .8
     for (let i = 0; i < 3; i++) {
       const dripX = rect.x + rect.w * (.22 + i * .25), length = rect.h * (.1 + range(age, t.hit + i * 120, t.hit + 1100) * .65)
@@ -189,11 +202,11 @@ function trail(ctx, from, to, age, timing, bounds, color, end = timing.hit) {
     ellipse(ctx, pose.x, pose.y, 9 + (5 - i) * 2, 4 + (5 - i), color, -.4); ctx.restore()
   }
 }
-function particles(ctx, target, age, hit, color, count = 16, gravity = 85) {
+function particles(ctx, target, age, hit, color, count = 16, gravity = 85, seed = 0) {
   const t = (age - hit) / 1000
   if (t < 0 || t > .95) return
   for (let i = 0; i < count; i++) {
-    const a = i * 2.39996, speed = 45 + (i % 5) * 16
+    const a = i * 2.39996 + seed, speed = 45 + (i % 5) * 16
     const x = target.x + Math.cos(a) * speed * t, y = target.y + Math.sin(a) * speed * t + gravity * t * t
     ctx.save(); ctx.globalAlpha *= (1 - t / .95) * .95; ctx.translate(x, y); ctx.rotate(a + t * 2)
     ellipse(ctx, 0, 0, 2.5 + i % 3, 4.5 + i % 4, color)
@@ -239,13 +252,13 @@ function tomatoAction(ctx, event, from, to, bounds, age) {
     if (hitAge < 430) {
       ctx.save(); ctx.globalAlpha *= (1 - range(hitAge, 180, 430)) * .8
       const grow = .4 + out(clamp(hitAge / 140)) * .6
-      splat(ctx, to.x, to.y, 31 * scale * grow, '#ec472c', 1)
-      splat(ctx, to.x - 3, to.y - 3, 19 * scale * grow, '#ff7550', 3)
+      splat(ctx, to.x, to.y, 31 * scale * grow, '#ec472c', bounds.seed + 1)
+      splat(ctx, to.x - 3, to.y - 3, 19 * scale * grow, '#ff7550', bounds.seed + 3)
       ctx.restore()
     }
-    particles(ctx, to, age, timing.hit, '#ec492b', 21, 90)
+    particles(ctx, to, age, timing.hit, '#ec492b', 21, 90, bounds.seed)
     for (let i = 0; i < 6; i++) {
-      const t = clamp(hitAge / 1300), a = i * 2.399, speed = 30 + i * 8
+      const t = clamp(hitAge / 1300), a = i * 2.399 + bounds.seed, speed = 30 + i * 8
       ctx.save(); ctx.globalAlpha *= fade * (1 - t) * .9
       ellipse(ctx, to.x + Math.cos(a) * speed * t, to.y + Math.sin(a) * speed * t + 70 * t * t,
         2 * scale, 4 * scale, '#ffe39e', a + t * 5); ctx.restore()
@@ -255,8 +268,8 @@ function tomatoAction(ctx, event, from, to, bounds, age) {
 }
 function coffeePosition(to, bounds) {
   const dir = to.x > bounds.w / 2 ? -1 : 1
-  return { x: clamp(to.x + dir * 62 * bounds.scale, 50, bounds.w - 50),
-    y: clamp(to.y - 35 * bounds.scale, 54, bounds.h - 98), dir }
+  return { x: clamp(to.x + dir * (62 + bounds.lane * 32) * bounds.scale, 50, bounds.w - 50),
+    y: clamp(to.y + (-35 + bounds.lane * 22) * bounds.scale, 54, bounds.h - 98), dir }
 }
 function coffeeAction(ctx, event, from, to, bounds, age) {
   const timing = SOCIAL_PROP_TIMINGS.coffee, targetCup = coffeePosition(to, bounds), scale = bounds.scale
@@ -298,7 +311,7 @@ function coffeeAction(ctx, event, from, to, bounds, age) {
     ctx.restore()
   }
   if (age >= timing.hit) {
-    particles(ctx, to, age, timing.hit, '#ad713c', 13, 85)
+    particles(ctx, to, age, timing.hit, '#ad713c', 13, 85, bounds.seed)
     shock(ctx, to, age, timing.hit, '#d9a567', 27 * scale)
     const drips = age - timing.hit, stainFade = 1 - range(age, timing.end - 600, timing.end)
     for (let i = 0; i < 5; i++) {
@@ -321,7 +334,7 @@ function hammerAngle(age) {
 function hammerAction(ctx, event, from, to, bounds, age) {
   const timing = SOCIAL_PROP_TIMINGS.hammer, scale = bounds.scale * 1.06
   // The grip stays fixed. The heavy head follows an arc around that grip.
-  const base = to.y < 65 ? 0 : Math.atan2(bounds.h * .45 - to.y, bounds.w / 2 - to.x) - Math.PI / 2
+  const base = (to.y < 65 ? 0 : Math.atan2(bounds.h * .45 - to.y, bounds.w / 2 - to.x) - Math.PI / 2) + bounds.lane * .36
   const handle = rotate(0, 61 * scale, base), pivot = { x: to.x + handle.x, y: to.y + handle.y }
   const angle = base + hammerAngle(age), headOffset = rotate(0, -61 * scale, angle)
   const head = { x: pivot.x + headOffset.x, y: pivot.y + headOffset.y }
@@ -345,7 +358,7 @@ function hammerAction(ctx, event, from, to, bounds, age) {
     const elapsed = age - hit
     if (elapsed < 0) continue
     shock(ctx, to, age, hit, '#ffda7c', 43 * scale)
-    particles(ctx, { x: to.x, y: to.y + 7 }, age, hit, '#d9bb7b', 9, 30)
+    particles(ctx, { x: to.x, y: to.y + 7 }, age, hit, '#d9bb7b', 9, 30, bounds.seed)
     if (elapsed < 230) {
       ctx.save(); ctx.globalAlpha *= 1 - elapsed / 230
       star(ctx, to.x, to.y, (29 + out(clamp(elapsed / 95)) * 13) * scale, '#fff0ad', age / 300)
@@ -373,10 +386,12 @@ export function drawSocialPropEffects(ctx, events, anchor, width, height, now) {
     if (!fromCard || !toCard) continue
     const source = socialAvatarBounds(fromCard), target = socialAvatarBounds(toCard)
     const from = { x: source.x + source.w / 2, y: source.y + source.h / 2 }
-    const to = { x: target.x + target.w / 2, y: target.y + target.h / 2 }
+    const lane = socialPropLane(event, events)
+    const to = { x: target.x + target.w / 2 + lane * target.w * .16, y: target.y + target.h / 2 }
+    if (event.value === 'hammer' && lane && to.y < 65) to.y = Math.max(to.y, 29 * bounds.scale)
     ctx.save()
     const draw = { tomato: tomatoAction, coffee: coffeeAction, hammer: hammerAction }[event.value]
-    draw(ctx, event, from, to, bounds, now - event.receivedAt)
+    draw(ctx, event, from, to, { ...bounds, lane, seed: eventSeed(event) }, now - event.receivedAt)
     ctx.restore()
   }
 }

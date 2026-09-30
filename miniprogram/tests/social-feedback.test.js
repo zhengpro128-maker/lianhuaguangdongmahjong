@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createSocialFeedback } from '../src/social-feedback.js'
 import { createSocialAudioAssets } from '../scripts/social-audio.mjs'
+import { getSocialFeedbackCues, SOCIAL_PROP_TIMINGS } from '../src/social-effects.js'
 
 const cues = [
   { at: 180, sound: 'social_throw.wav', volume: .35 },
@@ -90,6 +91,67 @@ describe('social effect feedback clock', () => {
     feedback.update(state, { now: 2280 })
     expect(playSound).not.toHaveBeenCalled()
     expect(vibrateShort).toHaveBeenCalledOnce()
+  })
+})
+
+describe('three players hitting the same player', () => {
+  const attacks = (value, receivedAt = 1000) => [1, 2, 3].map(seat => ({
+    id: `${value}-${seat}-${receivedAt}`, category: 'prop', value, seat, targetSeat: 0, receivedAt,
+  }))
+  it.each(['tomato', 'coffee', 'hammer'])('%s preserves all sounds, bounds their combined volume and merges simultaneous haptics', value => {
+    const playSound = vi.fn(), vibrateShort = vi.fn()
+    const feedback = createSocialFeedback({ getCues: getSocialFeedbackCues, playSound, vibrateShort })
+    const state = { phase: 'playing', socialSession: 1, user: { seat: 0 }, socialEvents: attacks(value) }
+    for (const at of [...new Set(getSocialFeedbackCues(state.socialEvents[0]).map(cue => cue.at))].sort((a, b) => a - b)) {
+      feedback.update(state, { now: 1000 + at })
+      feedback.update(state, { now: 1001 + at })
+    }
+    const soundsPerEvent = value === 'hammer' ? 3 : 2
+    expect(playSound).toHaveBeenCalledTimes(3 * soundsPerEvent)
+    const throwVolumes = playSound.mock.calls.filter(([name]) => name === 'social_throw.wav').map(([, volume]) => volume)
+    expect(throwVolumes).toHaveLength(3)
+    expect(throwVolumes.every(volume => volume > 0 && volume < .38)).toBe(true)
+    const recording = createSocialAudioAssets().find(asset => asset.file === 'social_throw.wav').pcm
+    let peak = 0
+    for (let i = 44; i < recording.length; i += 2) peak = Math.max(peak, Math.abs(recording.readInt16LE(i) / 32767))
+    expect(peak * throwVolumes.reduce((sum, volume) => sum + volume, 0)).toBeLessThan(1)
+    expect(vibrateShort).toHaveBeenCalledTimes(value === 'hammer' ? 2 : 1)
+    expect(vibrateShort.mock.calls[0][0].type).toBe(value === 'hammer' ? 'medium' : 'light')
+    const before = playSound.mock.calls.length
+    const lastCue = Math.max(...getSocialFeedbackCues(state.socialEvents[0]).map(cue => cue.at))
+    feedback.update({ ...state, socialEvents: [...state.socialEvents, ...state.socialEvents] }, { now: 1002 + lastCue })
+    expect(playSound).toHaveBeenCalledTimes(before)
+    const next = { ...state, socialEvents: [...state.socialEvents, ...attacks(value, 3000)] }
+    for (const cueAt of [...new Set(getSocialFeedbackCues(next.socialEvents[3]).map(cue => cue.at))].sort((a, b) => a - b))
+      feedback.update(next, { now: 3000 + cueAt })
+    expect(playSound).toHaveBeenCalledTimes(before * 2)
+    expect(vibrateShort).toHaveBeenCalledTimes(value === 'hammer' ? 4 : 2)
+  })
+
+  it('merges impacts arriving within 100 ms but preserves a later distinct hit and room reset', () => {
+    const playSound = vi.fn(), vibrateShort = vi.fn()
+    const feedback = createSocialFeedback({ getCues: getSocialFeedbackCues, playSound, vibrateShort })
+    const state = { phase: 'playing', socialSession: 1, user: { seat: 0 }, socialEvents: [attacks('tomato')[0]] }
+    feedback.update(state, { now: 1900 })
+    feedback.update({ ...state, socialEvents: [attacks('tomato', 1050)[1]] }, { now: 1950 })
+    expect(vibrateShort).toHaveBeenCalledTimes(1)
+    feedback.update({ ...state, socialEvents: [attacks('tomato', 1200)[2]] }, { now: 2100 })
+    expect(vibrateShort).toHaveBeenCalledTimes(2)
+    feedback.update({ ...state, socialSession: 2, socialEvents: [attacks('tomato', 1250)[0]] }, { now: 2150 })
+    expect(vibrateShort).toHaveBeenCalledTimes(3)
+  })
+
+  it('uses the strongest feedback for simultaneous mixed hits, and does not vibrate observers', () => {
+    const playSound = vi.fn(), vibrateShort = vi.fn()
+    const events = ['tomato', 'coffee', 'hammer'].map((value, index) => ({
+      ...attacks(value, 1900 - SOCIAL_PROP_TIMINGS[value].hit)[index],
+    }))
+    const feedback = createSocialFeedback({ getCues: getSocialFeedbackCues, playSound, vibrateShort })
+    const state = { phase: 'playing', socialSession: 1, user: { seat: 0 }, socialEvents: events }
+    feedback.update(state, { now: 1900 })
+    expect(vibrateShort).toHaveBeenCalledExactlyOnceWith({ type: 'medium', fail: expect.any(Function) })
+    feedback.update({ ...state, user: { seat: 2 }, socialSession: 2 }, { now: 1901 })
+    expect(vibrateShort).toHaveBeenCalledTimes(1)
   })
 })
 

@@ -20,6 +20,8 @@
 
 起手和命中配有随包的原创 PCM WAV 音效，由 `miniprogram/scripts/social-audio.mjs` 确定性生成，四段音效合计约 71 KiB。被击中的本机玩家在支持 `wx.vibrateShort` 的设备上获得短震动。关闭声音或屏蔽互动时不播放声音和震动；切到后台、恢复、离开房间不会补播旧音效。
 
+多人同时攻击一个目标时，杯子位置和锤柄角度按来源座位错开，各次飞溅使用不同的确定性形状。100 毫秒内的命中震动合并，单帧选择最强震动；相近时刻的音效保留每条录音，并降低各自音量以留出叠加余量。锤子的第二次砸击仍有独立反馈。
+
 同屏最多绘制最近四个有效道具；受击幅度有上限，结束后头像恢复原位。互动仍不影响手牌、分数和规则。
 
 ## 联机协议与发布
@@ -34,11 +36,12 @@
 
 - `pnpm exec vitest run --config miniprogram/vitest.config.mjs miniprogram/src/online.test.ts`：4 通过，验证微信网络适配、服务器广播接收、发送/目标座位转换、去重、断线禁发和离房清理。
 - `node miniprogram/scripts/social-online-smoke.mjs`：四个实际小游戏构建的浏览器宿主，通过微信网络 API 替身接入同一测试房间，真实触摸菜单发道具，再经 socket 消息进入生产解码器和桥接器。四种视角的目标头像像素均有变化，每人收到对应音效，只有目标本机震动；三类聊天、重复广播、断线和离房也通过。截图与报告在忽略的 `docs/evidence/miniprogram-social-online/`。此测试的房间传输为内存替身，真实后端广播由下一项独立验证。
-- 后端 `.venv/bin/python -m pytest tests/test_social.py -q`：23 通过。真实 WebSocket 测试连接四个客户端，验证三种道具、文字、短语和表情由服务端广播给全部四人，发送者和消息 ID 由服务端确定，保留真实两秒频率限制。
+- 后端 `.venv/bin/python -m pytest tests/test_social.py -q`：27 通过。真实 WebSocket 测试连接四个客户端，验证三种道具、文字、短语和表情由服务端广播给全部四人，发送者和消息 ID 由服务端确定，保留真实两秒频率限制。
+- `MINI_SOCIAL_CONCURRENT=1 node miniprogram/scripts/social-online-smoke.mjs`：三人同时向同一目标发三番茄、三咖啡、三锤子及混合道具，四视角均收齐事件、同时绘制、正确命中，音效无漏播/重播，其他玩家不震动。目标震动次数分别为 1/1/2/4；三杯和三柄可分辨，结束后像素完全恢复，手牌、比分、副露与弃牌不变。证据在忽略的 `docs/evidence/miniprogram-social-online-concurrent/`。后端对应四组参数化真实 WebSocket 并发测试，也验证三人的频控互不干扰、目标仍可回击。
 
 ## 动效增强验证
 
-- `pnpm test:mini`：91 通过；`pnpm typecheck:mini` 通过。
+- `pnpm test:mini`：98 通过；`pnpm typecheck:mini` 通过。包括每两秒连续两轮攻击同一目标时的绘制数量上限、头像恢复与消息历史保留。
 - `pnpm build:mini`：主包 1.77 MiB（96 个文件），低于 4 MiB 限制。
 - `node miniprogram/scripts/social-effects-preview.mjs`：实际小游戏构建在 844×390 和 667×320 上验证三种道具的飞行、命中、余效、四座位目标反馈和动画结束恢复。截图、可播放 APNG 与报告保存在忽略的 `docs/evidence/miniprogram-social-v2/`；`index.html` 同时展示六幅循环动画。
 - `node miniprogram/scripts/social-smoke.mjs`：聊天、文字、三种道具发送、消息记录、紧凑布局与表情菜单回归通过。

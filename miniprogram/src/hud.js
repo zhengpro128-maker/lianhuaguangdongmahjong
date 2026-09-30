@@ -478,7 +478,7 @@ export class MiniHud {
       const label = Array.from(socialLabel(event)), preview = label.length > 26 ? label.slice(0, 25).join('') + '…' : label.join('')
       this.wrapped(preview, x + 10, y + 14, bw - 20, 12, 16, '#244331', 2)
     }
-    drawSocialPropEffects(this.ctx, props, anchor, this.width, this.height, now)
+    drawSocialPropEffects(this.ctx, this.state.socialEvents, anchor, this.width, this.height, now)
   }
 
   hasResult() { return !!this.state.result && ['settled', 'finished'].includes(this.state.phase) || !!this.state.matchFinished }

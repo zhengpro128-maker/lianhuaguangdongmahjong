@@ -66,6 +66,7 @@ pnpm typecheck
 pnpm typecheck:mini
 pnpm test:mini:e2e  # 同一份小游戏 UMD 包的浏览器宿主测试
 node miniprogram/scripts/social-online-smoke.mjs # 四客户端联机互动、座位与反馈
+MINI_SOCIAL_CONCURRENT=1 node miniprogram/scripts/social-online-smoke.mjs # 三人同时攻击同一目标
 pnpm preview:mini  # http://127.0.0.1:4176
 ```
 
