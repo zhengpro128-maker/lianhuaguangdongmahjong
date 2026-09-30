@@ -6,6 +6,8 @@ import { createMiniGame } from './game-bridge.ts'
 import { ThreeTable } from './three-table.js'
 import { MiniHud } from './hud.js'
 import { createMiniAudio } from './audio.js'
+import { getSocialFeedbackCues } from './social-effects.js'
+import { createSocialFeedback } from './social-feedback.js'
 import { getJoinableRooms } from '../../src/game/online/api/roomApi.ts'
 
 const SETTINGS_KEY = 'wuhan-mini.settings.v1'
@@ -38,6 +40,8 @@ export function bootMiniGame(wxApi = globalThis.wx) {
   const settings = { ruleVariant: 'wuhan-huanghuang', matchType: normalizeMiniMatch(saved.matchType) }
   let soundEnabled = saved.soundEnabled !== false
   const audio = createMiniAudio(wxApi, soundEnabled)
+  const socialFeedback = createSocialFeedback({ getCues: getSocialFeedbackCues,
+    playSound: audio.playSound, vibrateShort: options => wxApi.vibrateShort?.(options) })
   let system = windowInfo(wxApi)
   let game, hud, table
   let visible = true, disposed = false, dirty = true, overlayDirty = true
@@ -90,6 +94,8 @@ export function bootMiniGame(wxApi = globalThis.wx) {
         overlayDirty = true; dirty = false
       }
       if (hud.socialAnimating) hud.render()
+      socialFeedback.update(hud.state, { enabled: soundEnabled, muted: hud.socialMuted, visible,
+        now: Date.now() })
       syncLoginButton()
       if (overlayDirty) { table.markOverlayDirty(); overlayDirty = false }
       table.render(time); lastFrame = time
@@ -261,7 +267,7 @@ export function bootMiniGame(wxApi = globalThis.wx) {
     table = new ThreeTable(canvas, system, { invalidate,
       onError: error => { loadError = String(error?.message || error); invalidate() } })
   } catch (error) {
-    game.dispose(); hud.dispose?.(); audio.dispose()
+    game.dispose(); hud.dispose?.(); socialFeedback.dispose(); audio.dispose()
     throw error
   }
   table.setOverlay(hud.canvas)
@@ -292,7 +298,7 @@ export function bootMiniGame(wxApi = globalThis.wx) {
     loginButton?.hide()
     visible = false; touchStart = null
     if (frame !== null) { cancelFrame(frame); frame = null }
-    audio.setHidden(true); game.pause?.()
+    socialFeedback.setHidden(true); audio.setHidden(true); game.pause?.()
   }
   const onResize = event => {
     system = { ...windowInfo(wxApi), ...event?.size }
@@ -302,7 +308,7 @@ export function bootMiniGame(wxApi = globalThis.wx) {
   const onShow = options => {
     if (disposed) return
     visible = true; lastFrame = 0
-    audio.setHidden(false); game.resume?.(); onResize()
+    socialFeedback.setHidden(false); audio.setHidden(false); game.resume?.(); onResize()
     const invitedRoom = sharedRoomId(options)
     if (invitedRoom) {
       pendingInviteRoom = invitedRoom
@@ -342,7 +348,7 @@ export function bootMiniGame(wxApi = globalThis.wx) {
         canvas.removeEventListener('touchstart', onTouchStart); canvas.removeEventListener('touchend', onTouchEnd)
         canvas.removeEventListener('touchcancel', onTouchCancel)
       }
-      game.dispose(); hud.dispose?.(); table.dispose(); audio.dispose()
+      game.dispose(); hud.dispose?.(); table.dispose(); socialFeedback.dispose(); audio.dispose()
       wxApi.setKeepScreenOn?.({ keepScreenOn: false })
     },
   }

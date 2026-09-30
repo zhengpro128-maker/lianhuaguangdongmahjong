@@ -527,6 +527,30 @@
       "target": "assets/audio/zimo.mp3",
       "sourceSha256": "92637eca8757d30632730ee8fce038a90ee6bed0994e371332e784e2e2b1526f",
       "bytes": 3417
+    },
+    {
+      "source": "miniprogram/scripts/social-audio.mjs",
+      "target": "assets/audio/social_throw.wav",
+      "sourceSha256": "2fd1613eb8ae9f943d15d66b1443635d95f77aed00456d1f363d43f00a32d854",
+      "bytes": 9306
+    },
+    {
+      "source": "miniprogram/scripts/social-audio.mjs",
+      "target": "assets/audio/social_tomato.wav",
+      "sourceSha256": "2fd1613eb8ae9f943d15d66b1443635d95f77aed00456d1f363d43f00a32d854",
+      "bytes": 16802
+    },
+    {
+      "source": "miniprogram/scripts/social-audio.mjs",
+      "target": "assets/audio/social_coffee.wav",
+      "sourceSha256": "2fd1613eb8ae9f943d15d66b1443635d95f77aed00456d1f363d43f00a32d854",
+      "bytes": 30472
+    },
+    {
+      "source": "miniprogram/scripts/social-audio.mjs",
+      "target": "assets/audio/social_hammer.wav",
+      "sourceSha256": "2fd1613eb8ae9f943d15d66b1443635d95f77aed00456d1f363d43f00a32d854",
+      "bytes": 15920
     }
   ]
 }
