@@ -24,6 +24,7 @@ pnpm build:mini
 - 顶部信息、两侧头像和底部手牌使用独立区域，WebGL 牌桌在中间区域渲染；兼容横屏安全区和微信胶囊。昵称仅显示一次，长昵称截断。
 - 显示听牌提示、癞子、庄家、当前出牌者、剩余牌数、四家分数与结算明细。
 - 托管可切换；音效和场次选择保存在微信本地存储。离开当前对局需在游戏内确认。
+- 单机和联机牌桌均可发送文字、快捷短语、表情；点击其他玩家头像可扔番茄、倒咖啡、砸锤子，带飞行/倾倒/挥击、头像反馈与音效。联机由服务器广播给同桌所有玩家，部署要求与使用说明见 [牌桌互动](../docs/miniprogram-social.md)。
 
 ## 微信登录与联机
 
@@ -51,8 +52,10 @@ pnpm build:mini
 | 四家头像 | `public/avatars/*.svg` 转 PNG |
 | 大厅预览 | `public/themes/lobby/v1/jade.png` 压缩 |
 | 报牌与操作音效 | `public/audio/*.mp3` 原文件 |
+| 道具动画与头像反馈 | `miniprogram/src/social-effects.js` 原生 Canvas 路径和时间轴 |
+| 道具起手与命中音效 | `miniprogram/scripts/social-audio.mjs` 生成的原创 WAV |
 
-`assets/manifest.json` 记录来源、原文件 SHA-256 和打包尺寸。资源全部来自现有浏览器版，没有新增名称衍生视觉。运行时使用微信 `createImage` / `createCanvas` / `createInnerAudioContext` 加载包内文件。
+`assets/manifest.json` 记录来源、来源文件 SHA-256 和打包尺寸。牌桌和牌面复用现有浏览器资源，互动道具与音效为本地绘制和生成，没有新增名称衍生视觉。运行时使用微信 `createImage` / `createCanvas` / `createInnerAudioContext` 加载包内文件。
 
 ## 验证
 
@@ -62,6 +65,7 @@ pnpm test          # 浏览器共享逻辑回归测试
 pnpm typecheck
 pnpm typecheck:mini
 pnpm test:mini:e2e  # 同一份小游戏 UMD 包的浏览器宿主测试
+node miniprogram/scripts/social-online-smoke.mjs # 四客户端联机互动、座位与反馈
 pnpm preview:mini  # http://127.0.0.1:4176
 ```
 
