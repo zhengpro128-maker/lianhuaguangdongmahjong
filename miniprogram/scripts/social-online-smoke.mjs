@@ -9,9 +9,10 @@ import { readFile, mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { createPreviewServer } from './preview.mjs'
 
-const roomId = 'ABC234', output = path.resolve('docs/evidence/miniprogram-social-online')
+const concurrent = process.env.MINI_SOCIAL_CONCURRENT === '1'
+const roomId = 'ABC234', output = path.resolve(`docs/evidence/miniprogram-social-online${concurrent ? '-concurrent' : ''}`)
 const clients = [], connected = new Set(), sent = [], requests = [], broadcasts = []
-const report = { interactions: [], messages: [], disconnected: null, left: null }
+const report = { interactions: [], messages: [], concurrent: [], disconnected: null, left: null }
 const hand = ['m1', 'm2', 'm3', 'p2', 'p3', 'p4', 's2', 's3', 's4', 'm6', 'm7', 'p8', 'p9']
 const info = () => ({ roomId, mode: 'rounds4', rulesetId: 'wuhan-huanghuang', capacity: 4, creatorSeat: 0, status: 'playing',
   seats: Array.from({ length: 4 }, (_, seat) => ({ seat, nickname: `联机玩家${seat}`, ready: true, connected: connected.has(seat) })) })
@@ -65,6 +66,111 @@ function checkRotations(event, states) {
     assert.equal(state.event.seat, (event.seat - viewer + 4) % 4, `Sender is rotated for viewer ${viewer}`)
     if (event.category === 'prop') assert.equal(state.event.targetSeat, (event.targetSeat - viewer + 4) % 4, `Target is rotated for viewer ${viewer}`)
     assert.equal(state.event.category, event.category); assert.equal(state.event.value, event.value)
+  }
+}
+
+async function simultaneousTargetScenarios() {
+  const target = 3, timings = { tomato: { hit: 900, end: 2900 }, coffee: { hit: 1280, end: 3600 }, hammer: { hit: 1120, end: 3050 } }
+  const scenarios = [['tomato-3', ['tomato', 'tomato', 'tomato']], ['coffee-3', ['coffee', 'coffee', 'coffee']],
+    ['hammer-3', ['hammer', 'hammer', 'hammer']], ['mixed-3', ['tomato', 'coffee', 'hammer']]]
+  // Observe native drawing transforms, rather than importing a reaction helper:
+  // the same production drawSeat call must actually move the target card.
+  await Promise.all(clients.map(({ page }) => page.evaluate(() => {
+    const hud = window.mini.hud, seat = hud.drawSeat.bind(hud), ctx = hud.ctx
+    window.__seatTransforms = {}; let drawing = null
+    for (const method of ['translate', 'rotate', 'scale']) {
+      const original = ctx[method].bind(ctx)
+      ctx[method] = (...args) => { if (drawing && !drawing[method]) drawing[method] = args; return original(...args) }
+    }
+    hud.drawSeat = (...args) => {
+      drawing = {}; try { return seat(...args) }
+      finally { window.__seatTransforms[args[1]] = drawing; drawing = null }
+    }
+  })))
+  for (const [name, values] of scenarios) {
+    const before = await Promise.all(clients.map(({ page }) => page.evaluate(() => ({
+      sounds: window.__socialSounds.length, haptics: window.__socialHaptics.length,
+      players: window.mini.snapshot().players.map(player => ({ hand: player.hand, score: player.score, melds: player.melds, discards: player.discards })),
+    }))))
+    const first = broadcasts.length
+    await Promise.all(values.map(async (value, sender) => {
+      await tap(clients[sender].page, { local: 'social-target', seat: (target - sender + 4) % 4 })
+      await tapProp(clients[sender].page, value)
+    }))
+    await clients[0].page.waitForFunction(first => window.mini.snapshot().socialEvents.length >= first + 3, first)
+    const events = broadcasts.slice(first), ids = events.map(event => event.id)
+    assert.equal(events.length, 3); assert.equal(new Set(ids).size, 3)
+    assert.deepEqual(events.map(event => event.seat).sort(), [0, 1, 2])
+    for (const event of events) { assert.equal(event.targetSeat, target); checkRotations(event, await eventsAfter(event.id)) }
+    const inspectFrame = (page, age) => page.evaluate(({ ids, age, timings }) => {
+      const hud = window.mini.hud, events = hud.state.socialEvents.filter(event => ids.includes(event.id))
+      const now = Math.max(...events.map(event => event.receivedAt)) + age
+      hud.socialMuted = true; hud.render(now)
+      const baseline = hud.ctx.getImageData(0, 0, hud.canvas.width, hud.canvas.height), localTarget = events[0].targetSeat
+      const still = structuredClone(window.__seatTransforms[localTarget])
+      hud.socialMuted = false; hud.render(now)
+      const active = hud.ctx.getImageData(0, 0, hud.canvas.width, hud.canvas.height), move = window.__seatTransforms[localTarget]
+      const card = hud.layout.seats[localTarget], side = card.w < 80 ? 24 : Math.min(card.h - 12, 32)
+      const ax = card.w < 80 ? card.x + (card.w - side) / 2 : card.x + 6, ay = card.y + (card.w < 80 ? 4 : 6)
+      let changed = 0, avatarChanged = 0
+      for (let pixel = 0; pixel < active.data.length; pixel += 4) {
+        const delta = Math.abs(active.data[pixel] - baseline.data[pixel]) + Math.abs(active.data[pixel+1] - baseline.data[pixel+1]) + Math.abs(active.data[pixel+2] - baseline.data[pixel+2]) + Math.abs(active.data[pixel+3] - baseline.data[pixel+3])
+        if (delta <= 20) continue
+        changed++
+        const x = pixel / 4 % active.width, y = Math.floor(pixel / 4 / active.width)
+        if (x >= ax && x < ax + side && y >= ay && y < ay + side) avatarChanged++
+      }
+      return { localTarget, changed, avatarChanged, animating: hud.socialAnimating,
+        active: events.filter(event => now >= event.receivedAt && now - event.receivedAt < timings[event.value].end).length,
+        reaction: { x: move.translate[0] - still.translate[0], y: move.translate[1] - still.translate[1],
+          rotation: move.rotate[0] - still.rotate[0], sx: move.scale[0] / still.scale[0], sy: move.scale[1] / still.scale[1] } }
+    }, { ids, age, timings })
+    const end = Math.max(...values.map(value => timings[value].end)), stages = []
+    for (const [phase, age] of [['flight', 460], ['impact', Math.max(...values.map(value => timings[value].hit)) + 100], ['residue', Math.min(...values.map(value => timings[value].end)) - 700]]) {
+      await clients[0].page.waitForFunction(({ ids, age }) => Date.now() - Math.max(...window.mini.hud.state.socialEvents.filter(event => ids.includes(event.id)).map(event => event.receivedAt)) >= age, { ids, age })
+      const frames = await Promise.all(clients.map(async ({ page }, viewer) => {
+        const frame = await inspectFrame(page, age)
+        assert.equal(frame.active, 3); assert.equal(frame.animating, true); assert.ok(frame.changed > 50)
+        assert.equal(frame.localTarget, (target - viewer + 4) % 4)
+        if (phase === 'impact') assert.ok(frame.avatarChanged > 10)
+        assert.ok(Math.abs(frame.reaction.x) <= 9.01 && Math.abs(frame.reaction.y) <= 7.01, 'Overlapping reactions stay within position bounds')
+        assert.ok(Math.abs(frame.reaction.rotation) <= .121 && frame.reaction.sx >= .899 && frame.reaction.sx <= 1.161 && frame.reaction.sy >= .779 && frame.reaction.sy <= 1.101, 'Overlapping reactions stay within squash/rotation bounds')
+        await page.screenshot({ path: path.join(output, `${name}-${phase}-viewer-${viewer}.png`) })
+        return { viewer, ...frame }
+      }))
+      stages.push({ phase, age, frames })
+    }
+    await clients[0].page.waitForFunction(({ ids, end }) => Date.now() - Math.max(...window.mini.hud.state.socialEvents.filter(event => ids.includes(event.id)).map(event => event.receivedAt)) >= end + 100, { ids, end })
+    const restored = await Promise.all(clients.map(async ({ page }, viewer) => {
+      const frame = await inspectFrame(page, end + 100)
+      assert.equal(frame.active, 0); assert.equal(frame.animating, false); assert.equal(frame.changed, 0, 'All concurrent effects fully disappear')
+      const players = await page.evaluate(() => window.mini.snapshot().players.map(player => ({ hand: player.hand, score: player.score, melds: player.melds, discards: player.discards })))
+      assert.deepEqual(players, before[viewer].players, 'Interactions leave hands, scores, melds and discards unchanged')
+      return { viewer, ...frame }
+    }))
+    const feedback = await Promise.all(clients.map(({ page }, viewer) => page.evaluate(before => ({
+      sounds: window.__socialSounds.slice(before.sounds), haptics: window.__socialHaptics.slice(before.haptics),
+    }), before[viewer])))
+    for (const [viewer, cue] of feedback.entries()) {
+      const maximum = { throw: 3 }
+      for (const value of values) maximum[value] = (maximum[value] || 0) + (value === 'hammer' ? 2 : 1)
+      for (const [kind, limit] of Object.entries(maximum)) {
+        const count = cue.sounds.filter(sound => sound.source.endsWith(`social_${kind}.wav`)).length
+        assert.equal(count, limit, `Every ${kind} cue plays once; volume may be reduced for concurrent voices`)
+      }
+      assert.equal(viewer === target ? cue.haptics.length > 0 : cue.haptics.length === 0, true, 'Only the target client can vibrate')
+    }
+    await Promise.all(events.flatMap(event => [...connected].map(seat => deliver(seat, event))))
+    await clients[0].page.waitForTimeout(150)
+    for (const [viewer, { page }] of clients.entries()) {
+      const after = await page.evaluate(ids => ({ copies: ids.map(id => window.mini.snapshot().socialEvents.filter(event => event.id === id).length), sounds: window.__socialSounds.length, haptics: window.__socialHaptics.length }), ids)
+      assert.deepEqual(after.copies, [1, 1, 1])
+      assert.equal(after.sounds, before[viewer].sounds + feedback[viewer].sounds.length)
+      assert.equal(after.haptics, before[viewer].haptics + feedback[viewer].haptics.length)
+    }
+    report.concurrent.push({ name, values, events, stages, restored, feedback })
+    console.log(`PASS concurrent: ${name}; three unique events, four views, bounded reactions, clean recovery and unchanged game state.`)
+    await clients[0].page.waitForTimeout(2000)
   }
 }
 
@@ -123,7 +229,7 @@ try {
       wx.vibrateShort = options => { window.__socialHaptics.push({ type:options.type, at:Date.now() }); options.success?.({}); };
       wx.createInnerAudioContext = () => {
         const audio = { source:'', volume:0, set src(value) { this.source=value }, onEnded(fn) { this.ended=fn }, onError() {}, onStop() {},
-          play() { window.__socialSounds.push({ source:this.source, at:Date.now() }); Promise.resolve().then(()=>this.ended?.()) }, destroy() {} };
+          play() { window.__socialSounds.push({ source:this.source, volume:this.volume, at:Date.now() }); Promise.resolve().then(()=>this.ended?.()) }, destroy() {} };
         return audio;
       };
       window.__socialDeliver = message => { for (const socket of window.__socialSockets) if (!socket.closed) socket.message?.({ data:JSON.stringify(message) }); };
@@ -148,6 +254,8 @@ try {
   }
   assert.equal(connected.size, 4)
   for (const { page } of clients) await page.evaluate(() => { window.__socialSounds.length = 0; window.__socialHaptics.length = 0 })
+  if (concurrent) await simultaneousTargetScenarios()
+  else {
   for (const [sender, value] of ['tomato', 'coffee', 'hammer'].entries()) {
     const target = sender + 1, page = clients[sender].page, counts = await Promise.all(clients.map(({ page }) => page.evaluate(() => ({ sounds: window.__socialSounds.length, haptics: window.__socialHaptics.length }))))
     await tap(page, { local: 'social-target', seat: 1 }); await tapProp(page, value)
@@ -200,6 +308,7 @@ try {
     const event = broadcasts.at(-1), states = await eventsAfter(event.id)
     checkRotations(event, states); report.messages.push({ event, rotations: states.map(state => state.event) })
   }
+  }
   const offline = clients[3].page
   await offline.evaluate(() => { window.__socialDisconnected = true; window.__socialSockets.find(socket => !socket.closed)?.close() })
   await offline.waitForFunction(() => window.mini.snapshot().online.status !== 'connected')
@@ -220,7 +329,7 @@ try {
   report.left = { prevented: true, sendCount: beforeLeave }
   for (const client of clients) assert.deepEqual(client.errors, [], `No runtime errors for client ${client.seat}`)
   await writeFile(path.join(output, 'report.json'), JSON.stringify({ ...report, requests, sent, broadcasts }, null, 2))
-  console.log(`PASS: four authenticated native clients; real HUD sends and shared room broadcasts; seat rotation, all prop animation/audio, target-only haptics, duplicate suppression, text/phrase/emoji, offline and leave guards. Evidence: ${output}`)
+  console.log(`PASS: four authenticated native clients; ${concurrent ? 'simultaneous three-player same-target props, bounded reactions, clean recovery and unchanged hands/scores' : 'all prop animation/audio, text/phrase/emoji'}; real HUD sends, room broadcasts, seat rotation, target-only haptics, duplicate suppression, offline and leave guards. Evidence: ${output}`)
 } finally {
   for (const { page } of clients) await page.evaluate(() => window.mini?.dispose()).catch(() => {})
   await browser.close(); server.close()
